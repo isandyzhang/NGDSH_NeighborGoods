@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NeighborGoods.Web.Data;
 
@@ -11,9 +12,11 @@ using NeighborGoods.Web.Data;
 namespace NeighborGoods.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251225100656_AddReviews")]
+    partial class AddReviews
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -242,33 +245,22 @@ namespace NeighborGoods.Web.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("ListingId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("Participant1Id")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<DateTime?>("Participant1LastReadAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Participant2Id")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("Participant2LastReadAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ListingId");
-
                     b.HasIndex("Participant2Id");
 
-                    b.HasIndex("Participant1Id", "Participant2Id", "ListingId");
+                    b.HasIndex("Participant1Id", "Participant2Id");
 
                     b.ToTable("Conversations");
                 });
@@ -471,12 +463,6 @@ namespace NeighborGoods.Web.Migrations
 
             modelBuilder.Entity("NeighborGoods.Web.Models.Entities.Conversation", b =>
                 {
-                    b.HasOne("NeighborGoods.Web.Models.Entities.Listing", "Listing")
-                        .WithMany()
-                        .HasForeignKey("ListingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("NeighborGoods.Web.Models.Entities.ApplicationUser", "Participant1")
                         .WithMany()
                         .HasForeignKey("Participant1Id")
@@ -488,8 +474,6 @@ namespace NeighborGoods.Web.Migrations
                         .HasForeignKey("Participant2Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Listing");
 
                     b.Navigation("Participant1");
 

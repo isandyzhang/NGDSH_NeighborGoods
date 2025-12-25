@@ -58,5 +58,15 @@ public class ListingDetailsViewModel
     /// 是否為商品擁有者。
     /// </summary>
     public bool IsOwner { get; set; } = false;
+
+    /// <summary>
+    /// 賣家總成交件數（只計算有評價的交易）
+    /// </summary>
+    public int SellerTotalCompletedTransactions { get; set; }
+
+    /// <summary>
+    /// 賣家平均評分（只計算有評價的交易）
+    /// </summary>
+    public double SellerAverageRating { get; set; }
 }
 

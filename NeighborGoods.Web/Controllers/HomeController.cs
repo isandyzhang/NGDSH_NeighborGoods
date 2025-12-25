@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Web.Data;
+using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
@@ -10,17 +11,19 @@ using NeighborGoods.Web.Models.ViewModels;
 
 namespace NeighborGoods.Web.Controllers;
 
-public class HomeController : Controller
+public class HomeController : BaseController
 {
     private readonly ILogger<HomeController> _logger;
     private readonly AppDbContext _db;
-    private readonly UserManager<ApplicationUser> _userManager;
 
-    public HomeController(ILogger<HomeController> logger, AppDbContext db, UserManager<ApplicationUser> userManager)
+    public HomeController(
+        ILogger<HomeController> logger, 
+        AppDbContext db,
+        UserManager<ApplicationUser> userManager)
+        : base(userManager)
     {
         _logger = logger;
         _db = db;
-        _userManager = userManager;
     }
 
     public async Task<IActionResult> Index(
@@ -30,19 +33,33 @@ public class HomeController : Controller
         int? minPrice,
         int? maxPrice,
         bool? isFree,
-        bool? isCharity)
+        bool? isCharity,
+        int page = 1)
     {
-        // 建立查詢
+        // 取得當前登入用戶（如果有的話）
+        var currentUser = await GetCurrentUserAsync();
+        var currentUserId = currentUser?.Id;
+
+        // 建立查詢基礎（不使用 Include，改用投影查詢）
         var query = _db.Listings
-            .Include(l => l.Images)
-            .Include(l => l.Seller)
             .Where(l => l.Status == ListingStatus.Active);
 
+        // 如果用戶已登入，排除自己的商品
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            query = query.Where(l => l.SellerId != currentUserId);
+        }
+
         // 關鍵字搜尋（標題或描述）
+        // 優化：限制搜尋長度，避免過短的搜尋詞影響效能
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchTerm = search.Trim();
-            query = query.Where(l => l.Title.Contains(searchTerm) || l.Description.Contains(searchTerm));
+            // 至少需要 2 個字元才進行搜尋
+            if (searchTerm.Length >= 2)
+            {
+                query = query.Where(l => l.Title.Contains(searchTerm) || l.Description.Contains(searchTerm));
+            }
         }
 
         // 分類篩選
@@ -80,28 +97,35 @@ public class HomeController : Controller
             query = query.Where(l => l.IsCharity == true);
         }
 
-        // 執行查詢並排序
-        var listings = await query
-            .OrderByDescending(l => l.CreatedAt)
-            .ToListAsync();
+        // 計算總數
+        var totalCount = await query.CountAsync();
 
-        // 轉換為 ViewModel
-        var viewModels = listings.Select(l => new ListingIndexViewModel
-        {
-            Id = l.Id,
-            Title = l.Title,
-            Category = l.Category,
-            Condition = l.Condition,
-            Price = l.Price,
-            IsFree = l.IsFree,
-            IsCharity = l.IsCharity,
-            Status = l.Status,
-            FirstImageUrl = l.Images
-                .OrderBy(img => img.SortOrder)
-                .FirstOrDefault()?.ImageUrl,
-            SellerDisplayName = l.Seller?.DisplayName ?? "未知賣家",
-            CreatedAt = l.CreatedAt
-        }).ToList();
+        // 使用投影查詢，只選擇需要的欄位
+        // 注意：在投影查詢中，EF Core 會自動處理關聯，不需要 Include
+        var viewModels = await query
+            .OrderByDescending(l => l.CreatedAt)
+            .Skip((page - 1) * 10)
+            .Take(10)
+            .Select(l => new ListingIndexViewModel
+            {
+                Id = l.Id,
+                Title = l.Title,
+                Category = l.Category,
+                Condition = l.Condition,
+                Price = l.Price,
+                IsFree = l.IsFree,
+                IsCharity = l.IsCharity,
+                Status = l.Status,
+                CreatedAt = l.CreatedAt,
+                // 只取第一張圖片的 URL（資料庫端處理）
+                FirstImageUrl = l.Images
+                    .OrderBy(img => img.SortOrder)
+                    .Select(img => img.ImageUrl)
+                    .FirstOrDefault(),
+                // 只取賣家顯示名稱（EF Core 會自動處理關聯查詢）
+                SellerDisplayName = l.Seller != null ? (l.Seller.DisplayName ?? "未知賣家") : "未知賣家"
+            })
+            .ToListAsync();
 
         // 建立搜尋 ViewModel
         var searchViewModel = new ListingSearchViewModel
@@ -113,8 +137,23 @@ public class HomeController : Controller
             MaxPrice = maxPrice,
             IsFree = isFree,
             IsCharity = isCharity,
-            Listings = viewModels
+            Listings = viewModels,
+            Page = page,
+            PageSize = 10,
+            TotalCount = totalCount
         };
+
+        // 如果是 AJAX 請求，返回 JSON
+        if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+        {
+            return Json(new
+            {
+                listings = viewModels,
+                hasMore = searchViewModel.HasMore,
+                page = page,
+                totalCount = totalCount
+            });
+        }
 
         return View(searchViewModel);
     }
@@ -133,32 +172,36 @@ public class HomeController : Controller
 
     /// <summary>
     /// 計算當前用戶的未讀訊息數量
-    /// 邏輯：計算所有對話中，最後一則訊息不是由當前用戶發送的對話數量
+    /// 邏輯：計算所有對話中，在最後已讀時間之後且不是由當前用戶發送的訊息數量
+    /// 優化：使用單一查詢避免 N+1 問題
     /// </summary>
     public async Task<int> GetUnreadMessageCountAsync(string userId)
     {
         try
         {
-            var conversations = await _db.Conversations
-                .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
-                .Where(c => c.Participant1Id == userId || c.Participant2Id == userId)
-                .ToListAsync();
+            // 使用單一查詢計算所有對話的未讀數量
+            // 分別處理 Participant1 和 Participant2 的情況
+            var unreadCount1 = await (
+                from c in _db.Conversations
+                where c.Participant1Id == userId
+                from m in _db.Messages
+                where m.ConversationId == c.Id
+                    && m.SenderId != userId
+                    && (c.Participant1LastReadAt == null || m.CreatedAt > c.Participant1LastReadAt.Value)
+                select m
+            ).CountAsync();
 
-            int unreadCount = 0;
-            foreach (var conversation in conversations)
-            {
-                var lastMessage = conversation.Messages
-                    .OrderByDescending(m => m.CreatedAt)
-                    .FirstOrDefault();
+            var unreadCount2 = await (
+                from c in _db.Conversations
+                where c.Participant2Id == userId
+                from m in _db.Messages
+                where m.ConversationId == c.Id
+                    && m.SenderId != userId
+                    && (c.Participant2LastReadAt == null || m.CreatedAt > c.Participant2LastReadAt.Value)
+                select m
+            ).CountAsync();
 
-                // 如果最後一則訊息存在且不是當前用戶發送的，則視為有未讀訊息
-                if (lastMessage != null && lastMessage.SenderId != userId)
-                {
-                    unreadCount++;
-                }
-            }
-
-            return unreadCount;
+            return unreadCount1 + unreadCount2;
         }
         catch (Exception ex)
         {

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Web.Data;
+using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Models.ViewModels;
@@ -12,10 +13,9 @@ using NeighborGoods.Web.Utils;
 namespace NeighborGoods.Web.Controllers;
 
 [Authorize]
-public class ListingController : Controller
+public class ListingController : BaseController
 {
     private readonly AppDbContext _db;
-    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IBlobService _blobService;
     private readonly ILogger<ListingController> _logger;
 
@@ -36,9 +36,9 @@ public class ListingController : Controller
         UserManager<ApplicationUser> userManager,
         IBlobService blobService,
         ILogger<ListingController> logger)
+        : base(userManager)
     {
         _db = db;
-        _userManager = userManager;
         _blobService = blobService;
         _logger = logger;
     }
@@ -75,109 +75,159 @@ public class ListingController : Controller
             return View(model);
         }
 
-        var user = await _userManager.GetUserAsync(User);
+        var user = await GetCurrentUserAsync();
         if (user == null)
         {
             return Challenge(); // 要求重新登入
         }
 
-        // 處理免費邏輯：價格為 0 時自動設定為免費商品
-        if (model.Price == 0)
+        // 檢查每日上傳限制（每帳號每天最多 10 個商品）
+        var todayStart = TaiwanTime.Now.Date;
+        var todayEnd = todayStart.AddDays(1);
+        var todayListingCount = await _db.Listings
+            .CountAsync(l => l.SellerId == user.Id && 
+                             l.CreatedAt >= todayStart && 
+                             l.CreatedAt < todayEnd);
+
+        if (todayListingCount >= 10)
         {
+            ModelState.AddModelError(string.Empty, "您今天已達到上傳上限（10 個商品），請明天再試");
+            return View(model);
+        }
+
+        // 處理免費邏輯
+        if (model.Price > 0 && model.IsFree)
+        {
+            // 如果使用者有輸入價格且勾選了免費商品，自動取消免費商品的勾選
+            model.IsFree = false;
+        }
+        else if (model.Price == 0)
+        {
+            // 價格為 0 時自動設定為免費商品
             model.IsFree = true;
         }
-        // 如果勾選免費索取，價格強制為 0
-        else if (model.IsFree)
+        else if (model.IsFree && model.Price > 0)
         {
+            // 如果勾選免費索取但價格 > 0，價格強制為 0（這個情況理論上不會發生，因為前端已經處理）
             model.Price = 0;
         }
 
         var now = TaiwanTime.Now;
 
-        var listing = new Listing
+        // 使用資料庫交易確保資料一致性
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
         {
-            Id = Guid.NewGuid(),
-            Title = model.Title,
-            Description = model.Description,
-            Category = model.Category,
-            Condition = model.Condition,
-            PickupLocation = model.PickupLocation,
-            Price = model.Price,
-            IsFree = model.IsFree,
-            IsCharity = model.IsCharity,
-            Status = ListingStatus.Active,
-            SellerId = user.Id,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        _db.Listings.Add(listing);
-        await _db.SaveChangesAsync(); // 先儲存以取得 listing.Id
-
-        // 處理圖片上傳（最多 5 張）
-        images = new[]
-        {
-            model.Image1,
-            model.Image2,
-            model.Image3,
-            model.Image4,
-            model.Image5
-        };
-
-        for (var i = 0; i < images.Length; i++)
-        {
-            var image = images[i];
-            if (image == null || image.Length == 0)
+            var listing = new Listing
             {
-                continue; // 跳過未上傳的圖片
-            }
+                Id = Guid.NewGuid(),
+                Title = model.Title,
+                Description = model.Description,
+                Category = model.Category,
+                Condition = model.Condition,
+                PickupLocation = model.PickupLocation,
+                Price = model.Price,
+                IsFree = model.IsFree,
+                IsCharity = model.IsCharity,
+                Status = ListingStatus.Active,
+                SellerId = user.Id,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
-            // 驗證檔案大小
-            if (image.Length > MaxFileSize)
+            _db.Listings.Add(listing);
+            await _db.SaveChangesAsync(); // 先儲存以取得 listing.Id
+
+            // 處理圖片上傳（最多 5 張）
+            images = new[]
             {
-                _logger.LogWarning("圖片 {Index} 超過大小限制：{Size} bytes", i + 1, image.Length);
-                ModelState.AddModelError($"Image{i + 1}", $"圖片大小不能超過 {MaxFileSize / 1024 / 1024}MB");
-                continue;
-            }
+                model.Image1,
+                model.Image2,
+                model.Image3,
+                model.Image4,
+                model.Image5
+            };
 
-            // 驗證檔案類型
-            if (!AllowedContentTypes.Contains(image.ContentType.ToLowerInvariant()))
+            var successfulImageCount = 0;
+            var imageSortOrder = 0;
+
+            for (var i = 0; i < images.Length; i++)
             {
-                _logger.LogWarning("圖片 {Index} 格式不允許：{ContentType}", i + 1, image.ContentType);
-                ModelState.AddModelError($"Image{i + 1}", "只允許上傳 jpg, jpeg, png, gif, webp, heic, heif 格式的圖片");
-                continue;
-            }
-
-            try
-            {
-                // 上傳圖片到 Blob Storage
-                var blobUrl = await _blobService.UploadListingImageAsync(
-                    listing.Id,
-                    image.OpenReadStream(),
-                    image.ContentType,
-                    i);
-
-                // 建立圖片記錄
-                _db.ListingImages.Add(new ListingImage
+                var image = images[i];
+                if (image == null || image.Length == 0)
                 {
-                    Id = Guid.NewGuid(),
-                    ListingId = listing.Id,
-                    ImageUrl = blobUrl,
-                    SortOrder = i,
-                    CreatedAt = now
-                });
+                    continue; // 跳過未上傳的圖片
+                }
+
+                // 驗證檔案大小
+                if (image.Length > MaxFileSize)
+                {
+                    _logger.LogWarning("圖片 {Index} 超過大小限制：{Size} bytes", i + 1, image.Length);
+                    ModelState.AddModelError($"Image{i + 1}", $"圖片大小不能超過 {MaxFileSize / 1024 / 1024}MB");
+                    continue;
+                }
+
+                // 驗證檔案類型
+                if (!AllowedContentTypes.Contains(image.ContentType.ToLowerInvariant()))
+                {
+                    _logger.LogWarning("圖片 {Index} 格式不允許：{ContentType}", i + 1, image.ContentType);
+                    ModelState.AddModelError($"Image{i + 1}", "只允許上傳 jpg, jpeg, png, gif, webp, heic, heif 格式的圖片");
+                    continue;
+                }
+
+                try
+                {
+                    // 上傳圖片到 Blob Storage
+                    var blobUrl = await _blobService.UploadListingImageAsync(
+                        listing.Id,
+                        image.OpenReadStream(),
+                        image.ContentType,
+                        imageSortOrder);
+
+                    // 建立圖片記錄
+                    _db.ListingImages.Add(new ListingImage
+                    {
+                        Id = Guid.NewGuid(),
+                        ListingId = listing.Id,
+                        ImageUrl = blobUrl,
+                        SortOrder = imageSortOrder,
+                        CreatedAt = now
+                    });
+
+                    successfulImageCount++;
+                    imageSortOrder++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "上傳圖片 {Index} 時發生錯誤", i + 1);
+                    ModelState.AddModelError($"Image{i + 1}", "圖片上傳失敗，請稍後再試");
+                    // 繼續處理其他圖片，不中斷整個流程
+                }
             }
-            catch (Exception ex)
+
+            // 驗證至少有一張圖片成功上傳
+            if (successfulImageCount == 0)
             {
-                _logger.LogError(ex, "上傳圖片 {Index} 時發生錯誤", i + 1);
-                ModelState.AddModelError($"Image{i + 1}", "圖片上傳失敗，請稍後再試");
-                // 繼續處理其他圖片，不中斷整個流程
+                await transaction.RollbackAsync();
+                ModelState.AddModelError(string.Empty, "至少需要成功上傳一張圖片，請檢查圖片格式和大小");
+                return View(model);
             }
+
+            // 儲存圖片記錄
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "建立商品時發生錯誤");
+            ModelState.AddModelError(string.Empty, "建立商品時發生錯誤，請稍後再試");
+            return View(model);
         }
 
-        // 再次儲存以儲存圖片記錄
-        await _db.SaveChangesAsync();
-
+        // 設定成功訊息
+        TempData["SuccessMessage"] = "商品已新增成功！您可以前往「我的商品」查看。";
+        
         // 之後會導到「商品詳情」或「我的商品」，暫時先回首頁
         return RedirectToAction("Index", "Home");
     }
@@ -197,11 +247,21 @@ public class ListingController : Controller
         }
 
         // 判斷是否為自己的商品
-        var currentUser = await _userManager.GetUserAsync(User);
+        var currentUser = await GetCurrentUserAsync();
         var isOwner = currentUser != null && listing.SellerId == currentUser.Id;
         
         // 如果用戶已登入且不是商品擁有者，可以發送訊息
         var canMessage = currentUser != null && !isOwner;
+
+        // 查詢賣家的統計資訊（只計算有評價的交易）
+        var sellerReviews = await _db.Reviews
+            .Where(r => r.SellerId == listing.SellerId)
+            .ToListAsync();
+
+        var sellerTotalCompletedTransactions = sellerReviews.Count;
+        var sellerAverageRating = sellerTotalCompletedTransactions > 0
+            ? sellerReviews.Average(r => (double)r.Rating)
+            : 0.0;
 
         var viewModel = new ListingDetailsViewModel
         {
@@ -224,7 +284,9 @@ public class ListingController : Controller
             CreatedAt = listing.CreatedAt,
             UpdatedAt = listing.UpdatedAt,
             CanMessage = canMessage,
-            IsOwner = isOwner
+            IsOwner = isOwner,
+            SellerTotalCompletedTransactions = sellerTotalCompletedTransactions,
+            SellerAverageRating = sellerAverageRating
         };
 
         return View(viewModel);
@@ -233,7 +295,7 @@ public class ListingController : Controller
     [HttpGet]
     public async Task<IActionResult> My()
     {
-        var user = await _userManager.GetUserAsync(User);
+        var user = await GetCurrentUserAsync();
         if (user == null)
         {
             return Challenge();
@@ -270,7 +332,7 @@ public class ListingController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(Guid id)
     {
-        var user = await _userManager.GetUserAsync(User);
+        var user = await GetCurrentUserAsync();
         if (user == null)
         {
             return Challenge();
@@ -289,6 +351,13 @@ public class ListingController : Controller
         if (listing.SellerId != user.Id)
         {
             return Forbid();
+        }
+
+        // 只有刊登中的商品可以編輯
+        if (listing.Status != ListingStatus.Active)
+        {
+            TempData["ErrorMessage"] = "只有刊登中的商品才能編輯";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         var viewModel = new ListingEditViewModel
@@ -315,7 +384,7 @@ public class ListingController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(Guid id, ListingEditViewModel model)
     {
-        var user = await _userManager.GetUserAsync(User);
+        var user = await GetCurrentUserAsync();
         if (user == null)
         {
             return Challenge();
@@ -352,6 +421,13 @@ public class ListingController : Controller
         if (listing.SellerId != user.Id)
         {
             return Forbid();
+        }
+
+        // 只有刊登中的商品可以編輯
+        if (listing.Status != ListingStatus.Active)
+        {
+            TempData["ErrorMessage"] = "只有刊登中的商品才能編輯";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         // 處理免費邏輯
@@ -482,82 +558,11 @@ public class ListingController : Controller
         return RedirectToAction("Details", new { id = listing.Id });
     }
 
-    [HttpGet]
-    public async Task<IActionResult> UpdateStatus(Guid id)
-    {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-        {
-            return Challenge();
-        }
-
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == id);
-
-        if (listing == null)
-        {
-            return NotFound();
-        }
-
-        // 驗證是否為商品擁有者
-        if (listing.SellerId != user.Id)
-        {
-            return Forbid();
-        }
-
-        var viewModel = new UpdateListingStatusViewModel
-        {
-            Id = listing.Id,
-            Title = listing.Title,
-            Status = listing.Status
-        };
-
-        return View(viewModel);
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(UpdateListingStatusViewModel model)
-    {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-        {
-            return Challenge();
-        }
-
-        if (!ModelState.IsValid)
-        {
-            return View(model);
-        }
-
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == model.Id);
-
-        if (listing == null)
-        {
-            return NotFound();
-        }
-
-        // 驗證是否為商品擁有者
-        if (listing.SellerId != user.Id)
-        {
-            return Forbid();
-        }
-
-        // 更新狀態
-        listing.Status = model.Status;
-        listing.UpdatedAt = TaiwanTime.Now;
-
-        await _db.SaveChangesAsync();
-
-        return RedirectToAction("Details", new { id = listing.Id });
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var user = await _userManager.GetUserAsync(User);
+        var user = await GetCurrentUserAsync();
         if (user == null)
         {
             return Challenge();
@@ -576,6 +581,13 @@ public class ListingController : Controller
         if (listing.SellerId != user.Id)
         {
             return Forbid();
+        }
+
+        // 只有刊登中的商品可以刪除
+        if (listing.Status != ListingStatus.Active)
+        {
+            TempData["ErrorMessage"] = "只有刊登中的商品才能刪除";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         try

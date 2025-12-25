@@ -2,6 +2,7 @@
 
 @{
     ViewData["Title"] = Model.Title;
+    ViewData["HideFooter"] = true;
 }
 
 <!-- 頂部導航欄 -->
@@ -109,16 +110,27 @@ else
 
         <hr class="listing-divider" />
 
-        <!-- 賣家信息（僅桌面版顯示） -->
-        <div class="listing-seller-info d-none d-md-block">
-            <small class="text-muted">
-                <strong>賣家：</strong>@Model.SellerDisplayName<br>
+        <!-- 賣家信息 -->
+        <div class="listing-seller-info">
+            <div class="text-muted">
+                <strong>賣家：</strong>
+                <a asp-controller="Account" asp-action="SellerProfile" asp-route-sellerId="@Model.SellerId" class="text-decoration-none">
+                    @Model.SellerDisplayName
+                </a><br>
+                @if (Model.SellerTotalCompletedTransactions > 0)
+                {
+                    <text>
+                        <strong>成交紀錄：</strong>@Model.SellerTotalCompletedTransactions 件<br>
+                        <strong>平均評分：</strong>@Html.Raw(GetStarRatingHtml(Model.SellerAverageRating))
+                        <span>@Model.SellerAverageRating.ToString("F1")</span><br>
+                    </text>
+                }
                 <strong>刊登時間：</strong>@Model.CreatedAt.ToString("yyyy/MM/dd HH:mm")<br>
                 @if (Model.UpdatedAt != Model.CreatedAt)
                 {
                     <strong>更新時間：</strong>@Model.UpdatedAt.ToString("yyyy/MM/dd HH:mm")
                 }
-            </small>
+            </div>
         </div>
 
     </div>
@@ -128,34 +140,78 @@ else
 <div class="listing-bottom-bar">
     @if (Model.IsOwner)
     {
-        <a asp-controller="Listing" asp-action="Edit" asp-route-id="@Model.Id" 
-           class="btn btn-primary listing-chat-btn listing-update-btn">
-            編輯商品
-        </a>
-        <a asp-controller="Listing" asp-action="UpdateStatus" asp-route-id="@Model.Id" 
-           class="btn btn-warning listing-chat-btn listing-update-btn">
-            修改商品狀態
-        </a>
-        <form asp-controller="Listing" asp-action="Delete" asp-route-id="@Model.Id" method="post" 
-              onsubmit="return confirm('確定要刪除這個商品嗎？此操作無法復原。');" class="d-inline listing-delete-form">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-danger listing-offer-btn listing-delete-btn">
-                刪除商品
-            </button>
-        </form>
+        <!-- 賣家看到的按鈕（只有刊登中才可以編輯/刪除） -->
+        @if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Active)
+        {
+            <a asp-controller="Listing" asp-action="Edit" asp-route-id="@Model.Id" 
+               class="btn btn-primary listing-chat-btn listing-update-btn">
+                編輯商品
+            </a>
+            <form asp-controller="Listing" asp-action="Delete" asp-route-id="@Model.Id" method="post" 
+                  onsubmit="return confirm('確定要刪除這個商品嗎？此操作無法復原。');" class="d-inline listing-delete-form">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger listing-offer-btn listing-delete-btn">
+                    刪除商品
+                </button>
+            </form>
+        }
     }
     else
     {
-        @if (Model.CanMessage)
+        <!-- 非賣家看到的按鈕，根據商品狀態顯示 -->
+        @if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Active)
         {
-            <a asp-controller="Message" asp-action="ChatWithUser" asp-route-userId="@Model.SellerId" 
-               class="btn btn-primary listing-chat-btn">
-                聊天
-            </a>
+            <!-- 上架中：顯示我要聊聊和我想購買/我要索取 -->
+            @if (Model.CanMessage)
+            {
+                <a asp-controller="Message" asp-action="ChatWithUser" 
+                   asp-route-userId="@Model.SellerId" 
+                   asp-route-listingId="@Model.Id"
+                   asp-route-sendInitialMessage="false"
+                   class="btn btn-primary listing-chat-btn">
+                    我要聊聊
+                </a>
+            }
+            @if (Model.IsFree || Model.IsCharity)
+            {
+                <a asp-controller="Message" asp-action="ChatWithUser" 
+                   asp-route-userId="@Model.SellerId" 
+                   asp-route-listingId="@Model.Id"
+                   class="btn btn-danger listing-offer-btn">
+                    我要索取
+                </a>
+            }
+            else
+            {
+                <a asp-controller="Message" asp-action="ChatWithUser" 
+                   asp-route-userId="@Model.SellerId" 
+                   asp-route-listingId="@Model.Id"
+                   class="btn btn-danger listing-offer-btn">
+                    我想購買
+                </a>
+            }
         }
-        <button type="button" class="btn btn-danger listing-offer-btn" disabled>
-            出價
-        </button>
+        else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)
+        {
+            <!-- 保留中：顯示保留中狀態 -->
+            <button type="button" class="btn btn-secondary listing-status-disabled-btn" disabled>
+                保留中
+            </button>
+        }
+        else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Donated)
+        {
+            <!-- 已售出/已捐贈：顯示已交易成功 -->
+            <button type="button" class="btn btn-secondary listing-status-disabled-btn" disabled>
+                已交易成功
+            </button>
+        }
+        else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Inactive)
+        {
+            <!-- 已下架：顯示已下架狀態 -->
+            <button type="button" class="btn btn-secondary listing-status-disabled-btn" disabled>
+                已下架
+            </button>
+        }
     }
 </div>
 
@@ -215,23 +271,28 @@ else
             _ => condition.ToString()
         };
     }
+
+    string GetStarRatingHtml(double rating)
+    {
+        var roundedRating = (int)Math.Round(rating);
+        var html = new System.Text.StringBuilder();
+        for (int i = 1; i <= 5; i++)
+        {
+            var starClass = i <= roundedRating ? "text-warning" : "text-muted";
+            html.Append($"<span class=\"{starClass}\">★</span>");
+        }
+        return html.ToString();
+    }
 }
 
 @section Scripts {
     <style>
-        /* 頂部導航欄 */
+        /* 頂部導航欄（返回按鈕） */
         .listing-top-nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            z-index: 1030;
             display: flex;
             align-items: center;
-            padding: 0 1rem;
+            padding: 0.5rem 1rem;
+            background: #fff;
             border-bottom: 1px solid #e5e5e5;
         }
 
@@ -254,7 +315,6 @@ else
 
         /* 圖片區域 */
         .listing-image-carousel {
-            margin-top: 56px;
             width: 100%;
         }
 
@@ -267,7 +327,6 @@ else
         }
 
         .listing-image-placeholder {
-            margin-top: 56px;
             width: 100%;
             height: 50vh;
             background: #f8f9fa;
@@ -317,11 +376,14 @@ else
         }
 
         .listing-title {
-            font-size: 1.5rem;
+            font-size: 1.75rem;
             font-weight: 600;
             margin-bottom: 1rem;
             color: #212529;
             line-height: 1.4;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
 
         .listing-price-section {
@@ -329,13 +391,13 @@ else
         }
 
         .listing-price {
-            font-size: 1.75rem;
+            font-size: 2rem;
             font-weight: bold;
             color: #0d6efd;
         }
 
         .listing-price-free {
-            font-size: 1.5rem;
+            font-size: 1.75rem;
             font-weight: bold;
             color: #28a745;
         }
@@ -343,7 +405,7 @@ else
         .listing-meta {
             margin-bottom: 1rem;
             color: #6c757d;
-            font-size: 0.9rem;
+            font-size: 1rem;
         }
 
         .listing-time {
@@ -355,13 +417,18 @@ else
             margin-bottom: 1rem;
         }
 
+        .listing-tags .badge {
+            font-size: 1rem;
+            padding: 0.5rem 0.75rem;
+        }
+
         .listing-divider {
             margin: 1.5rem 0;
             border-color: #e5e5e5;
         }
 
         .listing-section-title {
-            font-size: 1.1rem;
+            font-size: 1.3rem;
             font-weight: 600;
             margin-bottom: 0.75rem;
             color: #212529;
@@ -376,6 +443,10 @@ else
             white-space: pre-wrap;
             line-height: 1.6;
             margin: 0;
+            font-size: 1.1rem;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
 
         .listing-pickup {
@@ -385,6 +456,29 @@ else
         .listing-pickup-text {
             color: #6c757d;
             margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .listing-seller-info {
+            margin-bottom: 1.5rem;
+        }
+
+        .listing-seller-info > div {
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        .listing-seller-info strong {
+            font-weight: 600;
+        }
+
+        .listing-seller-info a {
+            color: #0d6efd;
+        }
+
+        .listing-seller-info a:hover {
+            color: #0a58ca;
+            text-decoration: underline;
         }
 
         /* 底部固定操作欄 */
@@ -398,39 +492,46 @@ else
             padding: 0.75rem 1rem;
             display: flex;
             gap: 0.75rem;
-            z-index: 1020;
+            z-index: 1050;
             box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
         }
 
         .listing-chat-btn,
         .listing-update-btn {
             flex: 2;
             min-height: 44px;
-            font-size: 1rem;
+            font-size: 1.2rem;
             font-weight: 500;
             border-radius: 8px;
+            box-sizing: border-box;
+            max-width: calc(50% - 0.375rem);
         }
 
         .listing-delete-form {
             display: flex;
             flex: 1;
+            box-sizing: border-box;
         }
 
         .listing-delete-btn {
             width: 100%;
             min-height: 44px;
-            font-size: 0.9rem;
+            font-size: 1.1rem;
             font-weight: 500;
             border-radius: 8px;
             padding: 0.5rem 1rem;
+            box-sizing: border-box;
         }
 
         .listing-offer-btn {
             flex: 1;
             min-height: 44px;
-            font-size: 1rem;
+            font-size: 1.2rem;
             font-weight: 500;
             border-radius: 8px;
+            box-sizing: border-box;
+            max-width: calc(50% - 0.375rem);
         }
 
         .listing-chat-btn {
@@ -456,18 +557,33 @@ else
             cursor: not-allowed;
         }
 
+        .listing-status-disabled-btn {
+            flex: 1;
+            min-height: 44px;
+            font-size: 1.2rem;
+            font-weight: 500;
+            border-radius: 8px;
+            box-sizing: border-box;
+            width: 100%;
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: white;
+            cursor: not-allowed;
+        }
+
         /* 桌面版樣式 */
         @@media (min-width: 768px) {
             .listing-top-nav {
-                position: relative;
                 background: transparent;
                 border-bottom: none;
                 padding: 0;
                 margin-bottom: 1rem;
+                max-width: 800px;
+                margin-left: auto;
+                margin-right: auto;
             }
 
             .listing-image-carousel {
-                margin-top: 0;
                 max-width: 800px;
                 margin: 0 auto;
             }

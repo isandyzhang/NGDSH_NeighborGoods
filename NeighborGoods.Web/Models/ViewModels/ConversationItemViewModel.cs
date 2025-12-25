@@ -8,5 +8,7 @@ public class ConversationItemViewModel
     public string? LastMessage { get; set; }
     public DateTime? LastMessageTime { get; set; }
     public int UnreadCount { get; set; }
+    public Guid ListingId { get; set; }
+    public string ListingTitle { get; set; } = string.Empty;
 }
 

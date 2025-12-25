@@ -40,5 +40,25 @@ public class Conversation
     /// 最後更新時間（台灣時間）
     /// </summary>
     public DateTime UpdatedAt { get; set; } = TaiwanTime.Now;
+
+    /// <summary>
+    /// 參與者1最後已讀時間（台灣時間）
+    /// </summary>
+    public DateTime? Participant1LastReadAt { get; set; }
+
+    /// <summary>
+    /// 參與者2最後已讀時間（台灣時間）
+    /// </summary>
+    public DateTime? Participant2LastReadAt { get; set; }
+
+    /// <summary>
+    /// 關聯的商品 ID（所有對話都必須關聯商品）
+    /// </summary>
+    public Guid ListingId { get; set; }
+
+    /// <summary>
+    /// 商品的導航屬性
+    /// </summary>
+    public Listing? Listing { get; set; }
 }
 

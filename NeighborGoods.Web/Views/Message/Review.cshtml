@@ -1,0 +1,182 @@
+@model NeighborGoods.Web.Models.ViewModels.ReviewViewModel
+
+@{
+    ViewData["Title"] = "評價";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">評價 @Model.OtherUserDisplayName</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">商品：@Model.ListingTitle</p>
+                    
+                    <form id="reviewForm" asp-controller="Account" asp-action="SubmitReview" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ListingId" value="@Model.ListingId" />
+                        <input type="hidden" name="ConversationId" value="@Model.ConversationId" />
+                        <input type="hidden" name="TargetUserId" value="@Model.OtherUserId" />
+                        
+                        <!-- 評分 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">評分 <span class="text-danger">*</span></label>
+                            <div class="star-rating">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <input type="radio" name="Rating" id="star-@(i)" value="@i" required />
+                                    <label for="star-@(i)" class="star-label" data-value="@i">★</label>
+                                }
+                            </div>
+                            <div class="rating-text mt-2">
+                                <span id="ratingText">請選擇評分</span>
+                            </div>
+                        </div>
+
+                        <!-- 評價內容 -->
+                        <div class="mb-4">
+                            <label for="Content" class="form-label fw-bold">評價內容（選填）</label>
+                            <textarea class="form-control" name="Content" id="Content" rows="4" 
+                                      placeholder="分享您的交易體驗..." maxlength="500"></textarea>
+                            <small class="text-muted">
+                                <span id="charCount">0</span>/500 字
+                            </small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-fill">提交評價</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // 星級評分互動
+        const starLabels = document.querySelectorAll('.star-label');
+        const ratingText = document.getElementById('ratingText');
+        const ratingTexts = {
+            1: '很差',
+            2: '差',
+            3: '普通',
+            4: '好',
+            5: '很好'
+        };
+
+        let selectedRating = 0;
+
+        // 點擊星星時更新顯示
+        starLabels.forEach(label => {
+            label.addEventListener('click', function() {
+                selectedRating = parseInt(this.dataset.value);
+                ratingText.textContent = ratingTexts[selectedRating] || '請選擇評分';
+                updateStars(selectedRating);
+            });
+
+            // Hover 效果：滑入時高亮該星及左側所有星星
+            label.addEventListener('mouseenter', function() {
+                const hoverRating = parseInt(this.dataset.value);
+                updateStars(hoverRating);
+            });
+
+            // Hover 效果：滑出時恢復到已選擇的狀態
+            label.addEventListener('mouseleave', function() {
+                updateStars(selectedRating);
+            });
+        });
+
+        // 更新星星顯示
+        function updateStars(rating) {
+            starLabels.forEach(star => {
+                const starValue = parseInt(star.dataset.value);
+                if (starValue <= rating) {
+                    star.classList.add('active');
+                } else {
+                    star.classList.remove('active');
+                }
+            });
+        }
+
+        // 字數統計
+        const contentTextarea = document.getElementById('Content');
+        const charCount = document.getElementById('charCount');
+        
+        contentTextarea.addEventListener('input', function() {
+            charCount.textContent = this.value.length;
+        });
+
+        // 表單提交
+        document.getElementById('reviewForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const rating = document.querySelector('input[name="Rating"]:checked');
+            if (!rating) {
+                alert('請選擇評分');
+                return;
+            }
+
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        // 跳轉回聊天頁面
+                        window.location.href = '/Message/Chat?conversationId=@Model.ConversationId';
+                    } else {
+                        alert(result.error || '提交失敗，請稍後再試');
+                    }
+                } else {
+                    alert('提交失敗，請稍後再試');
+                }
+            } catch (error) {
+                console.error('提交評價時發生錯誤:', error);
+                alert('提交失敗，請稍後再試');
+            }
+        });
+    </script>
+
+    <style>
+        .star-rating {
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            gap: 0.25rem;
+        }
+
+        .star-rating input[type="radio"] {
+            display: none;
+        }
+
+        .star-label {
+            font-size: 2rem;
+            color: #ddd;
+            cursor: pointer;
+            transition: color 0.2s;
+            user-select: none;
+        }
+
+        .star-label.active {
+            color: #ffc107;
+        }
+
+        .rating-text {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+    </style>
+}
+

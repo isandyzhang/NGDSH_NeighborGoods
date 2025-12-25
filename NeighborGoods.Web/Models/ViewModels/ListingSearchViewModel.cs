@@ -43,5 +43,25 @@ public class ListingSearchViewModel
     /// 搜尋結果列表
     /// </summary>
     public List<ListingIndexViewModel> Listings { get; set; } = new List<ListingIndexViewModel>();
+
+    /// <summary>
+    /// 當前頁碼
+    /// </summary>
+    public int Page { get; set; } = 1;
+
+    /// <summary>
+    /// 每頁數量
+    /// </summary>
+    public int PageSize { get; set; } = 10;
+
+    /// <summary>
+    /// 總商品數
+    /// </summary>
+    public int TotalCount { get; set; }
+
+    /// <summary>
+    /// 是否還有更多商品
+    /// </summary>
+    public bool HasMore => (Page * PageSize) < TotalCount;
 }
 

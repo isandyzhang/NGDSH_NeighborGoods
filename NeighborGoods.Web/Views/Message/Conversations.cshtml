@@ -23,14 +23,17 @@
         <div class="list-group">
             @foreach (var conversation in Model.Conversations)
             {
-                <a asp-controller="Message" asp-action="Chat" asp-route-conversationId="@conversation.ConversationId" 
+                <a asp-controller="Message" asp-action="Chat" asp-route-conversationId="@conversation.ConversationId" asp-route-listingId="@conversation.ListingId"
                    class="list-group-item list-group-item-action">
                     <div class="d-flex w-100 justify-content-between align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="mb-1">@conversation.OtherUserDisplayName</h5>
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <div class="d-flex align-items-center mb-1">
+                                <h5 class="mb-0 me-2">@conversation.OtherUserDisplayName</h5>
+                                <small class="text-muted listing-title-truncate">- @conversation.ListingTitle</small>
+                            </div>
                             @if (!string.IsNullOrEmpty(conversation.LastMessage))
                             {
-                                <p class="mb-1 text-muted" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 500px;">
+                                <p class="mb-1 text-muted message-preview">
                                     @conversation.LastMessage
                                 </p>
                             }
@@ -39,7 +42,7 @@
                                 <p class="mb-1 text-muted">尚無訊息</p>
                             }
                         </div>
-                        <div class="text-end">
+                        <div class="text-end flex-shrink-0 ms-2">
                             @if (conversation.LastMessageTime.HasValue)
                             {
                                 <small class="text-muted">
@@ -68,6 +71,27 @@
 
         .list-group-item:hover {
             background-color: #f8f9fa;
+        }
+
+        .message-preview {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        .listing-title-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 150px;
+            display: inline-block;
+        }
+
+        @@media (max-width: 576px) {
+            .listing-title-truncate {
+                max-width: 100px;
+            }
         }
 
         @@media (max-width: 576px) {

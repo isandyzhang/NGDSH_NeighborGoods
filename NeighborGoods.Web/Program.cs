@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.RateLimiting;
 using System.Text;
 using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Hubs;
@@ -30,6 +32,11 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = true;
         options.Password.RequiredUniqueChars = 1;
+        
+        // 啟用帳號鎖定功能
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15); // 鎖定 15 分鐘
+        options.Lockout.MaxFailedAccessAttempts = 5; // 5 次失敗後鎖定
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddErrorDescriber<ChineseIdentityErrorDescriber>()
@@ -93,6 +100,48 @@ builder.Services.AddControllersWithViews();
 // SignalR 設定
 builder.Services.AddSignalR();
 
+// 速率限制設定
+builder.Services.AddRateLimiter(options =>
+{
+    // 登入速率限制：每分鐘最多 5 次
+    options.AddFixedWindowLimiter("Login", limiterOptions =>
+    {
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 2;
+    });
+
+    // 註冊速率限制：每分鐘最多 3 次
+    options.AddFixedWindowLimiter("Register", limiterOptions =>
+    {
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.PermitLimit = 3;
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 1;
+    });
+
+    // 發送訊息速率限制：每 10 秒最多 10 次
+    options.AddFixedWindowLimiter("SendMessage", limiterOptions =>
+    {
+        limiterOptions.Window = TimeSpan.FromSeconds(10);
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 3;
+    });
+
+    // 全域速率限制：每秒最多 100 個請求
+    options.GlobalLimiter = PartitionedRateLimiter.Create<Microsoft.AspNetCore.Http.HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                Window = TimeSpan.FromSeconds(1)
+            }));
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -107,6 +156,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+// 速率限制必須在 UseAuthentication 和 UseAuthorization 之前
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

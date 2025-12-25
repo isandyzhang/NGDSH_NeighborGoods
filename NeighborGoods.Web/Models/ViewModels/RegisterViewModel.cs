@@ -9,6 +9,7 @@ public class RegisterViewModel
     public string UserName { get; set; } = string.Empty;
 
     [Required]
+    [StringLength(50, ErrorMessage = "顯示名稱不能超過 50 個字元")]
     [Display(Name = "顯示名稱")]
     public string DisplayName { get; set; } = string.Empty;
 

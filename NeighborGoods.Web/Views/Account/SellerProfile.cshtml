@@ -1,0 +1,98 @@
+@model NeighborGoods.Web.Models.ViewModels.SellerProfileViewModel
+
+@{
+    ViewData["Title"] = $"{Model.SellerDisplayName} 的賣家資料";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">@Model.SellerDisplayName 的賣家資料</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 統計資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0">@Model.TotalCompletedTransactions</h3>
+                                <small class="text-muted">總成交件數</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                @if (Model.TotalCompletedTransactions > 0)
+                                {
+                                    <div class="mb-2">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            <span class="fs-4 @(i <= Math.Round(Model.AverageRating) ? "text-warning" : "text-muted")">★</span>
+                                        }
+                                    </div>
+                                    <h5 class="mb-0">@Model.AverageRating.ToString("F1")</h5>
+                                    <small class="text-muted">平均評分</small>
+                                }
+                                else
+                                {
+                                    <p class="mb-0 text-muted">尚無成交紀錄</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 成交紀錄列表 -->
+                    @if (Model.CompletedTransactions.Any())
+                    {
+                        <h5 class="mb-3">成交紀錄</h5>
+                        <div class="list-group">
+                            @foreach (var transaction in Model.CompletedTransactions)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a asp-controller="Listing" asp-action="Details" asp-route-id="@transaction.ListingId" class="text-decoration-none">
+                                                    @transaction.ListingTitle
+                                                </a>
+                                            </h6>
+                                            <div class="mb-2">
+                                                @if (transaction.IsFree)
+                                                {
+                                                    <span class="text-success fw-bold">免費</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-primary fw-bold">NT$ @transaction.Price?.ToString("N0")</span>
+                                                }
+                                            </div>
+                                            <div class="mb-2">
+                                                @for (int i = 1; i <= 5; i++)
+                                                {
+                                                    <span class="@(i <= transaction.Rating ? "text-warning" : "text-muted")">★</span>
+                                                }
+                                                <span class="ms-2 text-muted">by @transaction.BuyerDisplayName</span>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(transaction.ReviewContent))
+                                            {
+                                                <p class="mb-0 text-muted small">@transaction.ReviewContent</p>
+                                            }
+                                        </div>
+                                        <small class="text-muted">@transaction.CompletedAt.ToString("yyyy/MM/dd")</small>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <p class="text-muted">尚無成交紀錄</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

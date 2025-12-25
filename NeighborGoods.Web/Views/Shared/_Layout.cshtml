@@ -1,9 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
 @using NeighborGoods.Web.Models.Entities
-@using NeighborGoods.Web.Data
 @inject UserManager<ApplicationUser> UserManager
-@inject AppDbContext DbContext
 
 <!DOCTYPE html>
 <html lang="en">
@@ -31,33 +28,6 @@
                 {
                     var appUser = await UserManager.GetUserAsync(User);
                     var displayName = appUser?.DisplayName ?? User.Identity!.Name;
-                    var unreadCount = 0;
-                    if (appUser != null)
-                    {
-                        try
-                        {
-                            var conversations = await DbContext.Conversations
-                                .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
-                                .Where(c => c.Participant1Id == appUser.Id || c.Participant2Id == appUser.Id)
-                                .ToListAsync();
-                            
-                            foreach (var conversation in conversations)
-                            {
-                                var lastMessage = conversation.Messages
-                                    .OrderByDescending(m => m.CreatedAt)
-                                    .FirstOrDefault();
-                                
-                                if (lastMessage != null && lastMessage.SenderId != appUser.Id)
-                                {
-                                    unreadCount++;
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            unreadCount = 0;
-                        }
-                    }
                     
                     <li class="sidebar-nav-item">
                         <span class="sidebar-nav-text">
@@ -91,10 +61,15 @@
                                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
                             </svg>
                             我的訊息
-                            @if (unreadCount > 0)
-                            {
-                                <span class="unread-badge">@unreadCount</span>
-                            }
+                            @await Component.InvokeAsync("UnreadMessageCount")
+                        </a>
+                    </li>
+                    <li class="sidebar-nav-item">
+                        <a class="sidebar-nav-link" asp-controller="Listing" asp-action="My">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-box-seam me-2" viewBox="0 0 16 16">
+                                <path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5l2.404.961L10.404 2zm3.564 1.426L5.596 5 8 5.961l4.904-2.325zm3.25 1.562-4.497 1.835v.928l5.674-2.177zm-.537 1.442v1.599l-5.557 2.16v-.928zM8 6.961l4.904 2.325L10.404 10zm-4.497 1.835L1.846 12.5l2.404.961L8 10.961zm-.537 1.442L1.309 13.5 8 15.961l6.691-2.461-1.156-1.262L8 13.961z"/>
+                            </svg>
+                            我的商品
                         </a>
                     </li>
                     <li class="sidebar-nav-item">
@@ -195,17 +170,20 @@
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+    <div class="@(ViewData["HideFooter"] != null && (bool)ViewData["HideFooter"] ? "container-fluid px-0" : "container")">
+        <main role="main" class="@(ViewData["HideFooter"] != null && (bool)ViewData["HideFooter"] ? "" : "pb-3")">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - 南港社宅社區專屬二手交易平台 - <a asp-area="" asp-controller="Home" asp-action="Privacy">隱私條款</a>
-        </div>
-    </footer>
+    @if (ViewData["HideFooter"] == null || !(bool)ViewData["HideFooter"])
+    {
+        <footer class="border-top footer text-muted">
+            <div class="container">
+                &copy; 2025 - 南港社宅社區專屬二手交易平台 - <a asp-area="" asp-controller="Home" asp-action="Terms">使用條款</a> - <a asp-area="" asp-controller="Home" asp-action="Privacy">隱私條款</a>
+            </div>
+        </footer>
+    }
 
     <!-- 免責條款同意 Modal -->
     <div class="modal fade" id="disclaimerModal" tabindex="-1" aria-labelledby="disclaimerModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">

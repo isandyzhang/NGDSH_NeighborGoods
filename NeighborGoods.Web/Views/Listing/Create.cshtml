@@ -13,7 +13,8 @@
 
             <div class="mb-3">
                 <label asp-for="Title" class="form-label fw-bold">標題</label>
-                <input asp-for="Title" class="form-control form-control-lg" />
+                <input asp-for="Title" class="form-control form-control-lg" maxlength="200" />
+                <div class="form-text">最多 200 個字元</div>
                 <span asp-validation-for="Title" class="text-danger"></span>
             </div>
 
@@ -39,24 +40,25 @@
 
             <div class="mb-3">
                 <label asp-for="Description" class="form-label fw-bold">描述</label>
-                <textarea asp-for="Description" class="form-control" rows="5"></textarea>
+                <textarea asp-for="Description" class="form-control" rows="5" maxlength="500"></textarea>
+                <div class="form-text">最多 500 個字元</div>
                 <span asp-validation-for="Description" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
                 <label asp-for="Price" class="form-label fw-bold">價格</label>
                 <input asp-for="Price" 
+                       id="Price"
                        class="form-control form-control-lg" 
                        type="number" 
                        inputmode="numeric"
                        step="1" 
                        min="0" />
-                <div class="form-text">若價格為 0，將自動設定為免費索取商品。</div>
                 <span asp-validation-for="Price" class="text-danger"></span>
             </div>
 
             <div class="mb-3 form-check form-check-lg">
-                <input asp-for="IsFree" class="form-check-input" type="checkbox" style="width: 1.5rem; height: 1.5rem;" />
+                <input asp-for="IsFree" id="IsFree" class="form-check-input" type="checkbox" style="width: 1.5rem; height: 1.5rem;" />
                 <label asp-for="IsFree" class="form-check-label fs-5">免費索取</label>
             </div>
 
@@ -175,27 +177,31 @@
             });
         });
 
-        // 價格為 0 時自動勾選「免費索取」
-        const priceInput = document.querySelector('input[name="Price"]');
-        const isFreeCheckbox = document.querySelector('input[name="IsFree"]');
+        // 價格輸入時自動取消免費商品勾選
+        const priceInput = document.getElementById('Price');
+        const isFreeCheckbox = document.getElementById('IsFree');
         
         if (priceInput && isFreeCheckbox) {
             priceInput.addEventListener('input', function() {
                 const price = parseFloat(this.value) || 0;
-                if (price === 0) {
+                // 如果使用者輸入價格（>0）且免費商品已勾選，自動取消勾選
+                if (price > 0 && isFreeCheckbox.checked) {
+                    isFreeCheckbox.checked = false;
+                }
+                // 如果價格為 0，自動勾選免費商品
+                else if (price === 0 && !isFreeCheckbox.checked) {
                     isFreeCheckbox.checked = true;
                 }
             });
+        }
 
-            // 如果「免費索取」被取消勾選，且價格是 0，提醒用戶
+        // 免費商品勾選時，如果已有價格，自動清空價格
+        if (isFreeCheckbox && priceInput) {
             isFreeCheckbox.addEventListener('change', function() {
-                const price = parseFloat(priceInput.value) || 0;
-                if (!this.checked && price === 0) {
-                    if (confirm('價格為 0 時，商品將自動設定為免費索取。是否要取消免費索取？')) {
-                        // 用戶確認取消，不做任何事
-                    } else {
-                        // 用戶取消操作，重新勾選
-                        this.checked = true;
+                if (this.checked) {
+                    const price = parseFloat(priceInput.value) || 0;
+                    if (price > 0) {
+                        priceInput.value = '0';
                     }
                 }
             });

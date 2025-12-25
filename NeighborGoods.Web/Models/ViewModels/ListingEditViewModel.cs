@@ -9,10 +9,12 @@ public class ListingEditViewModel
     public Guid Id { get; set; }
 
     [Required(ErrorMessage = "請填寫商品標題，讓大家更容易找到您的商品")]
+    [StringLength(200, ErrorMessage = "標題不能超過 200 個字元")]
     [Display(Name = "標題")]
     public string Title { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "請填寫商品描述，幫助大家更了解您的商品")]
+    [StringLength(500, ErrorMessage = "描述不能超過 500 個字元")]
     [Display(Name = "描述")]
     public string Description { get; set; } = string.Empty;
 

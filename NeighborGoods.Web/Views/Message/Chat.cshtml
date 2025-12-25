@@ -2,60 +2,170 @@
 
 @{
     ViewData["Title"] = $"與 {Model.OtherUserDisplayName} 的對話";
+    ViewData["HideFooter"] = true;
 }
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card" style="height: 600px; display: flex; flex-direction: column;">
-                <!-- 對話標題 -->
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">與 @Model.OtherUserDisplayName 的對話</h5>
-                    <a asp-controller="Message" asp-action="Conversations" class="btn btn-sm btn-outline-secondary">
-                        返回對話列表
+<div class="chat-page">
+    <!-- 對話標題 -->
+    <div class="chat-header">
+        <h5 class="mb-0">與 @Model.OtherUserDisplayName 的對話</h5>
+        <a asp-controller="Message" asp-action="Conversations" class="btn btn-sm btn-outline-secondary">
+            返回對話列表
+        </a>
+    </div>
+
+    <!-- 商品 card（如果有商品資訊） -->
+    @if (Model.ListingId.HasValue)
+    {
+        <div class="listing-card-container">
+            <div class="listing-card">
+                <!-- 左邊圖片 -->
+                @if (!string.IsNullOrEmpty(Model.ListingFirstImageUrl))
+                {
+                    <a asp-controller="Listing" asp-action="Details" asp-route-id="@Model.ListingId.Value" class="listing-card-image-link">
+                        <div class="listing-card-image">
+                            <img src="@Model.ListingFirstImageUrl" alt="@Model.ListingTitle" />
+                        </div>
                     </a>
-                </div>
-
-                <!-- 訊息列表 -->
-                <div class="card-body flex-grow-1 overflow-auto" id="messagesContainer" style="background-color: #f8f9fa;">
-                    @foreach (var message in Model.Messages)
-                    {
-                        <div class="mb-3 @(message.IsMine ? "text-end" : "text-start")">
-                            <div class="d-inline-block @(message.IsMine ? "bg-primary text-white" : "bg-white") rounded p-3 shadow-sm" 
-                                 style="max-width: 70%;">
-                                @if (!message.IsMine)
+                }
+                <!-- 右邊內容 -->
+                <div class="listing-card-content">
+                    <a asp-controller="Listing" asp-action="Details" asp-route-id="@Model.ListingId.Value" class="listing-card-link">
+                        <h6 class="listing-card-title">@Model.ListingTitle</h6>
+                        <div class="listing-card-price">
+                            @if (Model.ListingIsFree == true)
+                            {
+                                <span class="badge bg-success listing-price-badge">免費商品</span>
+                            }
+                            else
+                            {
+                                <span class="text-primary fw-bold listing-price-text">NT$ @Model.ListingPrice?.ToString("N0")</span>
+                            }
+                            @if (Model.ListingIsCharity == true)
+                            {
+                                <span class="badge bg-danger listing-charity-badge">愛心商品</span>
+                            }
+                        </div>
+                        @if (Model.ListingStatus.HasValue)
+                        {
+                            <span class="badge bg-secondary listing-status-badge">@GetStatusText(Model.ListingStatus.Value)</span>
+                        }
+                    </a>
+                    <!-- 按鈕區域 -->
+                    <div class="listing-card-buttons">
+                        @{
+                            // 檢查是否有購買請求（檢查最近的訊息是否包含系統發送的購買/索取訊息）
+                            var hasPurchaseRequest = Model.Messages.Any(m => 
+                                !m.IsMine && 
+                                (m.Content.Contains("[系統發送]") && 
+                                 (m.Content.Contains("我想購買此商品") || m.Content.Contains("我想索取此商品"))));
+                        }
+                        @if (!Model.IsSeller)
+                        {
+                            <!-- 買家看到的按鈕 -->
+                            @if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Donated)
+                            {
+                                <!-- 商品狀態為已售出或已捐贈時，如果尚未評價則顯示給予評價按鈕 -->
+                                @if (!Model.HasCurrentUserReviewed)
                                 {
-                                    <div class="small fw-bold mb-1">@message.SenderDisplayName</div>
+                                    <a asp-controller="Message" asp-action="Review" asp-route-listingId="@Model.ListingId.Value" asp-route-conversationId="@Model.ConversationId" class="btn btn-primary listing-action-btn">
+                                        給予評價
+                                    </a>
                                 }
-                                <div class="mb-1">@message.Content</div>
-                                <div class="small @(message.IsMine ? "text-white-50" : "text-muted")">
-                                    @message.CreatedAt.ToString("HH:mm")
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-
-                <!-- 訊息輸入區 -->
-                <div class="card-footer">
-                    <form id="messageForm" asp-controller="Message" asp-action="SendMessage" method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="ConversationId" value="@Model.ConversationId" />
-                        <div class="input-group">
-                            <input type="text" 
-                                   name="Content" 
-                                   id="messageInput" 
-                                   class="form-control" 
-                                   placeholder="輸入訊息..." 
-                                   required 
-                                   maxlength="1000" />
-                            <button type="submit" class="btn btn-primary" id="sendButton">發送</button>
-                        </div>
-                        <span class="text-danger" id="validationError"></span>
-                    </form>
+                            }
+                            else if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)
+                            {
+                                <!-- 商品狀態為保留中時，顯示完成交易按鈕 -->
+                                <button type="button" class="btn btn-success listing-action-btn" id="completeTransactionBtn" data-listing-id="@Model.ListingId.Value" data-conversation-id="@Model.ConversationId">
+                                    完成交易
+                                </button>
+                            }
+                            else if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Active)
+                            {
+                                <!-- 商品狀態為上架中時，顯示購買/索取按鈕 -->
+                                @if (Model.ListingIsFree == true || Model.ListingIsCharity == true)
+                                {
+                                    <button type="button" class="btn btn-danger listing-action-btn listing-purchase-btn" id="purchaseBtn" data-listing-id="@Model.ListingId.Value">
+                                        索取商品
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-danger listing-action-btn listing-purchase-btn" id="purchaseBtn" data-listing-id="@Model.ListingId.Value">
+                                        購買商品
+                                    </button>
+                                }
+                            }
+                            <a asp-controller="Account" asp-action="SellerProfile" asp-route-sellerId="@Model.ListingSellerId" class="btn btn-outline-secondary listing-action-btn listing-seller-btn">
+                                瀏覽賣家
+                            </a>
+                        }
+                        else
+                        {
+                            <!-- 賣家看到的按鈕 -->
+                            @if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Active && hasPurchaseRequest)
+                            {
+                                <button type="button" class="btn btn-success listing-action-btn" id="acceptPurchaseBtn" data-listing-id="@Model.ListingId.Value" data-conversation-id="@Model.ConversationId">
+                                    同意交易
+                                </button>
+                            }
+                            else if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Donated)
+                            {
+                                <!-- 商品狀態為已售出或已捐贈時，如果尚未評價則顯示給予評價按鈕 -->
+                                @if (!Model.HasCurrentUserReviewed)
+                                {
+                                    <a asp-controller="Message" asp-action="Review" asp-route-listingId="@Model.ListingId.Value" asp-route-conversationId="@Model.ConversationId" class="btn btn-primary listing-action-btn">
+                                        給予評價
+                                    </a>
+                                }
+                            }
+                            <a asp-controller="Account" asp-action="SellerProfile" asp-route-sellerId="@Model.CurrentUserId" class="btn btn-outline-secondary listing-action-btn listing-seller-btn">
+                                瀏覽賣家
+                            </a>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
+    }
+
+    <!-- 訊息列表 -->
+    <div class="messages-container" id="messagesContainer">
+        @foreach (var message in Model.Messages)
+        {
+            <div class="mb-3 @(message.IsMine ? "text-end" : "text-start")">
+                <div class="d-inline-block @(message.IsMine ? "bg-primary text-white" : "bg-white") rounded p-3 shadow-sm" 
+                     style="max-width: 70%;">
+                    @if (!message.IsMine)
+                    {
+                        <div class="small fw-bold mb-1">@message.SenderDisplayName</div>
+                    }
+                    <div class="mb-1">@message.Content</div>
+                    <div class="small @(message.IsMine ? "text-white-50" : "text-muted")">
+                        @message.CreatedAt.ToString("HH:mm")
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- 訊息輸入區（固定在底部） -->
+    <div class="message-input-container">
+        <form id="messageForm" asp-controller="Message" asp-action="SendMessage" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ConversationId" value="@Model.ConversationId" />
+            <div class="input-group">
+                <input type="text" 
+                       name="Content" 
+                       id="messageInput" 
+                       class="form-control" 
+                       placeholder="輸入訊息..." 
+                       required 
+                       maxlength="1000" />
+                <button type="submit" class="btn btn-primary" id="sendButton">發送</button>
+            </div>
+            <span class="text-danger" id="validationError"></span>
+        </form>
     </div>
 </div>
 
@@ -73,30 +183,38 @@
             console.error("SignalR 連線失敗:", err);
         });
 
+        // 取得當前用戶 ID 和對話 ID
+        const currentUserId = '@Model.CurrentUserId';
+        const conversationId = '@Model.ConversationId';
+        
         // 接收訊息
-        connection.on("ReceiveMessage", function (senderDisplayName, content, createdAt) {
+        connection.on("ReceiveMessage", function (senderId, senderDisplayName, content, createdAt) {
             const messagesContainer = document.getElementById("messagesContainer");
+            const isMine = senderId === currentUserId;
+            
             const messageDiv = document.createElement("div");
-            messageDiv.className = "mb-3 text-start";
+            messageDiv.className = "mb-3 " + (isMine ? "text-end" : "text-start");
             
             const messageContent = document.createElement("div");
-            messageContent.className = "d-inline-block bg-white rounded p-3 shadow-sm";
+            messageContent.className = "d-inline-block " + (isMine ? "bg-primary text-white" : "bg-white") + " rounded p-3 shadow-sm";
             messageContent.style.maxWidth = "70%";
             
-            const senderName = document.createElement("div");
-            senderName.className = "small fw-bold mb-1";
-            senderName.textContent = senderDisplayName;
+            if (!isMine) {
+                const senderName = document.createElement("div");
+                senderName.className = "small fw-bold mb-1";
+                senderName.textContent = senderDisplayName;
+                messageContent.appendChild(senderName);
+            }
             
             const messageText = document.createElement("div");
             messageText.className = "mb-1";
             messageText.textContent = content;
             
             const messageTime = document.createElement("div");
-            messageTime.className = "small text-muted";
+            messageTime.className = "small " + (isMine ? "text-white-50" : "text-muted");
             const time = new Date(createdAt);
             messageTime.textContent = time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
             
-            messageContent.appendChild(senderName);
             messageContent.appendChild(messageText);
             messageContent.appendChild(messageTime);
             messageDiv.appendChild(messageContent);
@@ -104,7 +222,39 @@
             
             // 自動滾動到底部
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // 如果不是自己發送的訊息，且用戶正在查看此對話，自動標記為已讀
+            if (!isMine) {
+                markAsRead();
+            }
         });
+
+        // 接收刷新聊天室通知（當交易狀態變更時）
+        connection.on("RefreshChat", function (targetConversationId) {
+            // 確認是當前對話才刷新
+            if (targetConversationId === conversationId) {
+                window.location.reload();
+            }
+        });
+        
+        // 標記對話為已讀的函數
+        async function markAsRead() {
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if (!token) return;
+                
+                await fetch('/Message/MarkAsRead', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(conversationId)
+                });
+            } catch (error) {
+                console.error('標記為已讀時發生錯誤:', error);
+            }
+        }
 
         // 處理表單提交
         document.getElementById("messageForm").addEventListener("submit", async function (e) {
@@ -118,26 +268,73 @@
             }
             
             const sendButton = document.getElementById("sendButton");
+            const originalButtonText = sendButton.textContent;
             sendButton.disabled = true;
+            sendButton.textContent = "發送中...";
             
             try {
+                // 先建立 FormData（在清空輸入框之前）
                 const formData = new FormData(this);
+                
+                // 清空輸入框（在發送請求之後）
+                messageInput.value = '';
                 const response = await fetch(this.action, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
                 });
                 
+                // 檢查回應的 Content-Type
+                const contentType = response.headers.get("content-type");
+                const isJson = contentType && contentType.includes("application/json");
+                
                 if (response.ok) {
-                    messageInput.value = '';
-                    // 訊息會透過 SignalR 即時顯示，不需要手動添加
+                    if (isJson) {
+                        const result = await response.json();
+                        if (result.success) {
+                            // 訊息已成功發送，等待 SignalR 推送
+                        } else {
+                            // 後端返回了錯誤
+                            alert(result.error || '發送訊息失敗，請稍後再試');
+                            messageInput.value = content; // 恢復輸入內容
+                        }
+                    } else {
+                        // 如果不是 JSON，可能是重定向，但這不應該發生在 AJAX 請求中
+                        console.warn('收到非 JSON 回應');
+                    }
                 } else {
-                    alert('發送訊息失敗，請稍後再試');
+                    // HTTP 狀態碼不是 200-299
+                    let errorMessage = '發送訊息失敗，請稍後再試';
+                    
+                    if (isJson) {
+                        try {
+                            const errorResult = await response.json();
+                            errorMessage = errorResult.error || errorMessage;
+                        } catch (e) {
+                            // 無法解析 JSON，使用預設錯誤訊息
+                        }
+                    } else {
+                        // 嘗試讀取文字回應
+                        try {
+                            const errorText = await response.text();
+                            console.error('發送訊息失敗:', errorText);
+                        } catch (e) {
+                            // 無法讀取文字
+                        }
+                    }
+                    
+                    alert(errorMessage);
+                    messageInput.value = content; // 恢復輸入內容
                 }
             } catch (error) {
                 console.error('發送訊息時發生錯誤:', error);
                 alert('發送訊息失敗，請稍後再試');
+                messageInput.value = content; // 恢復輸入內容
             } finally {
                 sendButton.disabled = false;
+                sendButton.textContent = originalButtonText;
                 messageInput.focus();
             }
         });
@@ -147,18 +344,509 @@
             const messagesContainer = document.getElementById("messagesContainer");
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         });
-    </script>
 
-    <style>
-        #messagesContainer {
-            min-height: 400px;
+        // 購買/索取商品功能
+        const purchaseBtn = document.getElementById("purchaseBtn");
+        if (purchaseBtn) {
+            purchaseBtn.addEventListener("click", function() {
+                const listingId = this.getAttribute("data-listing-id");
+                const isFreeOrCharity = '@(Model.ListingIsFree == true || Model.ListingIsCharity == true)' === 'True';
+                
+                // 顯示確認 Modal
+                const modal = new bootstrap.Modal(document.getElementById("purchaseConfirmModal"));
+                modal.show();
+                
+                // 設置確認按鈕的點擊事件
+                document.getElementById("confirmPurchaseBtn").onclick = async function() {
+                    // 立即禁用按鈕，防止重複提交
+                    const confirmButton = this;
+                    const originalText = confirmButton.textContent;
+                    confirmButton.disabled = true;
+                    confirmButton.textContent = "處理中...";
+                    
+                    try {
+                        const response = await fetch('/Message/SendPurchaseRequest', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                            },
+                            body: JSON.stringify({
+                                conversationId: '@Model.ConversationId',
+                                listingId: listingId,
+                                isFreeOrCharity: isFreeOrCharity
+                            })
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.success) {
+                                modal.hide();
+                                // 重新載入頁面以顯示「同意交易」按鈕（賣家）或更新狀態（買家）
+                                window.location.reload();
+                            } else {
+                                // 操作失敗，恢復按鈕狀態
+                                confirmButton.disabled = false;
+                                confirmButton.textContent = originalText;
+                                alert(result.error || '發送失敗，請稍後再試');
+                            }
+                        } else {
+                            // 請求失敗，恢復按鈕狀態
+                            confirmButton.disabled = false;
+                            confirmButton.textContent = originalText;
+                            alert('發送失敗，請稍後再試');
+                        }
+                    } catch (error) {
+                        // 發生錯誤，恢復按鈕狀態
+                        confirmButton.disabled = false;
+                        confirmButton.textContent = originalText;
+                        console.error('發送購買請求時發生錯誤:', error);
+                        alert('發送失敗，請稍後再試');
+                    }
+                };
+            });
         }
 
+        // 同意交易功能
+        const acceptPurchaseBtn = document.getElementById("acceptPurchaseBtn");
+        if (acceptPurchaseBtn) {
+            acceptPurchaseBtn.addEventListener("click", async function() {
+                // 立即禁用按鈕，防止重複提交
+                const button = this;
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.textContent = "處理中...";
+                
+                const listingId = button.getAttribute("data-listing-id");
+                const conversationId = button.getAttribute("data-conversation-id");
+                
+                if (!confirm("確定要同意此交易嗎？商品狀態將變為「保留中」。")) {
+                    // 用戶取消，恢復按鈕狀態
+                    button.disabled = false;
+                    button.textContent = originalText;
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/Message/AcceptPurchase', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        },
+                        body: JSON.stringify({
+                            conversationId: conversationId,
+                            listingId: listingId
+                        })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            // 重新載入頁面以更新商品狀態
+                            window.location.reload();
+                        } else {
+                            // 操作失敗，恢復按鈕狀態
+                            button.disabled = false;
+                            button.textContent = originalText;
+                            alert(result.error || '操作失敗，請稍後再試');
+                        }
+                    } else {
+                        // 請求失敗，恢復按鈕狀態
+                        button.disabled = false;
+                        button.textContent = originalText;
+                        alert('操作失敗，請稍後再試');
+                    }
+                } catch (error) {
+                    // 發生錯誤，恢復按鈕狀態
+                    button.disabled = false;
+                    button.textContent = originalText;
+                    console.error('同意交易時發生錯誤:', error);
+                    alert('操作失敗，請稍後再試');
+                }
+            });
+        }
+
+        // 完成交易功能
+        const completeTransactionBtn = document.getElementById("completeTransactionBtn");
+        if (completeTransactionBtn) {
+            completeTransactionBtn.addEventListener("click", async function() {
+                // 立即禁用按鈕，防止重複提交
+                const button = this;
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.textContent = "處理中...";
+                
+                const listingId = button.getAttribute("data-listing-id");
+                const conversationId = button.getAttribute("data-conversation-id");
+                
+                if (!confirm("確定要完成交易嗎？完成後將進入評價流程。")) {
+                    // 用戶取消，恢復按鈕狀態
+                    button.disabled = false;
+                    button.textContent = originalText;
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/Message/CompleteTransaction', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        },
+                        body: JSON.stringify({
+                            conversationId: conversationId,
+                            listingId: listingId
+                        })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            // 跳轉到評價頁面
+                            window.location.href = '/Message/Review?listingId=' + listingId + '&conversationId=' + conversationId;
+                        } else {
+                            // 操作失敗，恢復按鈕狀態
+                            button.disabled = false;
+                            button.textContent = originalText;
+                            alert(result.error || '操作失敗，請稍後再試');
+                        }
+                    } else {
+                        // 請求失敗，恢復按鈕狀態
+                        button.disabled = false;
+                        button.textContent = originalText;
+                        alert('操作失敗，請稍後再試');
+                    }
+                } catch (error) {
+                    // 發生錯誤，恢復按鈕狀態
+                    button.disabled = false;
+                    button.textContent = originalText;
+                    console.error('完成交易時發生錯誤:', error);
+                    alert('操作失敗，請稍後再試');
+                }
+            });
+        }
+    </script>
+
+    <!-- 購買/索取確認 Modal -->
+    <div class="modal fade" id="purchaseConfirmModal" tabindex="-1" aria-labelledby="purchaseConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="purchaseConfirmModalLabel">確認</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>請務必先跟賣家確認商品是否還在</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">確認</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* 隱藏 footer 並移除 navbar margin */
+        footer {
+            display: none !important;
+        }
+
+        .navbar {
+            margin-bottom: 0 !important;
+        }
+
+        /* 聊天頁面整體佈局 */
+        .chat-page {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 56px); /* 減去 navbar 高度（約 56px） */
+            background-color: #f8f9fa;
+        }
+
+        /* 對話標題 */
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background-color: #fff;
+            border-bottom: 1px solid #dee2e6;
+            flex-shrink: 0;
+        }
+
+        .chat-header h5 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* 商品 card 容器 */
+        .listing-card-container {
+            border-bottom: 1px solid #e5e5e5;
+            background-color: #fff;
+            flex-shrink: 0;
+        }
+
+        /* 商品 card - 確保左右分欄 */
+        .listing-card {
+            display: flex !important;
+            flex-direction: row !important;
+            padding: 1rem;
+            gap: 1rem;
+            align-items: flex-start;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .listing-card-link {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .listing-card-link:hover {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .listing-card-image-link {
+            text-decoration: none;
+            display: block;
+            flex-shrink: 0;
+        }
+
+        /* 左邊圖片 - 固定尺寸，不被擠壓 */
+        .listing-card-image {
+            width: 100px;
+            height: 100px;
+            min-width: 100px;
+            min-height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+            flex-shrink: 0;
+        }
+
+        .listing-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 右邊內容 */
+        .listing-card-content {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .listing-card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0;
+            color: #212529;
+            line-height: 1.4;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .listing-card-price {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .listing-price-text {
+            font-size: 1.1rem;
+        }
+
+        .listing-price-badge,
+        .listing-charity-badge,
+        .listing-status-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .listing-card-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .listing-action-btn {
+            flex: 1;
+            min-height: 36px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 6px;
+            padding: 0.35rem 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .listing-action-btn.btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+
+        .listing-action-btn.btn-danger:hover {
+            background-color: #bb2d3b;
+            border-color: #b02a37;
+        }
+
+        .listing-action-btn.btn-outline-secondary {
+            border-color: #dee2e6;
+            color: #212529;
+        }
+
+        .listing-action-btn.btn-outline-secondary:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* 訊息列表 - 可滾動區域 */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            padding-bottom: 80px; /* 預留底部輸入框空間 */
+            background-color: #f8f9fa;
+        }
+
+        /* 訊息輸入區 - 固定在底部 */
+        .message-input-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 0.75rem 1rem;
+            background-color: #fff;
+            border-top: 1px solid #dee2e6;
+            z-index: 100;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        .message-input-container .input-group {
+            max-width: 100%;
+        }
+
+        .message-input-container .form-control {
+            border-radius: 20px 0 0 20px;
+            padding: 0.5rem 1rem;
+        }
+
+        .message-input-container .btn {
+            border-radius: 0 20px 20px 0;
+            padding: 0.5rem 1.25rem;
+        }
+
+        /* 響應式設計 */
         @@media (max-width: 576px) {
-            .card {
-                height: calc(100vh - 200px) !important;
+            .chat-page {
+                height: calc(100vh - 60px);
+            }
+
+            .chat-header {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .chat-header h5 {
+                font-size: 1rem;
+            }
+
+            .listing-card {
+                padding: 0.75rem;
+                gap: 0.75rem;
+            }
+
+            .listing-card-image {
+                width: 90px;
+                height: 90px;
+                min-width: 90px;
+                min-height: 90px;
+            }
+
+            .listing-card-title {
+                font-size: 0.95rem;
+            }
+
+            .listing-price-text {
+                font-size: 1rem;
+            }
+
+            .listing-action-btn {
+                font-size: 0.85rem;
+                min-height: 32px;
+                padding: 0.3rem 0.4rem;
+            }
+
+            .messages-container {
+                padding: 0.75rem;
+                padding-bottom: 70px;
+            }
+
+            .message-input-container {
+                padding: 0.5rem 0.75rem;
+            }
+        }
+
+        @@media (min-width: 768px) {
+            .chat-page {
+                max-width: 800px;
+                margin: 0 auto;
+                height: calc(100vh - 100px);
+                border-left: 1px solid #dee2e6;
+                border-right: 1px solid #dee2e6;
+            }
+
+            .listing-card-image {
+                width: 120px;
+                height: 120px;
+                min-width: 120px;
+                min-height: 120px;
+            }
+
+            .listing-card-title {
+                font-size: 1.1rem;
+            }
+
+            .listing-price-text {
+                font-size: 1.2rem;
+            }
+
+            .listing-action-btn {
+                font-size: 1rem;
+                min-height: 40px;
+            }
+
+            .message-input-container {
+                max-width: 800px;
+                left: 50%;
+                transform: translateX(-50%);
             }
         }
     </style>
+}
+
+@functions {
+    string GetStatusText(NeighborGoods.Web.Models.Enums.ListingStatus status)
+    {
+        return status switch
+        {
+            NeighborGoods.Web.Models.Enums.ListingStatus.Active => "上架中",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Reserved => "保留中",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Sold => "已售出",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Donated => "已捐贈",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Inactive => "已下架",
+            _ => status.ToString()
+        };
+    }
 }
 
