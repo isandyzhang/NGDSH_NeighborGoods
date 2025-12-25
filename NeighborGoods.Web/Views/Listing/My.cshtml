@@ -1,0 +1,173 @@
+@model NeighborGoods.Web.Models.ViewModels.MyListingsViewModel
+@using NeighborGoods.Web.Models.Enums
+
+@{
+    ViewData["Title"] = "我的商品";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">我的商品</h2>
+
+    @if (Model.Listings == null || !Model.Listings.Any())
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <p class="text-muted mb-3">您還沒有刊登任何商品</p>
+                <a asp-controller="Listing" asp-action="Create" class="btn btn-primary btn-lg" style="min-height: 50px; font-size: 1.1rem;">
+                    立即刊登商品
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- 篩選按鈕（手機友善） -->
+        <div class="mb-3">
+            <div class="btn-group w-100" role="group" style="min-height: 44px;">
+                <button type="button" class="btn btn-outline-primary filter-btn active" data-status="all">
+                    全部 (@Model.Listings.Count)
+                </button>
+                <button type="button" class="btn btn-outline-primary filter-btn" data-status="@((int)ListingStatus.Active)">
+                    上架中 (@Model.Listings.Count(l => l.Status == ListingStatus.Active))
+                </button>
+                <button type="button" class="btn btn-outline-primary filter-btn" data-status="@((int)ListingStatus.Reserved)">
+                    保留中 (@Model.Listings.Count(l => l.Status == ListingStatus.Reserved))
+                </button>
+                <button type="button" class="btn btn-outline-primary filter-btn" data-status="completed">
+                    成交 (@Model.Listings.Count(l => l.Status == ListingStatus.Sold || l.Status == ListingStatus.Donated))
+                </button>
+            </div>
+        </div>
+
+        <!-- 商品列表 -->
+        <div class="row g-3" id="listingsContainer">
+            @foreach (var listing in Model.Listings)
+            {
+                var statusClass = listing.Status switch
+                {
+                    ListingStatus.Active => "success",
+                    ListingStatus.Reserved => "warning",
+                    ListingStatus.Sold => "info",
+                    ListingStatus.Donated => "primary",
+                    ListingStatus.Inactive => "secondary",
+                    _ => "secondary"
+                };
+
+                var statusText = listing.Status switch
+                {
+                    ListingStatus.Active => "上架中",
+                    ListingStatus.Reserved => "保留中",
+                    ListingStatus.Sold => "已售出",
+                    ListingStatus.Donated => "已捐贈",
+                    ListingStatus.Inactive => "已下架",
+                    _ => listing.Status.ToString()
+                };
+
+                var isCompleted = listing.Status == ListingStatus.Sold || listing.Status == ListingStatus.Donated;
+
+                <div class="col-12 col-md-6 col-lg-4 listing-item" 
+                     data-status="@((int)listing.Status)" 
+                     data-completed="@(isCompleted ? "true" : "false")">
+                    <div class="card h-100" style="cursor: pointer; transition: transform 0.2s;" 
+                         onclick="window.location.href='@Url.Action("Details", "Listing", new { id = listing.Id })'">
+                        @if (!string.IsNullOrEmpty(listing.FirstImageUrl))
+                        {
+                            <img src="@listing.FirstImageUrl" class="card-img-top" alt="@listing.Title" 
+                                 style="height: 200px; object-fit: cover;" loading="lazy">
+                        }
+                        else
+                        {
+                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                                 style="height: 200px;">
+                                <span class="text-muted">無圖片</span>
+                            </div>
+                        }
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title mb-2">@listing.Title</h5>
+                            <div class="mb-2">
+                                @if (listing.IsFree)
+                                {
+                                    <span class="badge bg-success">免費</span>
+                                }
+                                else
+                                {
+                                    <span class="text-primary fw-bold">NT$ @listing.Price.ToString("N0")</span>
+                                }
+                                @if (listing.IsCharity)
+                                {
+                                    <span class="badge bg-danger ms-1">愛心商品</span>
+                                }
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge bg-@statusClass">@statusText</span>
+                            </div>
+                            <div class="mt-auto">
+                                <small class="text-muted d-block mb-2">
+                                    刊登時間：@listing.CreatedAt.ToString("yyyy/MM/dd")
+                                </small>
+                                <a asp-action="Edit" asp-route-id="@listing.Id" 
+                                   class="btn btn-sm btn-outline-primary w-100"
+                                   onclick="event.stopPropagation();">
+                                    編輯商品
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // 篩選功能
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 更新按鈕狀態
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                const status = this.dataset.status;
+                const items = document.querySelectorAll('.listing-item');
+
+                items.forEach(item => {
+                    if (status === 'all') {
+                        item.style.display = '';
+                    } else if (status === 'completed') {
+                        const isCompleted = item.dataset.completed === 'true';
+                        item.style.display = isCompleted ? '' : 'none';
+                    } else {
+                        const itemStatus = item.dataset.status;
+                        item.style.display = itemStatus === status ? '' : 'none';
+                    }
+                });
+            });
+        });
+    </script>
+
+    <style>
+        /* 手機友善設計 */
+        @@media (max-width: 576px) {
+            .card {
+                border-radius: 12px;
+            }
+            
+            .card:active {
+                transform: scale(0.98);
+            }
+            
+            .btn-group {
+                flex-wrap: wrap;
+            }
+            
+            .btn-group .btn {
+                flex: 1 1 auto;
+                min-width: 0;
+                font-size: 14px;
+                padding: 8px 4px;
+            }
+        }
+    </style>
+}
+

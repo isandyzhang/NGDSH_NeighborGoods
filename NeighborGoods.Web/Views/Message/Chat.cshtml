@@ -1,0 +1,164 @@
+@model NeighborGoods.Web.Models.ViewModels.ChatViewModel
+
+@{
+    ViewData["Title"] = $"與 {Model.OtherUserDisplayName} 的對話";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card" style="height: 600px; display: flex; flex-direction: column;">
+                <!-- 對話標題 -->
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">與 @Model.OtherUserDisplayName 的對話</h5>
+                    <a asp-controller="Message" asp-action="Conversations" class="btn btn-sm btn-outline-secondary">
+                        返回對話列表
+                    </a>
+                </div>
+
+                <!-- 訊息列表 -->
+                <div class="card-body flex-grow-1 overflow-auto" id="messagesContainer" style="background-color: #f8f9fa;">
+                    @foreach (var message in Model.Messages)
+                    {
+                        <div class="mb-3 @(message.IsMine ? "text-end" : "text-start")">
+                            <div class="d-inline-block @(message.IsMine ? "bg-primary text-white" : "bg-white") rounded p-3 shadow-sm" 
+                                 style="max-width: 70%;">
+                                @if (!message.IsMine)
+                                {
+                                    <div class="small fw-bold mb-1">@message.SenderDisplayName</div>
+                                }
+                                <div class="mb-1">@message.Content</div>
+                                <div class="small @(message.IsMine ? "text-white-50" : "text-muted")">
+                                    @message.CreatedAt.ToString("HH:mm")
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- 訊息輸入區 -->
+                <div class="card-footer">
+                    <form id="messageForm" asp-controller="Message" asp-action="SendMessage" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ConversationId" value="@Model.ConversationId" />
+                        <div class="input-group">
+                            <input type="text" 
+                                   name="Content" 
+                                   id="messageInput" 
+                                   class="form-control" 
+                                   placeholder="輸入訊息..." 
+                                   required 
+                                   maxlength="1000" />
+                            <button type="submit" class="btn btn-primary" id="sendButton">發送</button>
+                        </div>
+                        <span class="text-danger" id="validationError"></span>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/messageHub")
+            .build();
+
+        connection.start().then(function () {
+            console.log("SignalR 連線已建立");
+        }).catch(function (err) {
+            console.error("SignalR 連線失敗:", err);
+        });
+
+        // 接收訊息
+        connection.on("ReceiveMessage", function (senderDisplayName, content, createdAt) {
+            const messagesContainer = document.getElementById("messagesContainer");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "mb-3 text-start";
+            
+            const messageContent = document.createElement("div");
+            messageContent.className = "d-inline-block bg-white rounded p-3 shadow-sm";
+            messageContent.style.maxWidth = "70%";
+            
+            const senderName = document.createElement("div");
+            senderName.className = "small fw-bold mb-1";
+            senderName.textContent = senderDisplayName;
+            
+            const messageText = document.createElement("div");
+            messageText.className = "mb-1";
+            messageText.textContent = content;
+            
+            const messageTime = document.createElement("div");
+            messageTime.className = "small text-muted";
+            const time = new Date(createdAt);
+            messageTime.textContent = time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+            
+            messageContent.appendChild(senderName);
+            messageContent.appendChild(messageText);
+            messageContent.appendChild(messageTime);
+            messageDiv.appendChild(messageContent);
+            messagesContainer.appendChild(messageDiv);
+            
+            // 自動滾動到底部
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+
+        // 處理表單提交
+        document.getElementById("messageForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+            
+            const messageInput = document.getElementById("messageInput");
+            const content = messageInput.value.trim();
+            
+            if (!content) {
+                return;
+            }
+            
+            const sendButton = document.getElementById("sendButton");
+            sendButton.disabled = true;
+            
+            try {
+                const formData = new FormData(this);
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    messageInput.value = '';
+                    // 訊息會透過 SignalR 即時顯示，不需要手動添加
+                } else {
+                    alert('發送訊息失敗，請稍後再試');
+                }
+            } catch (error) {
+                console.error('發送訊息時發生錯誤:', error);
+                alert('發送訊息失敗，請稍後再試');
+            } finally {
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        });
+
+        // 頁面載入時自動滾動到底部
+        window.addEventListener('load', function() {
+            const messagesContainer = document.getElementById("messagesContainer");
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+    </script>
+
+    <style>
+        #messagesContainer {
+            min-height: 400px;
+        }
+
+        @@media (max-width: 576px) {
+            .card {
+                height: calc(100vh - 200px) !important;
+            }
+        }
+    </style>
+}
+

@@ -1,0 +1,80 @@
+@model NeighborGoods.Web.Models.ViewModels.ConversationListViewModel
+
+@{
+    ViewData["Title"] = "我的訊息";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">我的訊息</h2>
+
+    @if (Model.Conversations == null || !Model.Conversations.Any())
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <p class="text-muted mb-3">您還沒有任何對話</p>
+                <a asp-controller="Home" asp-action="Index" class="btn btn-primary">
+                    瀏覽商品
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var conversation in Model.Conversations)
+            {
+                <a asp-controller="Message" asp-action="Chat" asp-route-conversationId="@conversation.ConversationId" 
+                   class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1">@conversation.OtherUserDisplayName</h5>
+                            @if (!string.IsNullOrEmpty(conversation.LastMessage))
+                            {
+                                <p class="mb-1 text-muted" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 500px;">
+                                    @conversation.LastMessage
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="mb-1 text-muted">尚無訊息</p>
+                            }
+                        </div>
+                        <div class="text-end">
+                            @if (conversation.LastMessageTime.HasValue)
+                            {
+                                <small class="text-muted">
+                                    @conversation.LastMessageTime.Value.ToString("MM/dd HH:mm")
+                                </small>
+                            }
+                            @if (conversation.UnreadCount > 0)
+                            {
+                                <span class="badge bg-primary rounded-pill ms-2">@conversation.UnreadCount</span>
+                            }
+                        </div>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <style>
+        .list-group-item {
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: background-color 0.2s;
+        }
+
+        .list-group-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        @@media (max-width: 576px) {
+            .list-group-item {
+                border-radius: 12px;
+            }
+        }
+    </style>
+}
+

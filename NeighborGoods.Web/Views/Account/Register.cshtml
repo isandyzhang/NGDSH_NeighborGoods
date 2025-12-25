@@ -1,0 +1,53 @@
+@model NeighborGoods.Web.Models.ViewModels.RegisterViewModel
+
+@{
+    ViewData["Title"] = "註冊";
+}
+
+<h2 class="mt-4 mb-3">註冊新帳號</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="alert alert-info">
+            <strong>密碼規則：</strong>
+            <ul class="mb-0">
+                <li>至少 6 個字元</li>
+                <li>至少 1 個大寫英文字母（A-Z）</li>
+                <li>至少 1 個小寫英文字母（a-z）</li>
+                <li>至少 1 個數字（0-9）</li>
+                <li>至少 1 個特殊符號（例如 <code>! @@ # ?</code> 等）</li>
+            </ul>
+        </div>
+        <form asp-action="Register" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="UserName" class="form-label"></label>
+                <input asp-for="UserName" class="form-control" />
+                <span asp-validation-for="UserName" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="DisplayName" class="form-label"></label>
+                <input asp-for="DisplayName" class="form-control" />
+                <span asp-validation-for="DisplayName" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label"></label>
+                <input asp-for="Password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="ConfirmPassword" class="form-label"></label>
+                <input asp-for="ConfirmPassword" class="form-control" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">註冊</button>
+            <a asp-action="Login" class="btn btn-link">已經有帳號？前往登入</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+

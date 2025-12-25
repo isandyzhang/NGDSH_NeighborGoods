@@ -1,0 +1,89 @@
+# Azure DevOps Pipeline for NeighborGoods (Linux)
+# 限制並行執行以避免並行作業限制
+
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  solution: '**/*.sln'
+
+stages:
+- stage: Build
+  displayName: 'Build Application'
+  jobs:
+  - job: Build
+    displayName: 'Build .NET Application'
+    strategy:
+      maxParallel: 1  # 限制並行執行
+    steps:
+    
+    - task: UseDotNet@2
+      displayName: 'Use .NET 8.0 SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '8.0.x'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore packages'
+      inputs:
+        command: 'restore'
+        projects: '$(solution)'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Build solution'
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish application'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/NeighborGoods.Web.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish artifacts'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'drop'
+
+# 新增：部署階段
+- stage: Deploy
+  displayName: 'Deploy to Azure App Service'
+  dependsOn: Build  # 等待 Build 階段完成
+  condition: succeeded()  # 只有建置成功才部署
+  jobs:
+  - deployment: DeployToAzure
+    displayName: 'Deploy to Azure App Service'
+    environment: 'production'  # 需要在 Azure DevOps 中建立環境
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          
+          # 下載建置成品
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download build artifacts'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          # 部署到 Azure App Service
+          - task: AzureWebApp@1
+            displayName: 'Deploy to Azure App Service'
+            inputs:
+              azureSubscription: 'NeighborGoods'  # 您的 Service Connection 名稱
+              appName: 'NeighborGoods'  # ←  App Service 名稱
+              resourceGroupName: 'NeighborGoods' # 資源群組名稱
+              package: '$(System.ArtifactsDirectory)/drop/*.zip'
+              deploymentMethod: 'auto'

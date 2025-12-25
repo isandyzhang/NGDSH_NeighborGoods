@@ -1,0 +1,559 @@
+@model NeighborGoods.Web.Models.ViewModels.ListingDetailsViewModel
+
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<!-- 頂部導航欄 -->
+<div class="listing-top-nav">
+    <a href="javascript:history.back()" class="back-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+        </svg>
+    </a>
+</div>
+
+<!-- 商品圖片區 -->
+@if (Model.Images != null && Model.Images.Any())
+{
+    <div id="listingCarousel" class="carousel slide listing-image-carousel" data-bs-ride="carousel">
+        <div class="carousel-inner">
+            @for (int i = 0; i < Model.Images.Count; i++)
+            {
+                <div class="carousel-item @(i == 0 ? "active" : "")">
+                    <img src="@Model.Images[i]" class="d-block w-100 listing-image" alt="商品圖片 @(i + 1)">
+                </div>
+            }
+        </div>
+        @if (Model.Images.Count > 1)
+        {
+            <button class="carousel-control-prev" type="button" data-bs-target="#listingCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">上一張</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#listingCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">下一張</span>
+            </button>
+            <!-- 圖片指示器 -->
+            <div class="carousel-indicators listing-indicators">
+                @for (int i = 0; i < Model.Images.Count; i++)
+                {
+                    <button type="button" data-bs-target="#listingCarousel" data-bs-slide-to="@i" class="@(i == 0 ? "active" : "")" aria-current="@(i == 0 ? "true" : "false")" aria-label="圖片 @(i + 1)"></button>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="listing-image-placeholder">
+        <span class="text-muted">無圖片</span>
+    </div>
+}
+
+<!-- 商品資訊區 -->
+<div class="listing-info-container">
+    <div class="listing-info-content">
+        <!-- 標題 -->
+        <h1 class="listing-title">@Model.Title</h1>
+
+        <!-- 價格 -->
+        <div class="listing-price-section">
+            @if (Model.IsFree)
+            {
+                <span class="listing-price-free">免費</span>
+            }
+            else
+            {
+                <span class="listing-price">NT$ @Model.Price.ToString("N0")</span>
+            }
+            @if (Model.IsCharity)
+            {
+                <span class="badge bg-danger ms-2">愛心商品</span>
+            }
+        </div>
+
+        <!-- 發布信息 -->
+        <div class="listing-meta">
+            <span class="listing-time">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                </svg>
+                <span class="relative-time" data-created-at="@Model.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")"></span>
+                <span class="ms-1">by @Model.SellerDisplayName</span>
+            </span>
+        </div>
+
+        <!-- 狀態和分類標籤 -->
+        <div class="listing-tags">
+            <span class="badge bg-secondary listing-status-badge">@GetStatusText(Model.Status)</span>
+            <span class="badge bg-info ms-2 listing-category-badge">@GetCategoryText(Model.Category)</span>
+            <span class="badge bg-success ms-2">@GetConditionText(Model.Condition)</span>
+        </div>
+
+        <hr class="listing-divider" />
+
+        <!-- 商品描述 -->
+        <div class="listing-description">
+            <h5 class="listing-section-title">商品描述</h5>
+            <p class="listing-description-text">@Model.Description</p>
+        </div>
+
+        <!-- 面交地點 -->
+        <div class="listing-pickup">
+            <h5 class="listing-section-title">面交地點</h5>
+            <p class="listing-pickup-text">@GetPickupLocationText(Model.PickupLocation)</p>
+        </div>
+
+        <hr class="listing-divider" />
+
+        <!-- 賣家信息（僅桌面版顯示） -->
+        <div class="listing-seller-info d-none d-md-block">
+            <small class="text-muted">
+                <strong>賣家：</strong>@Model.SellerDisplayName<br>
+                <strong>刊登時間：</strong>@Model.CreatedAt.ToString("yyyy/MM/dd HH:mm")<br>
+                @if (Model.UpdatedAt != Model.CreatedAt)
+                {
+                    <strong>更新時間：</strong>@Model.UpdatedAt.ToString("yyyy/MM/dd HH:mm")
+                }
+            </small>
+        </div>
+
+    </div>
+</div>
+
+<!-- 底部固定操作欄 -->
+<div class="listing-bottom-bar">
+    @if (Model.IsOwner)
+    {
+        <a asp-controller="Listing" asp-action="Edit" asp-route-id="@Model.Id" 
+           class="btn btn-primary listing-chat-btn listing-update-btn">
+            編輯商品
+        </a>
+        <a asp-controller="Listing" asp-action="UpdateStatus" asp-route-id="@Model.Id" 
+           class="btn btn-warning listing-chat-btn listing-update-btn">
+            修改商品狀態
+        </a>
+        <form asp-controller="Listing" asp-action="Delete" asp-route-id="@Model.Id" method="post" 
+              onsubmit="return confirm('確定要刪除這個商品嗎？此操作無法復原。');" class="d-inline listing-delete-form">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger listing-offer-btn listing-delete-btn">
+                刪除商品
+            </button>
+        </form>
+    }
+    else
+    {
+        @if (Model.CanMessage)
+        {
+            <a asp-controller="Message" asp-action="ChatWithUser" asp-route-userId="@Model.SellerId" 
+               class="btn btn-primary listing-chat-btn">
+                聊天
+            </a>
+        }
+        <button type="button" class="btn btn-danger listing-offer-btn" disabled>
+            出價
+        </button>
+    }
+</div>
+
+@functions {
+    string GetStatusText(NeighborGoods.Web.Models.Enums.ListingStatus status)
+    {
+        return status switch
+        {
+            NeighborGoods.Web.Models.Enums.ListingStatus.Active => "上架中",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Reserved => "保留中",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Sold => "已售出",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Donated => "已捐贈",
+            NeighborGoods.Web.Models.Enums.ListingStatus.Inactive => "已下架",
+            _ => status.ToString()
+        };
+    }
+
+    string GetCategoryText(NeighborGoods.Web.Models.Enums.ListingCategory category)
+    {
+        return category switch
+        {
+            NeighborGoods.Web.Models.Enums.ListingCategory.Furniture => "家具家飾",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Electronics => "電子產品",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Clothing => "服飾配件",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Books => "書籍文具",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Sports => "運動用品",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Toys => "玩具遊戲",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Kitchen => "廚房用品",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Daily => "生活用品",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Baby => "嬰幼兒用品",
+            NeighborGoods.Web.Models.Enums.ListingCategory.Other => "其他",
+            _ => category.ToString()
+        };
+    }
+
+    string GetPickupLocationText(NeighborGoods.Web.Models.Enums.ListingPickupLocation location)
+    {
+        return location switch
+        {
+            NeighborGoods.Web.Models.Enums.ListingPickupLocation.NorthBuilding => "北棟管理室",
+            NeighborGoods.Web.Models.Enums.ListingPickupLocation.SouthBuilding => "南棟管理室",
+            NeighborGoods.Web.Models.Enums.ListingPickupLocation.Gym => "風雨操場",
+            NeighborGoods.Web.Models.Enums.ListingPickupLocation.Message => "私訊",
+            _ => location.ToString()
+        };
+    }
+
+    string GetConditionText(NeighborGoods.Web.Models.Enums.ListingCondition condition)
+    {
+        return condition switch
+        {
+            NeighborGoods.Web.Models.Enums.ListingCondition.New => "全新",
+            NeighborGoods.Web.Models.Enums.ListingCondition.LikeNew => "近全新",
+            NeighborGoods.Web.Models.Enums.ListingCondition.Good => "良好",
+            NeighborGoods.Web.Models.Enums.ListingCondition.Fair => "普通",
+            NeighborGoods.Web.Models.Enums.ListingCondition.WellUsed => "歲月痕跡",
+            _ => condition.ToString()
+        };
+    }
+}
+
+@section Scripts {
+    <style>
+        /* 頂部導航欄 */
+        .listing-top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1030;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        .back-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            color: #212529;
+            text-decoration: none;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .back-button:hover {
+            background-color: #f0f0f0;
+            color: #212529;
+        }
+
+        /* 圖片區域 */
+        .listing-image-carousel {
+            margin-top: 56px;
+            width: 100%;
+        }
+
+        .listing-image {
+            width: 100%;
+            height: auto;
+            max-height: 70vh;
+            object-fit: contain;
+            background-color: #f8f9fa;
+        }
+
+        .listing-image-placeholder {
+            margin-top: 56px;
+            width: 100%;
+            height: 50vh;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 圖片指示器 */
+        .listing-indicators {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+        .listing-indicators button {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: none;
+            background-color: rgba(255, 255, 255, 0.5);
+            padding: 0;
+            margin: 0;
+            opacity: 0.5;
+            transition: opacity 0.3s, background-color 0.3s;
+        }
+
+        .listing-indicators button.active {
+            background-color: #28a745;
+            opacity: 1;
+        }
+
+        /* 商品資訊區 */
+        .listing-info-container {
+            padding: 1.5rem 1rem;
+            padding-bottom: 100px; /* 為底部操作欄留空間 */
+        }
+
+        .listing-info-content {
+            max-width: 100%;
+        }
+
+        .listing-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #212529;
+            line-height: 1.4;
+        }
+
+        .listing-price-section {
+            margin-bottom: 1rem;
+        }
+
+        .listing-price {
+            font-size: 1.75rem;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+
+        .listing-price-free {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .listing-meta {
+            margin-bottom: 1rem;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .listing-time {
+            display: flex;
+            align-items: center;
+        }
+
+        .listing-tags {
+            margin-bottom: 1rem;
+        }
+
+        .listing-divider {
+            margin: 1.5rem 0;
+            border-color: #e5e5e5;
+        }
+
+        .listing-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #212529;
+        }
+
+        .listing-description {
+            margin-bottom: 1.5rem;
+        }
+
+        .listing-description-text {
+            color: #6c757d;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .listing-pickup {
+            margin-bottom: 1.5rem;
+        }
+
+        .listing-pickup-text {
+            color: #6c757d;
+            margin: 0;
+        }
+
+        /* 底部固定操作欄 */
+        .listing-bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e5e5;
+            padding: 0.75rem 1rem;
+            display: flex;
+            gap: 0.75rem;
+            z-index: 1020;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .listing-chat-btn,
+        .listing-update-btn {
+            flex: 2;
+            min-height: 44px;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 8px;
+        }
+
+        .listing-delete-form {
+            display: flex;
+            flex: 1;
+        }
+
+        .listing-delete-btn {
+            width: 100%;
+            min-height: 44px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+        }
+
+        .listing-offer-btn {
+            flex: 1;
+            min-height: 44px;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 8px;
+        }
+
+        .listing-chat-btn {
+            background-color: #000;
+            border-color: #000;
+            color: white;
+        }
+
+        .listing-chat-btn:hover {
+            background-color: #333;
+            border-color: #333;
+            color: white;
+        }
+
+        .listing-offer-btn {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+
+        .listing-offer-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 桌面版樣式 */
+        @@media (min-width: 768px) {
+            .listing-top-nav {
+                position: relative;
+                background: transparent;
+                border-bottom: none;
+                padding: 0;
+                margin-bottom: 1rem;
+            }
+
+            .listing-image-carousel {
+                margin-top: 0;
+                max-width: 800px;
+                margin: 0 auto;
+            }
+
+            .listing-image {
+                max-height: 600px;
+            }
+
+            .listing-info-container {
+                max-width: 800px;
+                margin: 0 auto;
+                padding-bottom: 2rem;
+            }
+
+            .listing-bottom-bar {
+                position: relative;
+                max-width: 800px;
+                margin: 2rem auto 0;
+                border-top: none;
+                box-shadow: none;
+                padding: 0;
+            }
+
+            .listing-chat-btn,
+            .listing-update-btn {
+                flex: 2;
+                max-width: 400px;
+            }
+
+            .listing-delete-form {
+                flex: 1;
+            }
+
+            .listing-delete-btn {
+                max-width: 180px;
+            }
+        }
+
+        /* 手機友善設計 */
+        @@media (max-width: 576px) {
+            .btn-lg {
+                font-size: 16px; /* 防止 iOS 自動縮放 */
+            }
+        }
+    </style>
+
+    <script>
+        // 相對時間計算
+        function formatRelativeTime(dateString) {
+            const now = new Date();
+            const created = new Date(dateString);
+            const diffMs = now - created;
+            const diffSecs = Math.floor(diffMs / 1000);
+            const diffMins = Math.floor(diffSecs / 60);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            const diffWeeks = Math.floor(diffDays / 7);
+            const diffMonths = Math.floor(diffDays / 30);
+            const diffYears = Math.floor(diffDays / 365);
+
+            if (diffSecs < 60) {
+                return '剛剛';
+            } else if (diffMins < 60) {
+                return diffMins + ' 分鐘前';
+            } else if (diffHours < 24) {
+                return diffHours + ' 小時前';
+            } else if (diffDays < 7) {
+                return diffDays + ' 天前';
+            } else if (diffWeeks < 4) {
+                return diffWeeks + ' 週前';
+            } else if (diffMonths < 12) {
+                return diffMonths + ' 個月前';
+            } else {
+                return diffYears + ' 年前';
+            }
+        }
+
+        // 初始化相對時間顯示
+        document.addEventListener('DOMContentLoaded', function() {
+            const timeElements = document.querySelectorAll('.relative-time');
+            timeElements.forEach(function(element) {
+                const createdAt = element.getAttribute('data-created-at');
+                if (createdAt) {
+                    element.textContent = formatRelativeTime(createdAt);
+                }
+            });
+        });
+    </script>
+}

@@ -1,0 +1,277 @@
+﻿@model NeighborGoods.Web.Models.ViewModels.ListingSearchViewModel
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using NeighborGoods.Web.Models.Entities
+@using NeighborGoods.Web.Data
+@inject UserManager<ApplicationUser> UserManager
+@inject AppDbContext DbContext
+
+@{
+    ViewData["Title"] = "商品列表";
+    
+    var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
+    var unreadCount = 0;
+    
+    if (isAuthenticated && User != null)
+    {
+        var appUser = await UserManager.GetUserAsync(User);
+        if (appUser != null)
+        {
+            try
+            {
+                var conversations = await DbContext.Conversations
+                    .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
+                    .Where(c => c.Participant1Id == appUser.Id || c.Participant2Id == appUser.Id)
+                    .ToListAsync();
+                
+                foreach (var conversation in conversations)
+                {
+                    var lastMessage = conversation.Messages
+                        .OrderByDescending(m => m.CreatedAt)
+                        .FirstOrDefault();
+                    
+                    if (lastMessage != null && lastMessage.SenderId != appUser.Id)
+                    {
+                        unreadCount++;
+                    }
+                }
+            }
+            catch
+            {
+                unreadCount = 0;
+            }
+        }
+    }
+}
+
+<div class="container-fluid px-3">
+    <!-- 快捷按鈕區域 -->
+    <div class="quick-actions mt-4 mb-3">
+        <div class="row g-2">
+            <div class="col-6">
+                @if (isAuthenticated)
+                {
+                    <a asp-controller="Listing" asp-action="Create" class="btn btn-primary quick-action-btn w-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-plus-circle me-2" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+                        </svg>
+                        刊登商品
+                    </a>
+                }
+                else
+                {
+                    <a asp-controller="Account" asp-action="Login" class="btn btn-primary quick-action-btn w-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-plus-circle me-2" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+                        </svg>
+                        刊登商品
+                    </a>
+                }
+            </div>
+            <div class="col-6">
+                @if (isAuthenticated)
+                {
+                    <a asp-controller="Message" asp-action="Conversations" class="btn btn-outline-primary quick-action-btn w-100">
+                        <span class="d-flex align-items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-envelope me-2" viewBox="0 0 16 16">
+                                <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                            </svg>
+                            我的訊息
+                        </span>
+                        @if (unreadCount > 0)
+                        {
+                            <span class="unread-badge">@unreadCount</span>
+                        }
+                    </a>
+                }
+                else
+                {
+                    <a asp-controller="Account" asp-action="Login" class="btn btn-outline-primary quick-action-btn w-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-envelope me-2" viewBox="0 0 16 16">
+                            <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                        </svg>
+                        我的訊息
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <h2 class="mb-4">商品列表</h2>
+
+    <!-- 搜尋與篩選表單 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index" class="row g-3">
+                <div class="col-12 col-md-6">
+                    <label for="search" class="form-label">關鍵字搜尋</label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="search" 
+                           name="search" 
+                           value="@Model?.Search" 
+                           placeholder="搜尋商品標題或描述...">
+                </div>
+                
+                <div class="col-6 col-md-3">
+                    <label for="category" class="form-label">商品分類</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="">全部</option>
+                        @foreach (var cat in Html.GetEnumSelectList<NeighborGoods.Web.Models.Enums.ListingCategory>())
+                        {
+                            <option value="@cat.Value" selected="@(Model?.Category?.ToString() == cat.Value)">@cat.Text</option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="col-6 col-md-3">
+                    <label for="condition" class="form-label">新舊程度</label>
+                    <select class="form-select" id="condition" name="condition">
+                        <option value="">全部</option>
+                        @foreach (var cond in Html.GetEnumSelectList<NeighborGoods.Web.Models.Enums.ListingCondition>())
+                        {
+                            <option value="@cond.Value" selected="@(Model?.Condition?.ToString() == cond.Value)">@cond.Text</option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="col-6 col-md-3">
+                    <label for="minPrice" class="form-label">最低價格</label>
+                    <input type="number" 
+                           class="form-control" 
+                           id="minPrice" 
+                           name="minPrice" 
+                           value="@Model?.MinPrice" 
+                           min="0" 
+                           placeholder="0">
+                </div>
+                
+                <div class="col-6 col-md-3">
+                    <label for="maxPrice" class="form-label">最高價格</label>
+                    <input type="number" 
+                           class="form-control" 
+                           id="maxPrice" 
+                           name="maxPrice" 
+                           value="@Model?.MaxPrice" 
+                           min="0" 
+                           placeholder="不限">
+                </div>
+                
+                <div class="col-6 col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               id="isFree" 
+                               name="isFree" 
+                               value="true"
+                               checked="@(Model?.IsFree == true)">
+                        <label class="form-check-label" for="isFree">
+                            只看免費商品
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-6 col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               id="isCharity" 
+                               name="isCharity" 
+                               value="true"
+                               checked="@(Model?.IsCharity == true)">
+                        <label class="form-check-label" for="isCharity">
+                            只看愛心商品
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary me-2">搜尋</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">清除篩選</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model == null || Model.Listings == null || !Model.Listings.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            目前沒有上架中的商品。
+        </div>
+    }
+    else
+    {
+        <div class="listing-list">
+            @foreach (var listing in Model.Listings)
+            {
+                var timeAgo = "";
+                var timeDiff = DateTime.Now - listing.CreatedAt;
+                if (timeDiff.TotalDays < 1)
+                {
+                    if (timeDiff.TotalHours < 1)
+                    {
+                        timeAgo = $"{(int)timeDiff.TotalMinutes} 分鐘前";
+                    }
+                    else
+                    {
+                        timeAgo = $"{(int)timeDiff.TotalHours} 小時前";
+                    }
+                }
+                else if (timeDiff.TotalDays < 7)
+                {
+                    timeAgo = $"{(int)timeDiff.TotalDays} 天前";
+                }
+                else if (timeDiff.TotalDays < 30)
+                {
+                    timeAgo = $"{(int)(timeDiff.TotalDays / 7)} 週前";
+                }
+                else if (timeDiff.TotalDays < 365)
+                {
+                    timeAgo = $"{(int)(timeDiff.TotalDays / 30)} 個月前";
+                }
+                else
+                {
+                    timeAgo = $"{(int)(timeDiff.TotalDays / 365)} 年前";
+                }
+
+                <a asp-controller="Listing" asp-action="Details" asp-route-id="@listing.Id" class="listing-card">
+                    @if (!string.IsNullOrEmpty(listing.FirstImageUrl))
+                    {
+                        <img src="@listing.FirstImageUrl" class="listing-card-image" alt="@listing.Title">
+                    }
+                    else
+                    {
+                        <div class="listing-card-image-placeholder">
+                            <span>無圖片</span>
+                        </div>
+                    }
+                    <div class="listing-card-content">
+                        <div>
+                            <h5 class="listing-card-title">@listing.Title</h5>
+                            <div class="listing-card-price">
+                                @if (listing.IsFree)
+                                {
+                                    <span class="badge bg-success">免費</span>
+                                }
+                                else
+                                {
+                                    <span>NT$ @listing.Price.ToString("N0")</span>
+                                }
+                                @if (listing.IsCharity)
+                                {
+                                    <span class="badge bg-danger ms-1">愛心商品</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="listing-card-meta">
+                            <div>賣家：@listing.SellerDisplayName</div>
+                            <div class="listing-card-time">@timeAgo</div>
+                        </div>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</div>

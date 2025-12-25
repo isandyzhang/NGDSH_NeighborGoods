@@ -1,0 +1,154 @@
+@model NeighborGoods.Web.Models.ViewModels.ProfileViewModel
+@using NeighborGoods.Web.Models.Enums
+
+@{
+    ViewData["Title"] = "個人資料";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">個人資料</h2>
+
+    <!-- 個人資訊區塊 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">基本資訊</h5>
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <strong>用戶名稱：</strong>
+                    <div class="text-muted">@Model.User.UserName</div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <strong>顯示名稱：</strong>
+                    <div class="text-muted">@Model.User.DisplayName</div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <strong>註冊時間：</strong>
+                    <div class="text-muted">@Model.User.CreatedAt.ToString("yyyy/MM/dd HH:mm")</div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.User.LineUserId))
+                {
+                    <div class="col-12 col-md-6">
+                        <strong>登入方式：</strong>
+                        <div class="text-muted">LINE 登入</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計數據區塊 -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary mb-0">@Model.TotalListings</h3>
+                    <small class="text-muted">總刊登數</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success mb-0">@Model.ActiveListings</h3>
+                    <small class="text-muted">上架中</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info mb-0">@Model.CompletedListings</h3>
+                    <small class="text-muted">成交紀錄</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速連結區塊 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">我的商品</h5>
+            <a asp-controller="Listing" asp-action="My" class="btn btn-primary btn-lg w-100 mb-3" style="min-height: 50px; font-size: 1.1rem;">
+                查看我的商品
+            </a>
+        </div>
+    </div>
+
+    <!-- 成交紀錄區塊 -->
+    @if (Model.CompletedListings > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">成交紀錄</h5>
+                <p class="text-muted">您有 @Model.CompletedListings 筆已售出或已捐贈的商品</p>
+                <a asp-controller="Listing" asp-action="My" class="btn btn-outline-primary w-100" style="min-height: 44px;">
+                    查看成交紀錄
+                </a>
+            </div>
+        </div>
+    }
+
+    <!-- 刪除帳號區塊 -->
+    <div class="card border-danger mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-danger mb-3">危險操作</h5>
+            <p class="text-muted mb-3">
+                <strong>警告：</strong>刪除帳號將會永久刪除您的所有資料，包括：
+            </p>
+            <ul class="text-muted mb-3">
+                <li>所有已刊登的商品</li>
+                <li>所有商品圖片</li>
+                <li>所有交易紀錄</li>
+            </ul>
+            <p class="text-danger fw-bold mb-3">此操作無法復原！</p>
+            <button type="button" class="btn btn-danger btn-lg w-100" data-bs-toggle="modal" data-bs-target="#deleteAccountModal" style="min-height: 50px; font-size: 1.1rem;">
+                刪除帳號
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除帳號確認 Modal -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-labelledby="deleteAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-danger">
+                <h5 class="modal-title text-danger" id="deleteAccountModalLabel">確認刪除帳號</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="fw-bold text-danger">您確定要刪除帳號嗎？</p>
+                <p>此操作將會：</p>
+                <ul>
+                    <li>永久刪除您的所有已刊登商品（共 @Model.TotalListings 筆）</li>
+                    <li>永久刪除所有商品圖片</li>
+                    <li>永久刪除所有交易紀錄</li>
+                </ul>
+                <p class="text-danger fw-bold">此操作無法復原！</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form asp-action="DeleteAccount" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">確認刪除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        /* 手機友善設計 */
+        @@media (max-width: 576px) {
+            .card {
+                border-radius: 12px;
+            }
+            
+            .btn-lg {
+                font-size: 16px; /* 防止 iOS 自動縮放 */
+            }
+        }
+    </style>
+}
+
