@@ -15,10 +15,16 @@ html {
 html {
   position: relative;
   min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-width: 100%;
 }
 
 body {
   margin-bottom: 60px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-width: 100%;
 }
 
 /* 側邊欄樣式 */

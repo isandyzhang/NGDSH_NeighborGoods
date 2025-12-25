@@ -416,7 +416,7 @@ public class AccountController : BaseController
     }
 
     /// <summary>
-    /// 顯示賣家資料頁面
+    /// 顯示用戶個人檔案頁面（包含成交紀錄和評分）
     /// </summary>
     [HttpGet]
     [AllowAnonymous]

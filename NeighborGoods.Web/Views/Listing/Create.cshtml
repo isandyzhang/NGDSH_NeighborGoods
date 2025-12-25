@@ -63,8 +63,11 @@
             </div>
 
             <div class="mb-3 form-check form-check-lg">
-                <input asp-for="IsCharity" class="form-check-input" type="checkbox" style="width: 1.5rem; height: 1.5rem;" />
+                <input asp-for="IsCharity" id="IsCharity" class="form-check-input charity-checkbox" type="checkbox" style="width: 1.5rem; height: 1.5rem;" />
                 <label asp-for="IsCharity" class="form-check-label fs-5">愛心商品</label>
+                <div class="form-text mt-1">
+                    <small class="text-muted">愛心商品可讓公益團體免費索取，一起做愛心！</small>
+                </div>
             </div>
 
             <div class="mb-3">
@@ -118,8 +121,9 @@
                 }
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg w-100 mb-4" style="min-height: 50px; font-size: 1.1rem;">
-                送出刊登
+            <button type="submit" id="submitBtn" class="btn btn-primary btn-lg w-100 mb-4" style="min-height: 50px; font-size: 1.1rem;">
+                <span id="submitBtnText">送出刊登</span>
+                <span id="submitBtnSpinner" class="spinner-border spinner-border-sm d-none ms-2" role="status" aria-hidden="true"></span>
             </button>
         </form>
     </div>
@@ -209,8 +213,42 @@
 
         // 表單送出前檢查：至少需要一張圖片
         const form = document.querySelector('form');
+        const submitBtn = document.getElementById('submitBtn');
+        const submitBtnText = document.getElementById('submitBtnText');
+        const submitBtnSpinner = document.getElementById('submitBtnSpinner');
+        let isSubmitting = false;
+        
+        // 顯示載入狀態
+        function showLoadingState() {
+            if (submitBtn && submitBtnText && submitBtnSpinner) {
+                submitBtn.disabled = true;
+                submitBtnText.textContent = '刊登商品中...';
+                submitBtnSpinner.classList.remove('d-none');
+            }
+        }
+        
+        // 重置按鈕狀態
+        function resetButtonState() {
+            if (submitBtn && submitBtnText && submitBtnSpinner) {
+                submitBtn.disabled = false;
+                submitBtnText.textContent = '送出刊登';
+                submitBtnSpinner.classList.add('d-none');
+            }
+            isSubmitting = false;
+        }
+        
         if (form) {
             form.addEventListener('submit', function(e) {
+                // 防止重複提交
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // 立即顯示載入狀態，讓用戶知道系統正在處理
+                isSubmitting = true;
+                showLoadingState();
+                
                 // 檢查是否有至少一張圖片
                 const imageInputs = document.querySelectorAll('.image-input');
                 let hasImage = false;
@@ -222,6 +260,7 @@
 
                 if (!hasImage) {
                     e.preventDefault();
+                    resetButtonState();
                     alert('請至少上傳一張商品照片');
                     return false;
                 }
@@ -231,9 +270,24 @@
                 if (price === 0) {
                     if (!confirm('您正在刊登免費索取商品，確定要送出嗎？')) {
                         e.preventDefault();
+                        resetButtonState();
                         return false;
                     }
                 }
+
+                // 檢查 jQuery Validation（如果存在）
+                if (typeof $.fn.valid === 'function' && !$(form).valid()) {
+                    // 驗證失敗，恢復按鈕狀態
+                    resetButtonState();
+                    return false;
+                }
+                
+                // 設定超時保護（30秒後重置按鈕狀態）
+                setTimeout(function() {
+                    if (isSubmitting) {
+                        resetButtonState();
+                    }
+                }, 30000);
             });
         }
     </script>
@@ -254,6 +308,27 @@
             .form-control-lg {
                 font-size: 16px; /* 防止 iOS 自動縮放 */
             }
+        }
+
+        /* 愛心商品 checkbox 紅色樣式 */
+        .charity-checkbox:checked {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        .charity-checkbox:focus {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+        }
+
+        /* 提交按鈕載入狀態 */
+        #submitBtn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        #submitBtnSpinner {
+            vertical-align: middle;
         }
     </style>
 }

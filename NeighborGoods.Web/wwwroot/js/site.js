@@ -9,13 +9,13 @@
     function openSidebar() {
         sidebarMenu.classList.add('open');
         sidebarOverlay.classList.add('show');
-        body.style.overflow = 'hidden';
+        body.style.overflowY = 'hidden';
     }
 
     function closeSidebar() {
         sidebarMenu.classList.remove('open');
         sidebarOverlay.classList.remove('show');
-        body.style.overflow = '';
+        body.style.overflowY = '';
     }
 
     if (sidebarToggle) {

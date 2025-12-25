@@ -53,6 +53,20 @@ public class MessageController : BaseController
             .OrderByDescending(c => c.UpdatedAt)
             .ToListAsync();
 
+        // 載入所有商品的圖片（批量查詢以提高效能）
+        var listingIds = conversations
+            .Where(c => c.Listing != null)
+            .Select(c => c.Listing!.Id)
+            .Distinct()
+            .ToList();
+
+        if (listingIds.Any())
+        {
+            await _db.ListingImages
+                .Where(img => listingIds.Contains(img.ListingId))
+                .LoadAsync();
+        }
+
         // 取得所有對話 ID
         var conversationIds = conversations.Select(c => c.Id).ToList();
 
@@ -130,6 +144,15 @@ public class MessageController : BaseController
             // 取得未讀數量
             unreadCountDict.TryGetValue(conversation.Id, out var unreadCount);
 
+            // 取得商品的第一張圖片
+            string? listingFirstImageUrl = null;
+            if (conversation.Listing?.Images != null && conversation.Listing.Images.Any())
+            {
+                listingFirstImageUrl = conversation.Listing.Images
+                    .OrderBy(img => img.SortOrder)
+                    .FirstOrDefault()?.ImageUrl;
+            }
+
             conversationItems.Add(new ConversationItemViewModel
             {
                 ConversationId = conversation.Id,
@@ -139,7 +162,8 @@ public class MessageController : BaseController
                 LastMessageTime = lastMessage?.CreatedAt,
                 UnreadCount = unreadCount,
                 ListingId = conversation.ListingId,
-                ListingTitle = conversation.Listing?.Title ?? "未知商品"
+                ListingTitle = conversation.Listing?.Title ?? "未知商品",
+                ListingFirstImageUrl = listingFirstImageUrl
             });
         }
 

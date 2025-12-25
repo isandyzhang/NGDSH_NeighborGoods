@@ -1,4 +1,5 @@
 ﻿@model NeighborGoods.Web.Models.ViewModels.ListingSearchViewModel
+@using NeighborGoods.Web.Utils
 
 @{
     ViewData["Title"] = "商品列表";
@@ -16,6 +17,19 @@
             </svg>
             <strong>@TempData["SuccessMessage"]</strong>
             <a asp-controller="Listing" asp-action="My" class="alert-link ms-2">前往我的商品</a>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    
+    <!-- 錯誤訊息提醒 -->
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show mt-3" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-triangle me-2" viewBox="0 0 16 16">
+                <path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.146.146 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.163.163 0 0 1-.054.06.116.116 0 0 1-.066.017H1.146a.115.115 0 0 1-.066-.017.163.163 0 0 1-.054-.06.176.176 0 0 1 .002-.183L7.884 2.073a.147.147 0 0 1 .054-.057zm1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566z"/>
+                <path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+            </svg>
+            <strong>@TempData["ErrorMessage"]</strong>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
@@ -96,18 +110,13 @@
                                 aria-expanded="false" 
                                 aria-controls="advancedFilters"
                                 id="advancedFilterBtn">
-                            進階篩選
-                            <span class="badge bg-primary ms-1" id="filterCountBadge" style="display: none;">0</span>
+                            <span id="advancedFilterBtnText">進階篩選</span>
                         </button>
                         <button type="submit" class="btn btn-primary flex-fill">搜尋</button>
                         <a asp-action="Index" class="btn btn-outline-secondary">清除</a>
                     </div>
                 </div>
 
-                <!-- 已設定的篩選條件標籤 -->
-                <div id="activeFilterTags" class="mb-3" style="display: none;">
-                    <!-- 標籤將由 JavaScript 動態生成 -->
-                </div>
 
                 <!-- 可展開的進階篩選區域 -->
                 <div class="collapse" id="advancedFilters">
@@ -196,7 +205,7 @@
             @foreach (var listing in Model.Listings)
             {
                 var timeAgo = "";
-                var timeDiff = DateTime.Now - listing.CreatedAt;
+                var timeDiff = TaiwanTime.Now - listing.CreatedAt;
                 if (timeDiff.TotalDays < 1)
                 {
                     if (timeDiff.TotalHours < 1)
@@ -291,8 +300,7 @@
             const isCharityInput = document.getElementById('isCharityInput');
             const advancedFilters = document.getElementById('advancedFilters');
             const advancedFilterBtn = document.getElementById('advancedFilterBtn');
-            const filterCountBadge = document.getElementById('filterCountBadge');
-            const activeFilterTags = document.getElementById('activeFilterTags');
+            const advancedFilterBtnText = document.getElementById('advancedFilterBtnText');
 
             // 計算已設定的篩選條件數量
             function countActiveFilters() {
@@ -307,117 +315,6 @@
                 return count;
             }
 
-            // 更新篩選條件數量 badge
-            function updateFilterBadge() {
-                const count = countActiveFilters();
-                if (count > 0) {
-                    filterCountBadge.textContent = count;
-                    filterCountBadge.style.display = 'inline-block';
-                } else {
-                    filterCountBadge.style.display = 'none';
-                }
-            }
-
-            // 更新篩選條件標籤
-            function updateFilterTags() {
-                const tags = [];
-                
-                if (searchInput && searchInput.value.trim()) {
-                    tags.push({
-                        type: 'search',
-                        label: `關鍵字: ${searchInput.value.trim()}`
-                    });
-                }
-                
-                if (categorySelect && categorySelect.value) {
-                    const selectedOption = categorySelect.options[categorySelect.selectedIndex];
-                    tags.push({
-                        type: 'category',
-                        label: `分類: ${selectedOption.text}`
-                    });
-                }
-                
-                if (conditionSelect && conditionSelect.value) {
-                    const selectedOption = conditionSelect.options[conditionSelect.selectedIndex];
-                    tags.push({
-                        type: 'condition',
-                        label: `新舊: ${selectedOption.text}`
-                    });
-                }
-                
-                if (minPriceInput && minPriceInput.value) {
-                    tags.push({
-                        type: 'minPrice',
-                        label: `最低: ${minPriceInput.value}`
-                    });
-                }
-                
-                if (maxPriceInput && maxPriceInput.value) {
-                    tags.push({
-                        type: 'maxPrice',
-                        label: `最高: ${maxPriceInput.value}`
-                    });
-                }
-                
-                if (isFreeInput && isFreeInput.value === 'true') {
-                    tags.push({
-                        type: 'isFree',
-                        label: '免費商品'
-                    });
-                }
-                
-                if (isCharityInput && isCharityInput.value === 'true') {
-                    tags.push({
-                        type: 'isCharity',
-                        label: '愛心商品'
-                    });
-                }
-
-                // 顯示/隱藏標籤區域
-                if (tags.length > 0) {
-                    activeFilterTags.style.display = 'block';
-                    activeFilterTags.innerHTML = tags.map(tag => 
-                        `<span class="badge bg-secondary me-2 mb-2 filter-tag" 
-                              data-filter-type="${tag.type}"
-                              style="cursor: pointer; font-size: 0.875rem; padding: 0.5rem 0.75rem;">
-                            ${tag.label}
-                            <span class="ms-1" style="font-size: 1.2rem; line-height: 1;">×</span>
-                        </span>`
-                    ).join('');
-                } else {
-                    activeFilterTags.style.display = 'none';
-                    activeFilterTags.innerHTML = '';
-                }
-            }
-
-            // 處理標籤移除
-            function removeFilterTag(filterType) {
-                switch(filterType) {
-                    case 'search':
-                        searchInput.value = '';
-                        break;
-                    case 'category':
-                        categorySelect.value = '';
-                        break;
-                    case 'condition':
-                        conditionSelect.value = '';
-                        break;
-                    case 'minPrice':
-                        minPriceInput.value = '';
-                        break;
-                    case 'maxPrice':
-                        maxPriceInput.value = '';
-                        break;
-                    case 'isFree':
-                        toggleFilterButton(isFreeBtn, isFreeInput, 'success');
-                        break;
-                    case 'isCharity':
-                        toggleFilterButton(isCharityBtn, isCharityInput, 'danger');
-                        break;
-                }
-                updateFilterTags();
-                updateFilterBadge();
-            }
 
             // 切換篩選按鈕狀態
             function toggleFilterButton(btn, input, colorType) {
@@ -441,8 +338,6 @@
                 isFreeBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     toggleFilterButton(isFreeBtn, isFreeInput, 'success');
-                    updateFilterTags();
-                    updateFilterBadge();
                 });
             }
 
@@ -451,25 +346,17 @@
                 isCharityBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     toggleFilterButton(isCharityBtn, isCharityInput, 'danger');
-                    updateFilterTags();
-                    updateFilterBadge();
                 });
             }
 
-            // 監聽其他篩選條件的變化
-            [categorySelect, conditionSelect, minPriceInput, maxPriceInput].forEach(element => {
-                if (element) {
-                    element.addEventListener('change', function() {
-                        updateFilterTags();
-                        updateFilterBadge();
-                    });
-                }
-            });
-
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    updateFilterTags();
-                    updateFilterBadge();
+            // 監聽進階篩選展開/收合事件，更新按鈕文字
+            if (advancedFilters && advancedFilterBtnText) {
+                advancedFilters.addEventListener('show.bs.collapse', function() {
+                    advancedFilterBtnText.textContent = '關閉篩選';
+                });
+                
+                advancedFilters.addEventListener('hide.bs.collapse', function() {
+                    advancedFilterBtnText.textContent = '進階篩選';
                 });
             }
 
@@ -480,20 +367,10 @@
                 });
                 bsCollapse.show();
                 advancedFilterBtn.setAttribute('aria-expanded', 'true');
-            }
-
-            // 初始化 badge 和標籤
-            updateFilterBadge();
-            updateFilterTags();
-
-            // 標籤點擊移除功能
-            activeFilterTags.addEventListener('click', function(e) {
-                const tag = e.target.closest('.filter-tag');
-                if (tag) {
-                    const filterType = tag.getAttribute('data-filter-type');
-                    removeFilterTag(filterType);
+                if (advancedFilterBtnText) {
+                    advancedFilterBtnText.textContent = '關閉篩選';
                 }
-            });
+            }
 
             // 載入更多功能
             const loadMoreBtn = document.getElementById('loadMoreBtn');
@@ -651,21 +528,6 @@
         .filter-toggle-btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        #activeFilterTags .badge {
-            padding: 0.5rem 0.75rem;
-            font-weight: normal;
-        }
-
-        #activeFilterTags .badge:hover {
-            background-color: #6c757d !important;
-        }
-
-        #activeFilterTags .badge span {
-            font-size: 1.2rem;
-            line-height: 1;
-            margin-left: 0.25rem;
         }
 
         /* 商品卡片標題換行 */

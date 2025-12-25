@@ -10,5 +10,6 @@ public class ConversationItemViewModel
     public int UnreadCount { get; set; }
     public Guid ListingId { get; set; }
     public string ListingTitle { get; set; } = string.Empty;
+    public string? ListingFirstImageUrl { get; set; }
 }
 

@@ -81,17 +81,14 @@ public class ListingController : BaseController
             return Challenge(); // 要求重新登入
         }
 
-        // 檢查每日上傳限制（每帳號每天最多 10 個商品）
-        var todayStart = TaiwanTime.Now.Date;
-        var todayEnd = todayStart.AddDays(1);
-        var todayListingCount = await _db.Listings
+        // 檢查刊登中商品數量限制（每帳號最多同時 10 個刊登中商品）
+        var activeListingCount = await _db.Listings
             .CountAsync(l => l.SellerId == user.Id && 
-                             l.CreatedAt >= todayStart && 
-                             l.CreatedAt < todayEnd);
+                             l.Status == ListingStatus.Active);
 
-        if (todayListingCount >= 10)
+        if (activeListingCount >= 10)
         {
-            ModelState.AddModelError(string.Empty, "您今天已達到上傳上限（10 個商品），請明天再試");
+            ModelState.AddModelError(string.Empty, "您目前已有 10 個刊登中的商品，請先下架或售出部分商品後再刊登新商品");
             return View(model);
         }
 
@@ -243,7 +240,8 @@ public class ListingController : BaseController
 
         if (listing == null)
         {
-            return NotFound();
+            TempData["ErrorMessage"] = "該商品不存在或已被刪除";
+            return RedirectToAction("Index", "Home");
         }
 
         // 判斷是否為自己的商品

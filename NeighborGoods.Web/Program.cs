@@ -95,7 +95,13 @@ builder.Services.AddSingleton(blobOptions);
 builder.Services.AddSingleton<IBlobService, BlobService>();
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        // 設定 JSON 序列化選項，確保 DateTime 使用 ISO 8601 格式（包含時區資訊）
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        // DateTime 預設會序列化為 ISO 8601 格式，包含時區資訊
+    });
 
 // SignalR 設定
 builder.Services.AddSignalR();
