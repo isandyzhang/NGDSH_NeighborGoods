@@ -218,8 +218,7 @@ public class NotificationQueueBackgroundService : BackgroundService
 
                     // 發送通知
                     var chatUrl = $"/Message/Chat?conversationId={conversationId}";
-                    var baseUrl = lineOptions.BaseUrl?.TrimEnd('/') ?? "https://NeighborGoods.azurewebsites.net";
-                    var fullUrl = $"{baseUrl}{chatUrl}";
+                    var fullUrl = $"https://neighborgoods.azurewebsites.net{chatUrl}";
 
                     await messagingService.SendPushMessageWithLinkAsync(
                         lineUserId,
