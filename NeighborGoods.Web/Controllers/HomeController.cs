@@ -89,6 +89,9 @@ public class HomeController : BaseController
             });
         }
 
+        // 檢查用戶的 Line 綁定狀態
+        ViewBag.IsLineBound = currentUser != null && !string.IsNullOrEmpty(currentUser.LineMessagingApiUserId);
+
         return View(searchViewModel);
     }
 

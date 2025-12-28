@@ -37,7 +37,7 @@
     <!-- 快捷按鈕區域 -->
     <div class="quick-actions mt-4 mb-3">
         <div class="row g-2">
-            <div class="col-6">
+            <div class="col-6 col-md-4">
                 @if (isAuthenticated)
                 {
                     <a asp-controller="Listing" asp-action="Create" class="btn btn-primary quick-action-btn w-100">
@@ -59,7 +59,7 @@
                     </a>
                 }
             </div>
-            <div class="col-6">
+            <div class="col-6 col-md-4">
                 @if (isAuthenticated)
                 {
                     <a asp-controller="Message" asp-action="Conversations" class="btn btn-outline-primary quick-action-btn w-100">
@@ -69,7 +69,9 @@
                             </svg>
                             我的訊息
                         </span>
-                        @await Component.InvokeAsync("UnreadMessageCount")
+                        <span id="unread-message-badge" class="ms-2">
+                            @await Component.InvokeAsync("UnreadMessageCount")
+                        </span>
                     </a>
                 }
                 else
@@ -82,6 +84,17 @@
                     </a>
                 }
             </div>
+            @if (isAuthenticated && ViewBag.IsLineBound != true)
+            {
+                <div class="col-12 col-md-4">
+                    <a asp-controller="Account" asp-action="AuthorizeLineMessagingApi" class="btn btn-success quick-action-btn w-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-bell me-2" viewBox="0 0 16 16">
+                            <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>
+                        </svg>
+                        啟動Line通知
+                    </a>
+                </div>
+            }
         </div>
     </div>
     
@@ -544,5 +557,108 @@
                 padding: 0.5rem 0.75rem;
             }
         }
+
+        /* 未讀訊息 Badge 樣式 */
+        #unread-message-badge .unread-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 4px;
+        }
     </style>
+
+    @if (isAuthenticated)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+        <script>
+            (function() {
+                // SignalR 連線
+                const connection = new signalR.HubConnectionBuilder()
+                    .withUrl("/messageHub")
+                    .withAutomaticReconnect()
+                    .build();
+
+                // Badge 更新邏輯（使用 debounce 優化）
+                let updateTimeout = null;
+                function updateUnreadBadge(increment = false) {
+                    // 只在頁面可見時更新
+                    if (document.hidden) {
+                        return;
+                    }
+
+                    // 清除之前的 timeout
+                    if (updateTimeout) {
+                        clearTimeout(updateTimeout);
+                    }
+
+                    // 使用 debounce，避免頻繁更新
+                    updateTimeout = setTimeout(function() {
+                        const badgeContainer = document.getElementById('unread-message-badge');
+                        if (!badgeContainer) return;
+
+                        let currentCount = 0;
+                        const existingBadge = badgeContainer.querySelector('.unread-badge');
+                        if (existingBadge) {
+                            currentCount = parseInt(existingBadge.textContent) || 0;
+                        }
+
+                        const newCount = increment ? currentCount + 1 : currentCount;
+
+                        if (newCount > 0) {
+                            if (!existingBadge) {
+                                // 創建 badge
+                                const badge = document.createElement('span');
+                                badge.className = 'unread-badge';
+                                badge.textContent = newCount;
+                                badgeContainer.appendChild(badge);
+                            } else {
+                                // 更新 badge
+                                existingBadge.textContent = newCount;
+                            }
+                        } else if (existingBadge) {
+                            // 移除 badge
+                            existingBadge.remove();
+                        }
+                    }, 300); // 300ms debounce
+                }
+
+                // 監聽新訊息
+                connection.on("ReceiveMessage", function (senderId, senderDisplayName, content, createdAt) {
+                    updateUnreadBadge(true);
+                });
+
+                // 連線管理
+                connection.start().then(function () {
+                    console.log("SignalR 連線已建立（首頁）");
+                }).catch(function (err) {
+                    console.error("SignalR 連線失敗:", err);
+                });
+
+                // 頁面可見性變化時處理
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden && connection.state === signalR.HubConnectionState.Disconnected) {
+                        // 頁面重新可見且連線斷開時，嘗試重連
+                        connection.start().catch(function(err) {
+                            console.error("SignalR 重連失敗:", err);
+                        });
+                    }
+                });
+
+                // 頁面卸載時關閉連線
+                window.addEventListener('beforeunload', function() {
+                    if (connection.state !== signalR.HubConnectionState.Disconnected) {
+                        connection.stop();
+                    }
+                });
+            })();
+        </script>
+    }
 }
