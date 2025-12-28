@@ -8,6 +8,7 @@ using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Models.ViewModels;
+using NeighborGoods.Web.Services;
 using NeighborGoods.Web.Utils;
 
 namespace NeighborGoods.Web.Controllers;
@@ -16,15 +17,24 @@ public class AccountController : BaseController
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly AppDbContext _db;
+    private readonly IUserService _userService;
+    private readonly IReviewService _reviewService;
+    private readonly ILineMessagingApiService? _lineMessagingApiService;
 
     public AccountController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        AppDbContext db)
+        AppDbContext db,
+        IUserService userService,
+        IReviewService reviewService,
+        ILineMessagingApiService? lineMessagingApiService = null)
         : base(userManager)
     {
         _signInManager = signInManager;
         _db = db;
+        _userService = userService;
+        _reviewService = reviewService;
+        _lineMessagingApiService = lineMessagingApiService;
     }
 
     [HttpGet]
@@ -45,24 +55,19 @@ public class AccountController : BaseController
             return View(model);
         }
 
-        var user = new ApplicationUser
+        // 使用服務層註冊用戶
+        var result = await _userService.RegisterUserAsync(model);
+        if (result.Success && result.Data != null)
         {
-            UserName = model.UserName,
-            DisplayName = model.DisplayName,
-            Email = null, // 之後如需 Email 再擴充
-            CreatedAt = TaiwanTime.Now
-        };
-
-        var result = await UserManager.CreateAsync(user, model.Password);
-        if (result.Succeeded)
-        {
-            await _signInManager.SignInAsync(user, isPersistent: false);
+            // SignIn 保留在 Controller 層（屬於認證流程）
+            await _signInManager.SignInAsync(result.Data, isPersistent: false);
             return RedirectToAction("Index", "Home");
         }
 
-        foreach (var error in result.Errors)
+        // 處理錯誤
+        if (!string.IsNullOrEmpty(result.ErrorMessage))
         {
-            ModelState.AddModelError(string.Empty, error.Description);
+            ModelState.AddModelError(string.Empty, result.ErrorMessage);
         }
 
         return View(model);
@@ -245,23 +250,15 @@ public class AccountController : BaseController
             return Challenge();
         }
 
-        // 查詢統計數據
-        var totalListings = await _db.Listings
-            .CountAsync(l => l.SellerId == user.Id);
-
-        var activeListings = await _db.Listings
-            .CountAsync(l => l.SellerId == user.Id && l.Status == ListingStatus.Active);
-
-        var completedListings = await _db.Listings
-            .CountAsync(l => l.SellerId == user.Id && 
-                           (l.Status == ListingStatus.Sold || l.Status == ListingStatus.Donated));
+        // 使用服務層取得統計數據
+        var statistics = await _userService.GetUserStatisticsAsync(user.Id);
 
         var viewModel = new ProfileViewModel
         {
             User = user,
-            TotalListings = totalListings,
-            ActiveListings = activeListings,
-            CompletedListings = completedListings
+            TotalListings = statistics.TotalListings,
+            ActiveListings = statistics.ActiveListings,
+            CompletedListings = statistics.CompletedListings
         };
 
         return View(viewModel);
@@ -278,37 +275,30 @@ public class AccountController : BaseController
             return Challenge();
         }
 
-        // 刪除用戶（會透過 Cascade Delete 自動刪除相關的 Listings 和 ListingImages）
-        var result = await UserManager.DeleteAsync(user);
-        if (result.Succeeded)
+        // 使用服務層刪除用戶
+        var result = await _userService.DeleteUserAsync(user.Id);
+        if (result.Success)
         {
+            // SignOut 保留在 Controller 層（屬於認證流程）
             await _signInManager.SignOutAsync();
             return RedirectToAction("Index", "Home");
         }
 
         // 如果刪除失敗，返回個人資料頁面並顯示錯誤
-        foreach (var error in result.Errors)
+        if (!string.IsNullOrEmpty(result.ErrorMessage))
         {
-            ModelState.AddModelError(string.Empty, error.Description);
+            ModelState.AddModelError(string.Empty, result.ErrorMessage);
         }
 
         // 重新載入統計數據
-        var totalListings = await _db.Listings
-            .CountAsync(l => l.SellerId == user.Id);
-
-        var activeListings = await _db.Listings
-            .CountAsync(l => l.SellerId == user.Id && l.Status == ListingStatus.Active);
-
-        var completedListings = await _db.Listings
-            .CountAsync(l => l.SellerId == user.Id && 
-                           (l.Status == ListingStatus.Sold || l.Status == ListingStatus.Donated));
+        var statistics = await _userService.GetUserStatisticsAsync(user.Id);
 
         var viewModel = new ProfileViewModel
         {
             User = user,
-            TotalListings = totalListings,
-            ActiveListings = activeListings,
-            CompletedListings = completedListings
+            TotalListings = statistics.TotalListings,
+            ActiveListings = statistics.ActiveListings,
+            CompletedListings = statistics.CompletedListings
         };
 
         return View("Profile", viewModel);
@@ -332,79 +322,27 @@ public class AccountController : BaseController
             return BadRequest("評價資料無效");
         }
 
-        // 驗證評分範圍
-        if (model.Rating < 1 || model.Rating > 5)
+        // 使用服務層提交評價
+        var result = await _reviewService.SubmitReviewAsync(model, currentUser.Id);
+
+        if (!result.Success)
         {
-            return BadRequest("評分必須在 1-5 之間");
-        }
-
-        // 驗證商品
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == model.ListingId);
-
-        if (listing == null)
-        {
-            return NotFound("找不到商品");
-        }
-
-        // 驗證商品狀態為已售出
-        if (listing.Status != ListingStatus.Sold && listing.Status != ListingStatus.Donated)
-        {
-            return BadRequest("只有已售出或已捐贈的商品才能評價");
-        }
-
-        // 驗證對話
-        var conversation = await _db.Conversations
-            .FirstOrDefaultAsync(c => c.Id == model.ConversationId);
-
-        if (conversation == null)
-        {
-            return NotFound("找不到對話");
-        }
-
-        // 驗證當前用戶是否為對話參與者
-        if (conversation.Participant1Id != currentUser.Id && conversation.Participant2Id != currentUser.Id)
-        {
-            return Forbid();
-        }
-
-        // 判斷當前用戶是買家還是賣家
-        var isBuyer = listing.SellerId != currentUser.Id;
-        
-        // 確定被評價者
-        var targetUserId = isBuyer 
-            ? listing.SellerId  // 買家評價賣家
-            : (conversation.Participant1Id == currentUser.Id ? conversation.Participant2Id : conversation.Participant1Id); // 賣家評價買家
-        
-        // 檢查是否已經評價過
-        var existingReview = await _db.Reviews
-            .FirstOrDefaultAsync(r => r.ListingId == model.ListingId && r.BuyerId == currentUser.Id);
-
-        if (existingReview != null)
-        {
-            // 更新現有評價
-            existingReview.Rating = model.Rating;
-            existingReview.Content = model.Content?.Trim();
-            existingReview.CreatedAt = TaiwanTime.Now;
-        }
-        else
-        {
-            // 創建新評價
-            var review = new Review
+            if (result.ErrorMessage == "找不到商品" || result.ErrorMessage == "找不到對話")
             {
-                Id = Guid.NewGuid(),
-                ListingId = listing.Id,
-                SellerId = targetUserId, // 被評價者
-                BuyerId = currentUser.Id, // 評價者
-                Rating = model.Rating,
-                Content = model.Content?.Trim(),
-                CreatedAt = TaiwanTime.Now
-            };
+                return NotFound(result.ErrorMessage);
+            }
+            if (result.ErrorMessage == "無權限訪問此對話")
+            {
+                return Forbid();
+            }
 
-            _db.Reviews.Add(review);
+            // 如果是 AJAX 請求，返回 JSON；否則返回 BadRequest
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = false, error = result.ErrorMessage });
+            }
+            return BadRequest(result.ErrorMessage);
         }
-
-        await _db.SaveChangesAsync();
 
         // 如果是 AJAX 請求，返回 JSON；否則重定向
         if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
@@ -433,43 +371,207 @@ public class AccountController : BaseController
             return NotFound();
         }
 
-        // 查詢賣家的所有有評價的交易（透過 Review 記錄查詢）
-        var reviews = await _db.Reviews
-            .Include(r => r.Listing)
-            .Include(r => r.Buyer)
-            .Where(r => r.SellerId == sellerId)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
-
-        // 計算統計數據
-        var totalCompletedTransactions = reviews.Count;
-        var averageRating = totalCompletedTransactions > 0
-            ? reviews.Average(r => (double)r.Rating)
-            : 0.0;
-
-        // 構建成交紀錄列表
-        var completedTransactions = reviews.Select(r => new CompletedTransactionItem
+        // 使用服務層取得賣家檔案
+        var viewModel = await _reviewService.GetSellerProfileAsync(sellerId);
+        if (viewModel == null)
         {
-            ListingId = r.ListingId,
-            ListingTitle = r.Listing?.Title ?? "未知商品",
-            Price = r.Listing?.Price,
-            IsFree = r.Listing?.IsFree ?? false,
-            Rating = r.Rating,
-            ReviewContent = r.Content,
-            CompletedAt = r.CreatedAt,
-            BuyerDisplayName = r.Buyer?.DisplayName ?? "未知買家"
-        }).ToList();
+            return NotFound();
+        }
 
-        var viewModel = new SellerProfileViewModel
-        {
-            SellerId = seller.Id,
-            SellerDisplayName = seller.DisplayName,
-            TotalCompletedTransactions = totalCompletedTransactions,
-            AverageRating = averageRating,
-            CompletedTransactions = completedTransactions
-        };
+        // 填入賣家顯示名稱
+        viewModel.SellerId = seller.Id;
+        viewModel.SellerDisplayName = seller.DisplayName;
 
         return View(viewModel);
+    }
+
+    /// <summary>
+    /// LINE Messaging API Webhook 處理
+    /// </summary>
+    [HttpPost("/Account/LineMessagingApiWebhook")]
+    [IgnoreAntiforgeryToken]
+    [AllowAnonymous]
+    public async Task<IActionResult> LineMessagingApiWebhook()
+    {
+        if (_lineMessagingApiService == null)
+        {
+            return BadRequest("LINE Messaging API 服務未啟用");
+        }
+
+        try
+        {
+            // 讀取請求內容
+            using var reader = new StreamReader(Request.Body);
+            var body = await reader.ReadToEndAsync();
+
+            // 驗證簽章
+            var signature = Request.Headers["X-Line-Signature"].ToString();
+            if (string.IsNullOrEmpty(signature) || !_lineMessagingApiService.ValidateWebhookSignature(body, signature))
+            {
+                return Unauthorized("簽章驗證失敗");
+            }
+
+            // 解析事件
+            var events = _lineMessagingApiService.ParseWebhookEvents(body);
+
+            foreach (var evt in events)
+            {
+                if (evt.Type == "follow" && !string.IsNullOrEmpty(evt.UserId))
+                {
+                    // 用戶加入 Bot
+                    // 注意：這裡需要知道是哪個用戶加入的，但 Webhook 只提供 LINE User ID
+                    // 實際綁定應該在用戶掃描 QR Code 後，透過其他機制完成
+                    // 這裡可以記錄日誌或發送歡迎訊息
+                    // 實際綁定邏輯應該在用戶授權流程中處理
+                }
+                else if (evt.Type == "unfollow" && !string.IsNullOrEmpty(evt.UserId))
+                {
+                    // 用戶封鎖 Bot
+                    // 找出對應的用戶並解除綁定
+                    var user = await _db.Users
+                        .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == evt.UserId);
+
+                    if (user != null)
+                    {
+                        await _userService.UnbindLineMessagingApiAsync(user.Id);
+                    }
+                }
+            }
+
+            return Ok();
+        }
+        catch (Exception)
+        {
+            // 處理 Webhook 時發生錯誤
+            return StatusCode(500, "處理 Webhook 時發生錯誤");
+        }
+    }
+
+    /// <summary>
+    /// 顯示 LINE Messaging API 授權頁面（QR Code）
+    /// </summary>
+    [HttpGet]
+    [Authorize]
+    public IActionResult AuthorizeLineMessagingApi()
+    {
+        // 產生 QR Code 或提供 Bot 連結
+        // 這裡需要從設定檔取得 Bot ID 或 Channel ID
+        // 簡化實作：提供連結格式
+        var botId = "2008787056"; // TODO: 從設定檔取得
+        var botLink = $"line://ti/p/@{botId}";
+        var qrCodeUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(botLink)}";
+
+        ViewBag.BotLink = botLink;
+        ViewBag.QrCodeUrl = qrCodeUrl;
+
+        return View();
+    }
+
+    /// <summary>
+    /// 處理 LINE Messaging API 綁定（從 Webhook 接收 follow 事件後，用戶點擊確認綁定）
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmLineMessagingApiBinding(string lineUserId)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        if (string.IsNullOrEmpty(lineUserId))
+        {
+            return BadRequest("LINE User ID 不能為空");
+        }
+
+        var result = await _userService.BindLineMessagingApiAsync(currentUser.Id, lineUserId);
+        if (result.Success)
+        {
+            // 發送歡迎訊息
+            if (_lineMessagingApiService != null)
+            {
+                try
+                {
+                    await _lineMessagingApiService.SendPushMessageAsync(
+                        lineUserId,
+                        "歡迎使用 LINE 通知功能！您現在可以透過 LINE 接收訊息通知。",
+                        Models.Enums.NotificationPriority.Low);
+                }
+                catch (Exception)
+                {
+                    // 發送歡迎訊息失敗，但不影響綁定流程
+                }
+            }
+
+            TempData["SuccessMessage"] = "LINE 通知已啟用";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        TempData["ErrorMessage"] = result.ErrorMessage ?? "啟用 LINE 通知時發生錯誤";
+        return RedirectToAction(nameof(Profile));
+    }
+
+    /// <summary>
+    /// 解除 LINE Messaging API 綁定
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RevokeLineMessagingApi()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _userService.UnbindLineMessagingApiAsync(currentUser.Id);
+        if (result.Success)
+        {
+            TempData["SuccessMessage"] = "LINE 通知已停用";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "停用 LINE 通知時發生錯誤";
+        }
+
+        return RedirectToAction(nameof(Profile));
+    }
+
+    /// <summary>
+    /// 更新通知偏好設定
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateNotificationPreference(int preference)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        // 驗證偏好設定值（1=即時, 2=摘要, 3=僅重要, 4=關閉）
+        if (preference < 1 || preference > 4)
+        {
+            TempData["ErrorMessage"] = "無效的通知偏好設定";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        var result = await _userService.UpdateNotificationPreferenceAsync(currentUser.Id, preference);
+        if (result.Success)
+        {
+            TempData["SuccessMessage"] = "通知偏好設定已更新";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "更新通知偏好設定時發生錯誤";
+        }
+
+        return RedirectToAction(nameof(Profile));
     }
 }
 

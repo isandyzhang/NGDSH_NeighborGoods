@@ -22,6 +22,21 @@ public class ApplicationUser : IdentityUser
     /// 使用者建立時間（台灣時間，UTC+8）
     /// </summary>
     public DateTime CreatedAt { get; set; } = TaiwanTime.Now;
+
+    /// <summary>
+    /// LINE Messaging API User ID（用於識別 LINE Bot 用戶）
+    /// </summary>
+    public string? LineMessagingApiUserId { get; set; }
+
+    /// <summary>
+    /// LINE Messaging API 授權時間（台灣時間，UTC+8）
+    /// </summary>
+    public DateTime? LineMessagingApiAuthorizedAt { get; set; }
+
+    /// <summary>
+    /// LINE 通知偏好設定（1=即時, 2=摘要, 3=僅重要, 4=關閉）
+    /// </summary>
+    public int LineNotificationPreference { get; set; } = 1;
 }
 
 

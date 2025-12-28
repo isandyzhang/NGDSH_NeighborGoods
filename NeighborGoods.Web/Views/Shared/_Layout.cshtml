@@ -170,13 +170,16 @@
             </div>
         </nav>
     </header>
-    <div class="@(ViewData["HideFooter"] != null && (bool)ViewData["HideFooter"] ? "container-fluid px-0" : "container")">
-        <main role="main" class="@(ViewData["HideFooter"] != null && (bool)ViewData["HideFooter"] ? "" : "pb-3")">
+    @{
+        var hideFooter = ViewData["HideFooter"] as bool? ?? false;
+    }
+    <div class="@(hideFooter ? "container-fluid px-0" : "container")">
+        <main role="main" class="@(hideFooter ? "" : "pb-3")">
             @RenderBody()
         </main>
     </div>
 
-    @if (ViewData["HideFooter"] == null || !(bool)ViewData["HideFooter"])
+    @if (!hideFooter)
     {
         <footer class="border-top footer text-muted">
             <div class="container">

@@ -94,6 +94,45 @@ if (blobOptions == null || string.IsNullOrEmpty(blobOptions.ConnectionString))
 builder.Services.AddSingleton(blobOptions);
 builder.Services.AddSingleton<IBlobService, BlobService>();
 
+// LINE Messaging API 設定
+var lineMessagingApiOptions = builder.Configuration.GetSection("LineMessagingApi").Get<LineMessagingApiOptions>();
+if (lineMessagingApiOptions != null && 
+    !string.IsNullOrEmpty(lineMessagingApiOptions.ChannelAccessToken) &&
+    !string.IsNullOrEmpty(lineMessagingApiOptions.ChannelSecret))
+{
+    builder.Services.Configure<LineMessagingApiOptions>(builder.Configuration.GetSection("LineMessagingApi"));
+    
+    // 註冊 LINE Messaging API 服務
+    builder.Services.AddHttpClient<ILineMessagingApiService, LineMessagingApiService>();
+    builder.Services.AddSingleton<ILineMessagingApiService>(sp =>
+    {
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        var httpClient = httpClientFactory.CreateClient();
+        var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<LineMessagingApiOptions>>();
+        var logger = sp.GetRequiredService<ILogger<LineMessagingApiService>>();
+        return new LineMessagingApiService(httpClient, options, logger);
+    });
+    
+    // 註冊通知合併服務
+    builder.Services.AddMemoryCache();
+    builder.Services.AddSingleton<INotificationMergeService, NotificationMergeService>();
+    
+    // 註冊背景服務
+    builder.Services.AddHostedService<NotificationQueueBackgroundService>();
+}
+else
+{
+    // 如果設定不完整，記錄警告但不中斷應用程式啟動
+    var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<Program>();
+    logger.LogWarning("LINE Messaging API 設定不完整，LINE 通知功能將無法使用。請設定 LineMessagingApi:ChannelAccessToken 和 LineMessagingApi:ChannelSecret");
+}
+
+// 註冊服務層
+builder.Services.AddScoped<IListingService, ListingService>();
+builder.Services.AddScoped<IMessageService, MessageService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+
 // Add services to the container.
 builder.Services.AddControllersWithViews()
     .AddJsonOptions(options =>

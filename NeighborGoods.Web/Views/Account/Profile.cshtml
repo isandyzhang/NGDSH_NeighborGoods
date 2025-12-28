@@ -64,6 +64,72 @@
         </div>
     </div>
 
+    <!-- LINE 通知設定區塊 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">LINE 通知設定</h5>
+            
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["ErrorMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (string.IsNullOrEmpty(Model.User.LineMessagingApiUserId))
+            {
+                <!-- 未綁定狀態 -->
+                <p class="text-muted mb-3">啟用 LINE 通知後，您可以在 LINE 上接收訊息和交易通知。</p>
+                <a asp-action="AuthorizeLineMessagingApi" class="btn btn-primary btn-lg w-100 mb-3" style="min-height: 50px; font-size: 1.1rem;">
+                    啟用 LINE 通知
+                </a>
+            }
+            else
+            {
+                <!-- 已綁定狀態 -->
+                <div class="alert alert-success mb-3">
+                    <i class="bi bi-check-circle"></i> LINE 通知已啟用
+                </div>
+                <div class="mb-3">
+                    <strong>綁定時間：</strong>
+                    <span class="text-muted">
+                        @(Model.User.LineMessagingApiAuthorizedAt?.ToString("yyyy/MM/dd HH:mm") ?? "未知")
+                    </span>
+                </div>
+                
+                <!-- 通知偏好設定 -->
+                <div class="mb-3">
+                    <label class="form-label"><strong>通知偏好設定：</strong></label>
+                    <form asp-action="UpdateNotificationPreference" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <select name="preference" class="form-select d-inline-block w-auto" onchange="this.form.submit()">
+                            <option value="1" selected="@(Model.User.LineNotificationPreference == 1)">即時通知（所有訊息）</option>
+                            <option value="2" selected="@(Model.User.LineNotificationPreference == 2)">摘要通知（每 5 分鐘合併）</option>
+                            <option value="3" selected="@(Model.User.LineNotificationPreference == 3)">僅重要事件（購買、交易等）</option>
+                            <option value="4" selected="@(Model.User.LineNotificationPreference == 4)">關閉通知</option>
+                        </select>
+                    </form>
+                </div>
+                
+                <form asp-action="RevokeLineMessagingApi" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-danger w-100" style="min-height: 44px;" onclick="return confirm('確定要停用 LINE 通知嗎？');">
+                        停用 LINE 通知
+                    </button>
+                </form>
+            }
+        </div>
+    </div>
+
     <!-- 快速連結區塊 -->
     <div class="card mb-4">
         <div class="card-body">

@@ -1,0 +1,44 @@
+@{
+    ViewData["Title"] = "啟用 LINE 通知";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">啟用 LINE 通知</h2>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title mb-3">步驟說明</h5>
+            <ol class="mb-4">
+                <li>使用 LINE 掃描下方的 QR Code</li>
+                <li>加入 LINE Bot</li>
+                <li>返回此頁面，點擊「確認綁定」按鈕</li>
+            </ol>
+
+            @if (ViewBag.QrCodeUrl != null)
+            {
+                <div class="text-center mb-4">
+                    <img src="@ViewBag.QrCodeUrl" alt="LINE Bot QR Code" class="img-fluid" style="max-width: 300px;" />
+                </div>
+            }
+
+            @if (ViewBag.BotLink != null)
+            {
+                <div class="text-center mb-4">
+                    <p class="text-muted">或點擊以下連結：</p>
+                    <a href="@ViewBag.BotLink" class="btn btn-primary btn-lg" target="_blank">
+                        開啟 LINE Bot
+                    </a>
+                </div>
+            }
+
+            <div class="alert alert-info">
+                <strong>提示：</strong>掃描 QR Code 或點擊連結後，請確保已成功加入 Bot，然後返回此頁面點擊「確認綁定」。
+            </div>
+
+            <div class="d-grid gap-2">
+                <a asp-action="Profile" class="btn btn-secondary">返回個人資料</a>
+            </div>
+        </div>
+    </div>
+</div>
+
