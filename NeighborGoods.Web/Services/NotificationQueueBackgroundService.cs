@@ -2,9 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using NeighborGoods.Web.Constants;
 using NeighborGoods.Web.Data;
-using NeighborGoods.Web.Models.Configuration;
 using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Utils;
 
@@ -16,17 +15,14 @@ namespace NeighborGoods.Web.Services;
 public class NotificationQueueBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly LineMessagingApiOptions _options;
     private readonly ILogger<NotificationQueueBackgroundService> _logger;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(1);
 
     public NotificationQueueBackgroundService(
         IServiceProvider serviceProvider,
-        IOptions<LineMessagingApiOptions> options,
         ILogger<NotificationQueueBackgroundService> logger)
     {
         _serviceProvider = serviceProvider;
-        _options = options.Value;
         _logger = logger;
     }
 
@@ -53,7 +49,7 @@ public class NotificationQueueBackgroundService : BackgroundService
 
     private async Task ProcessNotificationQueueAsync(CancellationToken cancellationToken)
     {
-        if (!_options.EnableNotificationMerging)
+        if (!NotificationConstants.EnableNotificationMerging)
         {
             return;
         }
@@ -71,7 +67,7 @@ public class NotificationQueueBackgroundService : BackgroundService
             .ToListAsync(cancellationToken);
 
         var now = TaiwanTime.Now;
-        var mergeWindow = TimeSpan.FromMinutes(_options.MergeWindowMinutes);
+        var mergeWindow = TimeSpan.FromMinutes(NotificationConstants.MergeWindowMinutes);
 
         foreach (var user in usersWithLineBot)
         {

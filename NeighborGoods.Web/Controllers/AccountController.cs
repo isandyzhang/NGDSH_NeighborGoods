@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
@@ -20,6 +21,7 @@ public class AccountController : BaseController
     private readonly IUserService _userService;
     private readonly IReviewService _reviewService;
     private readonly ILineMessagingApiService? _lineMessagingApiService;
+    private readonly IConfiguration _configuration;
 
     public AccountController(
         UserManager<ApplicationUser> userManager,
@@ -27,6 +29,7 @@ public class AccountController : BaseController
         AppDbContext db,
         IUserService userService,
         IReviewService reviewService,
+        IConfiguration configuration,
         ILineMessagingApiService? lineMessagingApiService = null)
         : base(userManager)
     {
@@ -34,6 +37,7 @@ public class AccountController : BaseController
         _db = db;
         _userService = userService;
         _reviewService = reviewService;
+        _configuration = configuration;
         _lineMessagingApiService = lineMessagingApiService;
     }
 
@@ -454,11 +458,16 @@ public class AccountController : BaseController
     [Authorize]
     public IActionResult AuthorizeLineMessagingApi()
     {
-        // 產生 QR Code 或提供 Bot 連結
-        // 這裡需要從設定檔取得 Bot ID 或 Channel ID
-        // 簡化實作：提供連結格式
-        var botId = "2008787056"; // TODO: 從設定檔取得
-        var botLink = $"line://ti/p/@{botId}";
+        // 從設定檔取得 Bot ID
+        var botId = _configuration["LineMessagingApi:BotId"] ?? "@559fslxw";
+        
+        // 確保 Bot ID 格式正確（如果有 @ 就保留，沒有就加上）
+        if (!botId.StartsWith("@"))
+        {
+            botId = "@" + botId;
+        }
+        
+        var botLink = $"line://ti/p/{botId}";
         var qrCodeUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(botLink)}";
 
         ViewBag.BotLink = botLink;

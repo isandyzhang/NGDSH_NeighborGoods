@@ -23,13 +23,8 @@ public class LineMessagingApiOptions
     public string ChannelId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 合併時間窗口（分鐘，預設：5）
+    /// Bot ID（用於產生加入 Bot 的連結，格式：@abc123）
     /// </summary>
-    public int MergeWindowMinutes { get; set; } = 5;
-
-    /// <summary>
-    /// 是否啟用通知合併（預設：true）
-    /// </summary>
-    public bool EnableNotificationMerging { get; set; } = true;
+    public string BotId { get; set; } = string.Empty;
 }
 

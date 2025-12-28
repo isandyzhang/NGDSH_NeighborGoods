@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using NeighborGoods.Web.Constants;
 using NeighborGoods.Web.Models;
-using NeighborGoods.Web.Models.Configuration;
 
 namespace NeighborGoods.Web.Services;
 
@@ -12,17 +11,14 @@ namespace NeighborGoods.Web.Services;
 public class NotificationMergeService : INotificationMergeService
 {
     private readonly IMemoryCache _cache;
-    private readonly LineMessagingApiOptions _options;
     private readonly ILogger<NotificationMergeService> _logger;
     private const string CacheKeyPrefix = "PendingNotifications_";
 
     public NotificationMergeService(
         IMemoryCache cache,
-        IOptions<LineMessagingApiOptions> options,
         ILogger<NotificationMergeService> logger)
     {
         _cache = cache;
-        _options = options.Value;
         _logger = logger;
     }
 
@@ -59,7 +55,7 @@ public class NotificationMergeService : INotificationMergeService
         // 儲存到快取（設定過期時間為合併時間窗口 + 1 分鐘緩衝）
         var cacheOptions = new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_options.MergeWindowMinutes + 1)
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(NotificationConstants.MergeWindowMinutes + 1)
         };
         _cache.Set(cacheKey, existingNotifications, cacheOptions);
     }
