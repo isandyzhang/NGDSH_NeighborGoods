@@ -470,26 +470,53 @@ public class ListingService : IListingService
                 return ServiceResult.Fail("無權限刪除此商品");
             }
 
-            // 只有刊登中的商品可以刪除
-            if (listing.Status != ListingStatus.Active)
+            // 只有刊登中或已下架的商品可以刪除
+            if (listing.Status != ListingStatus.Active && listing.Status != ListingStatus.Inactive)
             {
-                return ServiceResult.Fail("只有刊登中的商品才能刪除");
+                return ServiceResult.Fail("只有刊登中或已下架的商品才能刪除");
             }
 
-            // 刪除 Blob Storage 中的圖片
-            if (listing.Images != null && listing.Images.Any())
+            // 先保存圖片 URL（在刪除資料庫記錄之前）
+            var imageUrls = listing.Images != null && listing.Images.Any()
+                ? listing.Images.Select(img => img.ImageUrl).ToList()
+                : new List<string>();
+
+            // 使用資料庫交易確保資料一致性
+            using var transaction = await _db.Database.BeginTransactionAsync();
+            try
             {
-                var imageUrls = listing.Images.Select(img => img.ImageUrl).ToList();
-                await _blobService.DeleteListingImagesAsync(imageUrls);
+                // 1. 先刪除資料庫記錄（ListingImage 會自動級聯刪除）
+                _db.Listings.Remove(listing);
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("用戶 {UserId} 刪除了商品 {ListingId}（資料庫記錄已刪除）", userId, listingId);
+
+                // 2. 資料庫刪除成功後，再刪除 Blob Storage 中的圖片
+                // 即使 Blob 刪除失敗，也不影響資料庫刪除的成功
+                if (imageUrls.Any())
+                {
+                    try
+                    {
+                        await _blobService.DeleteListingImagesAsync(imageUrls);
+                        _logger.LogInformation("商品 {ListingId} 的 Blob 圖片已成功刪除", listingId);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 記錄錯誤但不拋出，因為資料庫已經刪除了
+                        // Blob 刪除失敗可以稍後通過清理任務處理
+                        _logger.LogWarning(ex, "刪除商品 {ListingId} 的 Blob 圖片時發生錯誤，但資料庫記錄已刪除", listingId);
+                    }
+                }
+
+                return ServiceResult.Ok();
             }
-
-            // 刪除資料庫記錄（ListingImage 會自動級聯刪除）
-            _db.Listings.Remove(listing);
-            await _db.SaveChangesAsync();
-
-            _logger.LogInformation("用戶 {UserId} 刪除了商品 {ListingId}", userId, listingId);
-
-            return ServiceResult.Ok();
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "刪除商品 {ListingId} 的資料庫記錄時發生錯誤，已回滾", listingId);
+                throw;
+            }
         }
         catch (Exception ex)
         {
@@ -534,6 +561,229 @@ public class ListingService : IListingService
         {
             _logger.LogError(ex, "下架商品 {ListingId} 時發生錯誤", listingId);
             return ServiceResult.Fail("下架商品時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<ListingDetailsViewModel>> GetListingDetailsAsync(
+        Guid listingId,
+        string? currentUserId)
+    {
+        try
+        {
+            var listing = await _db.Listings
+                .Include(l => l.Images)
+                .Include(l => l.Seller)
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<ListingDetailsViewModel>.Fail("找不到商品");
+            }
+
+            // 判斷是否為自己的商品
+            var isOwner = !string.IsNullOrEmpty(currentUserId) && listing.SellerId == currentUserId;
+
+            // 如果用戶已登入且不是商品擁有者，可以發送訊息
+            var canMessage = !string.IsNullOrEmpty(currentUserId) && !isOwner;
+
+            // 查詢賣家的統計資訊（只計算有評價的交易）
+            var sellerReviews = await _db.Reviews
+                .Where(r => r.SellerId == listing.SellerId)
+                .ToListAsync();
+
+            var sellerTotalCompletedTransactions = sellerReviews.Count;
+            var sellerAverageRating = sellerTotalCompletedTransactions > 0
+                ? sellerReviews.Average(r => (double)r.Rating)
+                : 0.0;
+
+            var viewModel = new ListingDetailsViewModel
+            {
+                Id = listing.Id,
+                Title = listing.Title,
+                Description = listing.Description,
+                Category = listing.Category,
+                Condition = listing.Condition,
+                PickupLocation = listing.PickupLocation,
+                Price = listing.Price,
+                IsFree = listing.IsFree,
+                IsCharity = listing.IsCharity,
+                Status = listing.Status,
+                Images = listing.Images
+                    .OrderBy(img => img.SortOrder)
+                    .Select(img => img.ImageUrl)
+                    .ToList(),
+                SellerId = listing.SellerId,
+                SellerDisplayName = listing.Seller?.DisplayName ?? "未知賣家",
+                CreatedAt = listing.CreatedAt,
+                UpdatedAt = listing.UpdatedAt,
+                CanMessage = canMessage,
+                IsOwner = isOwner,
+                SellerTotalCompletedTransactions = sellerTotalCompletedTransactions,
+                SellerAverageRating = sellerAverageRating
+            };
+
+            return ServiceResult<ListingDetailsViewModel>.Ok(viewModel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得商品詳情時發生錯誤：ListingId={ListingId}", listingId);
+            return ServiceResult<ListingDetailsViewModel>.Fail("取得商品詳情時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<MyListingsViewModel>> GetUserListingsAsync(string userId)
+    {
+        try
+        {
+            var listings = await _db.Listings
+                .Include(l => l.Images)
+                .Where(l => l.SellerId == userId)
+                .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            var listingItems = listings.Select(l => new ListingItem
+            {
+                Id = l.Id,
+                Title = l.Title,
+                Category = l.Category,
+                Price = l.Price,
+                IsFree = l.IsFree,
+                IsCharity = l.IsCharity,
+                Status = l.Status,
+                FirstImageUrl = l.Images.OrderBy(img => img.SortOrder).FirstOrDefault()?.ImageUrl,
+                CreatedAt = l.CreatedAt,
+                UpdatedAt = l.UpdatedAt
+            }).ToList();
+
+            var viewModel = new MyListingsViewModel
+            {
+                Listings = listingItems
+            };
+
+            return ServiceResult<MyListingsViewModel>.Ok(viewModel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得用戶商品列表時發生錯誤：UserId={UserId}", userId);
+            return ServiceResult<MyListingsViewModel>.Fail("取得商品列表時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<ListingEditViewModel>> GetListingForEditAsync(
+        Guid listingId,
+        string userId)
+    {
+        try
+        {
+            var listing = await _db.Listings
+                .Include(l => l.Images)
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<ListingEditViewModel>.Fail("找不到商品");
+            }
+
+            // 驗證是否為商品擁有者
+            if (listing.SellerId != userId)
+            {
+                return ServiceResult<ListingEditViewModel>.Fail("無權限修改此商品");
+            }
+
+            // 只有刊登中的商品可以編輯
+            if (listing.Status != ListingStatus.Active)
+            {
+                return ServiceResult<ListingEditViewModel>.Fail("只有刊登中的商品才能編輯");
+            }
+
+            var viewModel = new ListingEditViewModel
+            {
+                Id = listing.Id,
+                Title = listing.Title,
+                Description = listing.Description,
+                Category = listing.Category,
+                Condition = listing.Condition,
+                Price = listing.Price,
+                IsFree = listing.IsFree,
+                IsCharity = listing.IsCharity,
+                PickupLocation = listing.PickupLocation,
+                ExistingImages = listing.Images
+                    .OrderBy(img => img.SortOrder)
+                    .Select(img => img.ImageUrl)
+                    .ToList()
+            };
+
+            return ServiceResult<ListingEditViewModel>.Ok(viewModel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得商品編輯資料時發生錯誤：ListingId={ListingId}, UserId={UserId}", listingId, userId);
+            return ServiceResult<ListingEditViewModel>.Fail("取得商品編輯資料時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<string?>> UpdateListingStatusAsync(
+        Guid listingId,
+        ListingStatus newStatus,
+        string userId)
+    {
+        try
+        {
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<string?>.Fail("找不到商品");
+            }
+
+            // 驗證是否為商品擁有者
+            if (listing.SellerId != userId)
+            {
+                return ServiceResult<string?>.Fail("無權限修改此商品");
+            }
+
+            // 只有刊登中的商品可以修改狀態
+            if (listing.Status != ListingStatus.Active)
+            {
+                return ServiceResult<string?>.Fail("只有刊登中的商品才能修改狀態");
+            }
+
+            // 驗證新狀態是否有效
+            if (newStatus != ListingStatus.Sold && 
+                newStatus != ListingStatus.Reserved && 
+                newStatus != ListingStatus.Inactive)
+            {
+                return ServiceResult<string?>.Fail("無效的商品狀態");
+            }
+
+            string? warningMessage = null;
+
+            // 如果選擇「交易完成」，檢查是否有相關 Conversation
+            if (newStatus == ListingStatus.Sold)
+            {
+                var hasConversation = await _db.Conversations
+                    .AnyAsync(c => c.ListingId == listingId);
+
+                if (hasConversation)
+                {
+                    warningMessage = "此商品有相關的對話記錄，建議您透過正常交易流程完成交易，這樣可以建立買賣雙方關聯並進行評價。您確定要直接標記為交易完成嗎？";
+                }
+            }
+
+            // 更新商品狀態
+            listing.Status = newStatus;
+            listing.UpdatedAt = TaiwanTime.Now;
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("用戶 {UserId} 將商品 {ListingId} 狀態更新為 {NewStatus}", userId, listingId, newStatus);
+
+            return ServiceResult<string?>.Ok(warningMessage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "更新商品狀態時發生錯誤：ListingId={ListingId}, UserId={UserId}, NewStatus={NewStatus}", listingId, userId, newStatus);
+            return ServiceResult<string?>.Fail("更新商品狀態時發生錯誤，請稍後再試");
         }
     }
 }

@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
-using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Hubs;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
@@ -17,20 +15,17 @@ namespace NeighborGoods.Web.Controllers;
 [Authorize]
 public class MessageController : BaseController
 {
-    private readonly AppDbContext _db;
     private readonly IHubContext<MessageHub> _hubContext;
     private readonly IMessageService _messageService;
     private readonly ILogger<MessageController> _logger;
 
     public MessageController(
-        AppDbContext db,
         UserManager<ApplicationUser> userManager,
         IHubContext<MessageHub> hubContext,
         IMessageService messageService,
         ILogger<MessageController> logger)
         : base(userManager)
     {
-        _db = db;
         _hubContext = hubContext;
         _messageService = messageService;
         _logger = logger;
@@ -99,9 +94,9 @@ public class MessageController : BaseController
             return NotFound("找不到該用戶");
         }
 
-        // 驗證商品是否存在
-        var listing = await _db.Listings.FirstOrDefaultAsync(l => l.Id == listingId);
-        if (listing == null)
+        // 使用服務層驗證商品是否存在
+        var listingResult = await _messageService.ValidateListingAsync(listingId);
+        if (!listingResult.Success || listingResult.Data == null)
         {
             return NotFound("找不到該商品");
         }
@@ -204,9 +199,9 @@ public class MessageController : BaseController
                 return NotFound("找不到接收者");
             }
 
-            // 驗證商品是否存在
-            var listing = await _db.Listings.FirstOrDefaultAsync(l => l.Id == model.ListingId.Value);
-            if (listing == null)
+            // 使用服務層驗證商品是否存在
+            var listingResult = await _messageService.ValidateListingAsync(model.ListingId.Value);
+            if (!listingResult.Success || listingResult.Data == null)
             {
                 if (isAjax)
                 {
@@ -239,26 +234,22 @@ public class MessageController : BaseController
             return BadRequest(result.ErrorMessage ?? "發送訊息時發生錯誤");
         }
 
-        // 取得對話以取得接收者 ID（用於 SignalR 通知）
-        var conversation = await _db.Conversations
-            .FirstOrDefaultAsync(c => 
-                (model.ConversationId.HasValue && c.Id == model.ConversationId.Value) ||
-                (!model.ConversationId.HasValue && !string.IsNullOrEmpty(model.ReceiverId) && 
-                 ((c.Participant1Id == currentUser.Id && c.Participant2Id == model.ReceiverId) ||
-                  (c.Participant2Id == currentUser.Id && c.Participant1Id == model.ReceiverId)) &&
-                 c.ListingId == model.ListingId));
+        // 使用服務層取得對話資訊（用於 SignalR 通知）
+        var conversationInfoResult = await _messageService.GetConversationForSignalRAsync(
+            model.ConversationId,
+            currentUser.Id,
+            model.ReceiverId,
+            model.ListingId);
 
-        if (conversation != null)
+        if (conversationInfoResult.Success && conversationInfoResult.Data != null)
         {
-        var receiverId = conversation.Participant1Id == currentUser.Id
-            ? conversation.Participant2Id
-            : conversation.Participant1Id;
+            var receiverId = conversationInfoResult.Data.ReceiverId;
 
             // 透過 SignalR 推送訊息給接收者
-        await _hubContext.Clients.Users(new[] { currentUser.Id, receiverId }).SendAsync(
-            "ReceiveMessage",
-            currentUser.Id,
-            currentUser.DisplayName,
+            await _hubContext.Clients.Users(new[] { currentUser.Id, receiverId }).SendAsync(
+                "ReceiveMessage",
+                currentUser.Id,
+                currentUser.DisplayName,
                 model.Content.Trim(),
                 TaiwanTime.Now);
         }
@@ -269,7 +260,7 @@ public class MessageController : BaseController
             return Json(new { success = true, messageId = result.Data });
         }
 
-        return RedirectToAction(nameof(Chat), new { conversationId = conversation?.Id ?? model.ConversationId });
+        return RedirectToAction(nameof(Chat), new { conversationId = conversationInfoResult.Data?.ConversationId ?? model.ConversationId });
     }
 
     /// <summary>
@@ -285,80 +276,47 @@ public class MessageController : BaseController
             return JsonError("未登入");
         }
 
-        // 驗證對話
-        var conversation = await _db.Conversations
-            .FirstOrDefaultAsync(c => c.Id == model.ConversationId);
-
-        if (conversation == null)
-        {
-            return Json(new { success = false, error = "找不到對話" });
-        }
-
-        // 驗證當前用戶是否為對話參與者
-        if (conversation.Participant1Id != currentUser.Id && conversation.Participant2Id != currentUser.Id)
-        {
-            return Json(new { success = false, error = "無權限訪問此對話" });
-        }
-
-        // 驗證商品
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == model.ListingId);
-
-        if (listing == null)
-        {
-            return Json(new { success = false, error = "找不到商品" });
-        }
-
-        // 驗證用戶不是賣家
-        if (listing.SellerId == currentUser.Id)
-        {
-            return JsonError("無法購買自己的商品");
-        }
-
-        // 驗證商品狀態允許購買請求
-        if (listing.Status != Models.Enums.ListingStatus.Active)
-        {
-            return JsonError("商品已下架或已售出，無法發送購買請求");
-        }
-
-        // 根據商品類型生成訊息內容
-        var messageContent = model.IsFreeOrCharity
-            ? "[系統發送] 我想索取此商品"
-            : "[系統發送] 我想購買此商品";
-
-        // 建立訊息
-        var message = new Message
-        {
-            Id = Guid.NewGuid(),
-            ConversationId = conversation.Id,
-            SenderId = currentUser.Id,
-            Content = messageContent,
-            CreatedAt = TaiwanTime.Now
-        };
-
-        _db.Messages.Add(message);
-
-        // 更新對話的最後更新時間
-        conversation.UpdatedAt = TaiwanTime.Now;
-
-        await _db.SaveChangesAsync();
-
-        // 透過 SignalR 推送訊息給雙方參與者（包括發送者自己）
-        var receiverId = conversation.Participant1Id == currentUser.Id
-            ? conversation.Participant2Id
-            : conversation.Participant1Id;
-
-        await _hubContext.Clients.Users(new[] { currentUser.Id, receiverId }).SendAsync(
-            "ReceiveMessage",
+        // 使用服務層發送購買請求
+        var result = await _messageService.SendPurchaseRequestAsync(
+            model.ConversationId,
+            model.ListingId,
             currentUser.Id,
-            currentUser.DisplayName,
-            message.Content,
-            message.CreatedAt);
+            model.IsFreeOrCharity);
 
-        // 通知賣家刷新頁面以顯示「同意交易」按鈕
-        await _hubContext.Clients.User(receiverId).SendAsync("RefreshChat", conversation.Id);
+        if (!result.Success)
+        {
+            return Json(new { success = false, error = result.ErrorMessage ?? "發送購買請求時發生錯誤" });
+        }
 
-        return Json(new { success = true, messageId = message.Id });
+        // 取得對話資訊以取得接收者 ID（用於 SignalR）
+        var conversationInfoResult = await _messageService.GetConversationForSignalRAsync(
+            model.ConversationId,
+            currentUser.Id,
+            null,
+            model.ListingId);
+
+        if (conversationInfoResult.Success && conversationInfoResult.Data != null)
+        {
+            var receiverId = conversationInfoResult.Data.ReceiverId;
+
+            // 根據商品類型生成訊息內容
+            var messageContent = model.IsFreeOrCharity
+                ? "[系統發送] 我想索取此商品"
+                : "[系統發送] 我想購買此商品";
+
+            // 透過 SignalR 推送訊息給雙方參與者（包括發送者自己）
+            await _hubContext.Clients.Users(new[] { currentUser.Id, receiverId }).SendAsync(
+                "ReceiveMessage",
+                currentUser.Id,
+                currentUser.DisplayName,
+                messageContent,
+                TaiwanTime.Now);
+
+            // 通知賣家刷新頁面以顯示「同意交易」按鈕
+            await _hubContext.Clients.User(receiverId).SendAsync("RefreshChat", model.ConversationId);
+        }
+
+        return Json(new { success = true, messageId = result.Data });
     }
 
     /// <summary>
@@ -374,77 +332,27 @@ public class MessageController : BaseController
             return JsonError("未登入");
         }
 
-        // 驗證對話
-        var conversation = await _db.Conversations
-            .FirstOrDefaultAsync(c => c.Id == model.ConversationId);
+        // 使用服務層同意交易
+        var result = await _messageService.AcceptPurchaseAsync(
+            model.ConversationId,
+            model.ListingId,
+            currentUser.Id);
 
-        if (conversation == null)
+        if (!result.Success || result.Data == null)
         {
-            return Json(new { success = false, error = "找不到對話" });
+            return Json(new { success = false, error = result.ErrorMessage ?? "同意交易時發生錯誤" });
         }
-
-        // 驗證當前用戶是否為對話參與者
-        if (conversation.Participant1Id != currentUser.Id && conversation.Participant2Id != currentUser.Id)
-        {
-            return Json(new { success = false, error = "無權限訪問此對話" });
-        }
-
-        // 驗證商品
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == model.ListingId);
-
-        if (listing == null)
-        {
-            return Json(new { success = false, error = "找不到商品" });
-        }
-
-        // 驗證用戶是賣家
-        if (listing.SellerId != currentUser.Id)
-        {
-            return JsonError("只有賣家可以同意交易");
-        }
-
-        // 驗證商品狀態為上架中
-        if (listing.Status != Models.Enums.ListingStatus.Active)
-        {
-            return JsonError("商品狀態不允許此操作");
-        }
-
-        // 更新商品狀態為保留中
-        listing.Status = Models.Enums.ListingStatus.Reserved;
-        listing.UpdatedAt = TaiwanTime.Now;
-
-        // 發送系統訊息通知買家
-        var buyerId = conversation.Participant1Id == currentUser.Id
-            ? conversation.Participant2Id
-            : conversation.Participant1Id;
-
-        var notificationMessage = new Message
-        {
-            Id = Guid.NewGuid(),
-            ConversationId = conversation.Id,
-            SenderId = currentUser.Id,
-            Content = "[系統發送] 賣家已同意交易，商品狀態已變更為「保留中」。請與賣家確認面交時間和地點。",
-            CreatedAt = TaiwanTime.Now
-        };
-
-        _db.Messages.Add(notificationMessage);
-
-        // 更新對話的最後更新時間
-        conversation.UpdatedAt = TaiwanTime.Now;
-
-        await _db.SaveChangesAsync();
 
         // 透過 SignalR 推送訊息給雙方參與者
-        await _hubContext.Clients.Users(new[] { currentUser.Id, buyerId }).SendAsync(
+        await _hubContext.Clients.Users(new[] { currentUser.Id, result.Data.BuyerId }).SendAsync(
             "ReceiveMessage",
             currentUser.Id,
             currentUser.DisplayName,
-            notificationMessage.Content,
-            notificationMessage.CreatedAt);
+            result.Data.MessageContent,
+            result.Data.MessageCreatedAt);
 
         // 通知買家刷新頁面以顯示「完成交易」按鈕
-        await _hubContext.Clients.User(buyerId).SendAsync("RefreshChat", conversation.Id);
+        await _hubContext.Clients.User(result.Data.BuyerId).SendAsync("RefreshChat", model.ConversationId);
 
         return Json(new { success = true });
     }
@@ -462,75 +370,27 @@ public class MessageController : BaseController
             return JsonError("未登入");
         }
 
-        // 驗證對話
-        var conversation = await _db.Conversations
-            .FirstOrDefaultAsync(c => c.Id == model.ConversationId);
+        // 使用服務層完成交易
+        var result = await _messageService.CompleteTransactionAsync(
+            model.ConversationId,
+            model.ListingId,
+            currentUser.Id);
 
-        if (conversation == null)
+        if (!result.Success || result.Data == null)
         {
-            return Json(new { success = false, error = "找不到對話" });
+            return Json(new { success = false, error = result.ErrorMessage ?? "完成交易時發生錯誤" });
         }
-
-        // 驗證當前用戶是否為對話參與者
-        if (conversation.Participant1Id != currentUser.Id && conversation.Participant2Id != currentUser.Id)
-        {
-            return Json(new { success = false, error = "無權限訪問此對話" });
-        }
-
-        // 驗證商品
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == model.ListingId);
-
-        if (listing == null)
-        {
-            return Json(new { success = false, error = "找不到商品" });
-        }
-
-        // 驗證用戶是買家（不是賣家）
-        if (listing.SellerId == currentUser.Id)
-        {
-            return JsonError("只有買家可以完成交易");
-        }
-
-        // 驗證商品狀態為保留中
-        if (listing.Status != Models.Enums.ListingStatus.Reserved)
-        {
-            return JsonError("商品狀態不允許此操作");
-        }
-
-        // 更新商品狀態為已售出
-        listing.Status = Models.Enums.ListingStatus.Sold;
-        listing.UpdatedAt = TaiwanTime.Now;
-
-        // 發送系統訊息通知賣家
-        var sellerId = listing.SellerId;
-
-        var notificationMessage = new Message
-        {
-            Id = Guid.NewGuid(),
-            ConversationId = conversation.Id,
-            SenderId = currentUser.Id,
-            Content = "[系統發送] 買家已完成交易，商品狀態已變更為「已售出」。請對買家進行評價。",
-            CreatedAt = TaiwanTime.Now
-        };
-
-        _db.Messages.Add(notificationMessage);
-
-        // 更新對話的最後更新時間
-        conversation.UpdatedAt = TaiwanTime.Now;
-
-        await _db.SaveChangesAsync();
 
         // 透過 SignalR 推送訊息給雙方參與者
-        await _hubContext.Clients.Users(new[] { currentUser.Id, sellerId }).SendAsync(
+        await _hubContext.Clients.Users(new[] { currentUser.Id, result.Data.SellerId }).SendAsync(
             "ReceiveMessage",
             currentUser.Id,
             currentUser.DisplayName,
-            notificationMessage.Content,
-            notificationMessage.CreatedAt);
+            result.Data.MessageContent,
+            result.Data.MessageCreatedAt);
 
         // 通知賣家刷新頁面以更新商品狀態
-        await _hubContext.Clients.User(sellerId).SendAsync("RefreshChat", conversation.Id);
+        await _hubContext.Clients.User(result.Data.SellerId).SendAsync("RefreshChat", model.ConversationId);
 
         return Json(new { success = true });
     }
@@ -547,57 +407,25 @@ public class MessageController : BaseController
             return Challenge();
         }
 
-        // 驗證對話
-        var conversation = await _db.Conversations
-            .Include(c => c.Participant1)
-            .Include(c => c.Participant2)
-            .FirstOrDefaultAsync(c => c.Id == conversationId);
+        // 使用服務層取得評價資訊
+        var result = await _messageService.GetReviewInfoAsync(listingId, conversationId, currentUser.Id);
 
-        if (conversation == null)
+        if (!result.Success || result.Data == null)
         {
-            return NotFound();
+            if (result.ErrorMessage == "找不到對話" || result.ErrorMessage == "找不到商品" || result.ErrorMessage == "找不到對方用戶")
+            {
+                return NotFound();
+            }
+            if (result.ErrorMessage == "無權限訪問此對話")
+            {
+                return Forbid();
+            }
+
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "取得評價資訊時發生錯誤";
+            return RedirectToAction(nameof(Conversations));
         }
 
-        // 驗證當前用戶是否為對話參與者
-        if (conversation.Participant1Id != currentUser.Id && conversation.Participant2Id != currentUser.Id)
-        {
-            return Forbid();
-        }
-
-        // 驗證商品
-        var listing = await _db.Listings
-            .FirstOrDefaultAsync(l => l.Id == listingId);
-
-        if (listing == null)
-        {
-            return NotFound();
-        }
-
-        // 判斷對方是誰
-        var otherUser = conversation.Participant1Id == currentUser.Id
-            ? conversation.Participant2
-            : conversation.Participant1;
-
-        if (otherUser == null)
-        {
-            return NotFound();
-        }
-
-        // 判斷當前用戶是買家還是賣家
-        var isBuyer = listing.SellerId != currentUser.Id;
-        var isBuyerReviewingSeller = isBuyer;
-
-        var viewModel = new ReviewViewModel
-        {
-            ListingId = listing.Id,
-            ConversationId = conversation.Id,
-            ListingTitle = listing.Title,
-            OtherUserId = otherUser.Id,
-            OtherUserDisplayName = otherUser.DisplayName,
-            IsBuyerReviewingSeller = isBuyerReviewingSeller
-        };
-
-        return View(viewModel);
+        return View(result.Data);
     }
 
 

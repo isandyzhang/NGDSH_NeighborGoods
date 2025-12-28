@@ -105,27 +105,9 @@
                         @(Model.User.LineMessagingApiAuthorizedAt?.ToString("yyyy/MM/dd HH:mm") ?? "未知")
                     </span>
                 </div>
-                
-                <!-- 通知偏好設定 -->
-                <div class="mb-3">
-                    <label class="form-label"><strong>通知偏好設定：</strong></label>
-                    <form asp-action="UpdateNotificationPreference" method="post" class="d-inline">
-                        @Html.AntiForgeryToken()
-                        <select name="preference" class="form-select d-inline-block w-auto" onchange="this.form.submit()">
-                            <option value="1" selected="@(Model.User.LineNotificationPreference == 1)">即時通知（所有訊息）</option>
-                            <option value="2" selected="@(Model.User.LineNotificationPreference == 2)">摘要通知（每 5 分鐘合併）</option>
-                            <option value="3" selected="@(Model.User.LineNotificationPreference == 3)">僅重要事件（購買、交易等）</option>
-                            <option value="4" selected="@(Model.User.LineNotificationPreference == 4)">關閉通知</option>
-                        </select>
-                    </form>
-                </div>
-                
-                <form asp-action="RevokeLineMessagingApi" method="post" class="d-inline">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-outline-danger w-100" style="min-height: 44px;" onclick="return confirm('確定要停用 LINE 通知嗎？');">
-                        停用 LINE 通知
-                    </button>
-                </form>
+                <p class="text-muted">
+                    <small>如需停用 LINE 通知，請直接在 LINE 中封鎖 Bot。</small>
+                </p>
             }
         </div>
     </div>

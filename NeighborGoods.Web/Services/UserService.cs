@@ -213,5 +213,160 @@ public class UserService : IUserService
             return false;
         }
     }
+
+    public async Task<ApplicationUser?> GetUserByLineMessagingApiUserIdAsync(string lineUserId)
+    {
+        try
+        {
+            return await _db.Users
+                .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == lineUserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "根據 LINE Messaging API User ID 查詢用戶時發生錯誤：LineUserId={LineUserId}", lineUserId);
+            return null;
+        }
+    }
+
+    public async Task<Models.Entities.LineBindingPending?> GetLineBindingPendingByUserIdAsync(string userId, Guid? pendingBindingId)
+    {
+        try
+        {
+            if (pendingBindingId.HasValue)
+            {
+                return await _db.LineBindingPending
+                    .FirstOrDefaultAsync(p => p.Id == pendingBindingId.Value && p.UserId == userId);
+            }
+            else
+            {
+                // 如果沒有提供 ID，查詢該用戶最新的暫存記錄
+                return await _db.LineBindingPending
+                    .Where(p => p.UserId == userId)
+                    .OrderByDescending(p => p.CreatedAt)
+                    .FirstOrDefaultAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得綁定暫存記錄時發生錯誤：UserId={UserId}, PendingBindingId={PendingBindingId}", userId, pendingBindingId);
+            return null;
+        }
+    }
+
+    public async Task<List<Models.Entities.LineBindingPending>> GetLineBindingPendingByLineUserIdAsync(string? lineUserId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(lineUserId))
+            {
+                // 查詢所有 LineUserId 為 null 的記錄（正在綁定中的記錄）
+                return await _db.LineBindingPending
+                    .Where(p => p.LineUserId == null)
+                    .ToListAsync();
+            }
+            else
+            {
+                // 根據 LineUserId 查詢
+                return await _db.LineBindingPending
+                    .Where(p => p.LineUserId == lineUserId)
+                    .ToListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "根據 LINE User ID 查詢暫存記錄時發生錯誤：LineUserId={LineUserId}", lineUserId);
+            return new List<Models.Entities.LineBindingPending>();
+        }
+    }
+
+    public async Task<ServiceResult<Models.Entities.LineBindingPending>> CreateLineBindingPendingAsync(string userId, string token)
+    {
+        try
+        {
+            var pendingBinding = new Models.Entities.LineBindingPending
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Token = token,
+                LineUserId = null,
+                CreatedAt = TaiwanTime.Now
+            };
+
+            _db.LineBindingPending.Add(pendingBinding);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("建立綁定暫存記錄：UserId={UserId}, Token={Token}", userId, token);
+            return ServiceResult<Models.Entities.LineBindingPending>.Ok(pendingBinding);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "建立綁定暫存記錄時發生錯誤：UserId={UserId}, Token={Token}", userId, token);
+            return ServiceResult<Models.Entities.LineBindingPending>.Fail("建立綁定暫存記錄時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult> UpdateLineBindingPendingLineUserIdAsync(Guid pendingId, string lineUserId)
+    {
+        try
+        {
+            var pending = await _db.LineBindingPending
+                .FirstOrDefaultAsync(p => p.Id == pendingId);
+
+            if (pending == null)
+            {
+                return ServiceResult.Fail("找不到綁定暫存記錄");
+            }
+
+            pending.LineUserId = lineUserId;
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("更新綁定暫存記錄的 LINE User ID：PendingId={PendingId}, LineUserId={LineUserId}", pendingId, lineUserId);
+            return ServiceResult.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "更新綁定暫存記錄的 LINE User ID 時發生錯誤：PendingId={PendingId}, LineUserId={LineUserId}", pendingId, lineUserId);
+            return ServiceResult.Fail("更新綁定暫存記錄時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult> DeleteLineBindingPendingAsync(Guid pendingId)
+    {
+        try
+        {
+            var pending = await _db.LineBindingPending
+                .FirstOrDefaultAsync(p => p.Id == pendingId);
+
+            if (pending == null)
+            {
+                return ServiceResult.Fail("找不到綁定暫存記錄");
+            }
+
+            _db.LineBindingPending.Remove(pending);
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("刪除綁定暫存記錄：PendingId={PendingId}", pendingId);
+            return ServiceResult.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "刪除綁定暫存記錄時發生錯誤：PendingId={PendingId}", pendingId);
+            return ServiceResult.Fail("刪除綁定暫存記錄時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<bool> CheckLineUserIdExistsAsync(string lineUserId, string excludeUserId)
+    {
+        try
+        {
+            return await _db.Users
+                .AnyAsync(u => u.LineMessagingApiUserId == lineUserId && u.Id != excludeUserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "檢查 LINE User ID 是否存在時發生錯誤：LineUserId={LineUserId}, ExcludeUserId={ExcludeUserId}", lineUserId, excludeUserId);
+            return false;
+        }
+    }
 }
 

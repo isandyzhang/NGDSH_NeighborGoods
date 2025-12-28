@@ -2,9 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
@@ -17,7 +15,6 @@ namespace NeighborGoods.Web.Controllers;
 public class AccountController : BaseController
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly AppDbContext _db;
     private readonly IUserService _userService;
     private readonly IReviewService _reviewService;
     private readonly ILineMessagingApiService? _lineMessagingApiService;
@@ -26,7 +23,6 @@ public class AccountController : BaseController
     public AccountController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        AppDbContext db,
         IUserService userService,
         IReviewService reviewService,
         IConfiguration configuration,
@@ -34,7 +30,6 @@ public class AccountController : BaseController
         : base(userManager)
     {
         _signInManager = signInManager;
-        _db = db;
         _userService = userService;
         _reviewService = reviewService;
         _configuration = configuration;
@@ -426,8 +421,7 @@ public class AccountController : BaseController
                     var lineUserId = evt.UserId;
                     
                     // 檢查用戶是否已經綁定過
-                    var existingUser = await _db.Users
-                        .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == lineUserId);
+                    var existingUser = await _userService.GetUserByLineMessagingApiUserIdAsync(lineUserId);
                     
                     if (existingUser != null)
                     {
@@ -450,30 +444,30 @@ public class AccountController : BaseController
                     else
                     {
                         // 查詢資料庫暫存表：找出所有「正在綁定」的記錄（LineUserId 為 null）
-                        var pendingBindings = await _db.LineBindingPending
-                            .Where(p => p.LineUserId == null)
-                            .ToListAsync();
+                        var pendingBindings = await _userService.GetLineBindingPendingByLineUserIdAsync(null);
                         
                         if (pendingBindings.Count == 1)
                         {
                             // 只有一筆記錄，直接更新
                             var pending = pendingBindings.First();
-                            pending.LineUserId = lineUserId;
-                            await _db.SaveChangesAsync();
+                            var updateResult = await _userService.UpdateLineBindingPendingLineUserIdAsync(pending.Id, lineUserId);
                             
-                            // 發送歡迎訊息，提示用戶返回網站確認
-                            if (_lineMessagingApiService != null)
+                            if (updateResult.Success)
                             {
-                                try
+                                // 發送歡迎訊息，提示用戶返回網站確認
+                                if (_lineMessagingApiService != null)
                                 {
-                                    await _lineMessagingApiService.SendPushMessageAsync(
-                                        lineUserId,
-                                        "歡迎加入！請返回網站點擊「確認綁定」按鈕完成綁定。",
-                                        Models.Enums.NotificationPriority.Low);
-                                }
-                                catch (Exception)
-                                {
-                                    // 發送失敗不影響流程
+                                    try
+                                    {
+                                        await _lineMessagingApiService.SendPushMessageAsync(
+                                            lineUserId,
+                                            "歡迎加入！請返回網站點擊「確認綁定」按鈕完成綁定。",
+                                            Models.Enums.NotificationPriority.Low);
+                                    }
+                                    catch (Exception)
+                                    {
+                                        // 發送失敗不影響流程
+                                    }
                                 }
                             }
                         }
@@ -519,8 +513,7 @@ public class AccountController : BaseController
                 {
                     // 用戶封鎖 Bot
                     // 找出對應的用戶並解除綁定
-                    var user = await _db.Users
-                        .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == evt.UserId);
+                    var user = await _userService.GetUserByLineMessagingApiUserIdAsync(evt.UserId);
 
                     if (user != null)
                     {
@@ -561,18 +554,15 @@ public class AccountController : BaseController
         // 產生 Token
         var token = Guid.NewGuid().ToString("N"); // 32 字元，無連字號
 
-        // 建立暫存記錄
-        var pendingBinding = new Models.Entities.LineBindingPending
+        // 使用服務層建立暫存記錄
+        var result = await _userService.CreateLineBindingPendingAsync(currentUser.Id, token);
+        if (!result.Success || result.Data == null)
         {
-            Id = Guid.NewGuid(),
-            UserId = currentUser.Id,
-            Token = token,
-            LineUserId = null, // 還不知道
-            CreatedAt = Utils.TaiwanTime.Now
-        };
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "建立綁定記錄時發生錯誤";
+            return RedirectToAction(nameof(Profile));
+        }
 
-        _db.LineBindingPending.Add(pendingBinding);
-        await _db.SaveChangesAsync();
+        var pendingBinding = result.Data;
 
         // 從設定檔取得 Bot ID
         var botId = _configuration["LineMessagingApi:BotId"] ?? "@559fslxw";
@@ -640,67 +630,6 @@ public class AccountController : BaseController
     }
 
     /// <summary>
-    /// 解除 LINE Messaging API 綁定
-    /// </summary>
-    [HttpPost]
-    [Authorize]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RevokeLineMessagingApi()
-    {
-        var currentUser = await GetCurrentUserAsync();
-        if (currentUser == null)
-        {
-            return Unauthorized();
-        }
-
-        var result = await _userService.UnbindLineMessagingApiAsync(currentUser.Id);
-        if (result.Success)
-        {
-            TempData["SuccessMessage"] = "LINE 通知已停用";
-        }
-        else
-        {
-            TempData["ErrorMessage"] = result.ErrorMessage ?? "停用 LINE 通知時發生錯誤";
-        }
-
-        return RedirectToAction(nameof(Profile));
-    }
-
-    /// <summary>
-    /// 更新通知偏好設定
-    /// </summary>
-    [HttpPost]
-    [Authorize]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateNotificationPreference(int preference)
-    {
-        var currentUser = await GetCurrentUserAsync();
-        if (currentUser == null)
-        {
-            return Unauthorized();
-        }
-
-        // 驗證偏好設定值（1=即時, 2=摘要, 3=僅重要, 4=關閉）
-        if (preference < 1 || preference > 4)
-        {
-            TempData["ErrorMessage"] = "無效的通知偏好設定";
-            return RedirectToAction(nameof(Profile));
-        }
-
-        var result = await _userService.UpdateNotificationPreferenceAsync(currentUser.Id, preference);
-        if (result.Success)
-        {
-            TempData["SuccessMessage"] = "通知偏好設定已更新";
-        }
-        else
-        {
-            TempData["ErrorMessage"] = result.ErrorMessage ?? "更新通知偏好設定時發生錯誤";
-        }
-
-        return RedirectToAction(nameof(Profile));
-    }
-
-    /// <summary>
     /// 檢查 LINE 綁定狀態（供前端 JavaScript 呼叫）
     /// </summary>
     [HttpGet]
@@ -724,21 +653,8 @@ public class AccountController : BaseController
             });
         }
 
-        // 查詢暫存記錄
-        Models.Entities.LineBindingPending? pending = null;
-        if (pendingBindingId.HasValue)
-        {
-            pending = await _db.LineBindingPending
-                .FirstOrDefaultAsync(p => p.Id == pendingBindingId.Value && p.UserId == currentUser.Id);
-        }
-        else
-        {
-            // 如果沒有提供 ID，查詢該用戶最新的暫存記錄
-            pending = await _db.LineBindingPending
-                .Where(p => p.UserId == currentUser.Id)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
-        }
+        // 使用服務層查詢暫存記錄
+        var pending = await _userService.GetLineBindingPendingByUserIdAsync(currentUser.Id, pendingBindingId);
 
         if (pending == null)
         {
@@ -784,9 +700,8 @@ public class AccountController : BaseController
             return Unauthorized();
         }
 
-        // 查詢暫存記錄
-        var pending = await _db.LineBindingPending
-            .FirstOrDefaultAsync(p => p.Id == pendingBindingId && p.UserId == currentUser.Id);
+        // 使用服務層查詢暫存記錄
+        var pending = await _userService.GetLineBindingPendingByUserIdAsync(currentUser.Id, pendingBindingId);
 
         if (pending == null)
         {
@@ -805,22 +720,19 @@ public class AccountController : BaseController
         if (!string.IsNullOrEmpty(currentUser.LineMessagingApiUserId))
         {
             // 清除暫存記錄
-            _db.LineBindingPending.Remove(pending);
-            await _db.SaveChangesAsync();
+            await _userService.DeleteLineBindingPendingAsync(pending.Id);
 
             TempData["InfoMessage"] = "您已經綁定 LINE 通知功能";
             return RedirectToAction(nameof(Profile));
         }
 
         // 檢查 LINE User ID 是否已被其他用戶使用
-        var existingUser = await _db.Users
-            .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == pending.LineUserId && u.Id != currentUser.Id);
+        var lineUserIdExists = await _userService.CheckLineUserIdExistsAsync(pending.LineUserId, currentUser.Id);
 
-        if (existingUser != null)
+        if (lineUserIdExists)
         {
             // 清除暫存記錄
-            _db.LineBindingPending.Remove(pending);
-            await _db.SaveChangesAsync();
+            await _userService.DeleteLineBindingPendingAsync(pending.Id);
 
             TempData["ErrorMessage"] = "此 LINE 帳號已被其他用戶綁定";
             return RedirectToAction(nameof(AuthorizeLineMessagingApi));
@@ -831,8 +743,7 @@ public class AccountController : BaseController
         if (result.Success)
         {
             // 清除暫存記錄
-            _db.LineBindingPending.Remove(pending);
-            await _db.SaveChangesAsync();
+            await _userService.DeleteLineBindingPendingAsync(pending.Id);
 
             // 發送歡迎訊息
             if (_lineMessagingApiService != null)

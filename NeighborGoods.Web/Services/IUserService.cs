@@ -43,5 +43,40 @@ public interface IUserService
     /// 取得 LINE Messaging API 綁定狀態
     /// </summary>
     Task<bool> GetUserLineMessagingApiStatusAsync(string userId);
+
+    /// <summary>
+    /// 根據 LINE Messaging API User ID 查詢用戶
+    /// </summary>
+    Task<ApplicationUser?> GetUserByLineMessagingApiUserIdAsync(string lineUserId);
+
+    /// <summary>
+    /// 取得綁定暫存記錄
+    /// </summary>
+    Task<Models.Entities.LineBindingPending?> GetLineBindingPendingByUserIdAsync(string userId, Guid? pendingBindingId);
+
+    /// <summary>
+    /// 根據 LINE User ID 查詢暫存記錄（LineUserId 為 null 的記錄）
+    /// </summary>
+    Task<List<Models.Entities.LineBindingPending>> GetLineBindingPendingByLineUserIdAsync(string? lineUserId);
+
+    /// <summary>
+    /// 建立綁定暫存記錄
+    /// </summary>
+    Task<ServiceResult<Models.Entities.LineBindingPending>> CreateLineBindingPendingAsync(string userId, string token);
+
+    /// <summary>
+    /// 更新暫存記錄的 LINE User ID
+    /// </summary>
+    Task<ServiceResult> UpdateLineBindingPendingLineUserIdAsync(Guid pendingId, string lineUserId);
+
+    /// <summary>
+    /// 刪除綁定暫存記錄
+    /// </summary>
+    Task<ServiceResult> DeleteLineBindingPendingAsync(Guid pendingId);
+
+    /// <summary>
+    /// 檢查 LINE User ID 是否已被其他用戶使用
+    /// </summary>
+    Task<bool> CheckLineUserIdExistsAsync(string lineUserId, string excludeUserId);
 }
 

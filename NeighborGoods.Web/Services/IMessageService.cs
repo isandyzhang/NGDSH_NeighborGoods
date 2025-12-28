@@ -46,5 +46,83 @@ public interface IMessageService
     /// 標記對話為已讀
     /// </summary>
     Task<ServiceResult> MarkAsReadAsync(Guid conversationId, string userId);
+
+    /// <summary>
+    /// 驗證商品是否存在
+    /// </summary>
+    Task<ServiceResult<Models.Entities.Listing>> ValidateListingAsync(Guid listingId);
+
+    /// <summary>
+    /// 取得對話資訊（用於 SignalR）
+    /// </summary>
+    Task<ServiceResult<ConversationInfo>> GetConversationForSignalRAsync(
+        Guid? conversationId,
+        string senderId,
+        string? receiverId,
+        Guid? listingId);
+
+    /// <summary>
+    /// 發送購買/索取請求
+    /// </summary>
+    Task<ServiceResult<Guid>> SendPurchaseRequestAsync(
+        Guid conversationId,
+        Guid listingId,
+        string buyerId,
+        bool isFreeOrCharity);
+
+    /// <summary>
+    /// 賣家同意交易
+    /// </summary>
+    Task<ServiceResult<AcceptPurchaseResult>> AcceptPurchaseAsync(
+        Guid conversationId,
+        Guid listingId,
+        string sellerId);
+
+    /// <summary>
+    /// 買家完成交易
+    /// </summary>
+    Task<ServiceResult<CompleteTransactionResult>> CompleteTransactionAsync(
+        Guid conversationId,
+        Guid listingId,
+        string buyerId);
+
+    /// <summary>
+    /// 取得評價頁面所需資訊
+    /// </summary>
+    Task<ServiceResult<Models.ViewModels.ReviewViewModel>> GetReviewInfoAsync(
+        Guid listingId,
+        Guid conversationId,
+        string currentUserId);
+}
+
+/// <summary>
+/// 對話資訊（用於 SignalR）
+/// </summary>
+public class ConversationInfo
+{
+    public Guid ConversationId { get; set; }
+    public string ReceiverId { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 同意交易結果
+/// </summary>
+public class AcceptPurchaseResult
+{
+    public Guid MessageId { get; set; }
+    public string BuyerId { get; set; } = string.Empty;
+    public string MessageContent { get; set; } = string.Empty;
+    public DateTime MessageCreatedAt { get; set; }
+}
+
+/// <summary>
+/// 完成交易結果
+/// </summary>
+public class CompleteTransactionResult
+{
+    public Guid MessageId { get; set; }
+    public string SellerId { get; set; } = string.Empty;
+    public string MessageContent { get; set; } = string.Empty;
+    public DateTime MessageCreatedAt { get; set; }
 }
 

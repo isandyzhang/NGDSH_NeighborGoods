@@ -542,5 +542,390 @@ public class MessageService : IMessageService
             _notificationMergeService.AddNotification(receiverId, pendingNotification);
         }
     }
+
+    public async Task<ServiceResult<Models.Entities.Listing>> ValidateListingAsync(Guid listingId)
+    {
+        try
+        {
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<Models.Entities.Listing>.Fail("找不到商品");
+            }
+
+            return ServiceResult<Models.Entities.Listing>.Ok(listing);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "驗證商品時發生錯誤：ListingId={ListingId}", listingId);
+            return ServiceResult<Models.Entities.Listing>.Fail("驗證商品時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<ConversationInfo>> GetConversationForSignalRAsync(
+        Guid? conversationId,
+        string senderId,
+        string? receiverId,
+        Guid? listingId)
+    {
+        try
+        {
+            Conversation? conversation = null;
+
+            if (conversationId.HasValue)
+            {
+                conversation = await _db.Conversations
+                    .FirstOrDefaultAsync(c => c.Id == conversationId.Value);
+            }
+            else if (!string.IsNullOrEmpty(receiverId) && listingId.HasValue)
+            {
+                conversation = await _db.Conversations
+                    .FirstOrDefaultAsync(c =>
+                        ((c.Participant1Id == senderId && c.Participant2Id == receiverId) ||
+                         (c.Participant2Id == senderId && c.Participant1Id == receiverId)) &&
+                        c.ListingId == listingId.Value);
+            }
+
+            if (conversation == null)
+            {
+                return ServiceResult<ConversationInfo>.Fail("找不到對話");
+            }
+
+            var receiverIdValue = conversation.Participant1Id == senderId
+                ? conversation.Participant2Id
+                : conversation.Participant1Id;
+
+            return ServiceResult<ConversationInfo>.Ok(new ConversationInfo
+            {
+                ConversationId = conversation.Id,
+                ReceiverId = receiverIdValue
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得對話資訊時發生錯誤");
+            return ServiceResult<ConversationInfo>.Fail("取得對話資訊時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<Guid>> SendPurchaseRequestAsync(
+        Guid conversationId,
+        Guid listingId,
+        string buyerId,
+        bool isFreeOrCharity)
+    {
+        try
+        {
+            // 驗證對話
+            var conversation = await _db.Conversations
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+
+            if (conversation == null)
+            {
+                return ServiceResult<Guid>.Fail("找不到對話");
+            }
+
+            // 驗證當前用戶是否為對話參與者
+            if (conversation.Participant1Id != buyerId && conversation.Participant2Id != buyerId)
+            {
+                return ServiceResult<Guid>.Fail("無權限訪問此對話");
+            }
+
+            // 驗證商品
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<Guid>.Fail("找不到商品");
+            }
+
+            // 驗證用戶不是賣家
+            if (listing.SellerId == buyerId)
+            {
+                return ServiceResult<Guid>.Fail("無法購買自己的商品");
+            }
+
+            // 驗證商品狀態允許購買請求
+            if (listing.Status != Models.Enums.ListingStatus.Active)
+            {
+                return ServiceResult<Guid>.Fail("商品已下架或已售出，無法發送購買請求");
+            }
+
+            // 根據商品類型生成訊息內容
+            var messageContent = isFreeOrCharity
+                ? "[系統發送] 我想索取此商品"
+                : "[系統發送] 我想購買此商品";
+
+            // 建立訊息
+            var message = new Message
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversation.Id,
+                SenderId = buyerId,
+                Content = messageContent,
+                CreatedAt = TaiwanTime.Now
+            };
+
+            _db.Messages.Add(message);
+
+            // 更新對話的最後更新時間
+            conversation.UpdatedAt = TaiwanTime.Now;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("發送購買請求：ConversationId={ConversationId}, ListingId={ListingId}, BuyerId={BuyerId}",
+                conversationId, listingId, buyerId);
+
+            return ServiceResult<Guid>.Ok(message.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "發送購買請求時發生錯誤：ConversationId={ConversationId}, ListingId={ListingId}, BuyerId={BuyerId}",
+                conversationId, listingId, buyerId);
+            return ServiceResult<Guid>.Fail("發送購買請求時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<AcceptPurchaseResult>> AcceptPurchaseAsync(
+        Guid conversationId,
+        Guid listingId,
+        string sellerId)
+    {
+        try
+        {
+            // 驗證對話
+            var conversation = await _db.Conversations
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+
+            if (conversation == null)
+            {
+                return ServiceResult<AcceptPurchaseResult>.Fail("找不到對話");
+            }
+
+            // 驗證當前用戶是否為對話參與者
+            if (conversation.Participant1Id != sellerId && conversation.Participant2Id != sellerId)
+            {
+                return ServiceResult<AcceptPurchaseResult>.Fail("無權限訪問此對話");
+            }
+
+            // 驗證商品
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<AcceptPurchaseResult>.Fail("找不到商品");
+            }
+
+            // 驗證用戶是賣家
+            if (listing.SellerId != sellerId)
+            {
+                return ServiceResult<AcceptPurchaseResult>.Fail("只有賣家可以同意交易");
+            }
+
+            // 驗證商品狀態為上架中
+            if (listing.Status != Models.Enums.ListingStatus.Active)
+            {
+                return ServiceResult<AcceptPurchaseResult>.Fail("商品狀態不允許此操作");
+            }
+
+            // 更新商品狀態為保留中
+            listing.Status = Models.Enums.ListingStatus.Reserved;
+            listing.UpdatedAt = TaiwanTime.Now;
+
+            // 發送系統訊息通知買家
+            var buyerId = conversation.Participant1Id == sellerId
+                ? conversation.Participant2Id
+                : conversation.Participant1Id;
+
+            var notificationMessage = new Message
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversation.Id,
+                SenderId = sellerId,
+                Content = "[系統發送] 賣家已同意交易，商品狀態已變更為「保留中」。請與賣家確認面交時間和地點。",
+                CreatedAt = TaiwanTime.Now
+            };
+
+            _db.Messages.Add(notificationMessage);
+
+            // 更新對話的最後更新時間
+            conversation.UpdatedAt = TaiwanTime.Now;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("賣家同意交易：ConversationId={ConversationId}, ListingId={ListingId}, SellerId={SellerId}",
+                conversationId, listingId, sellerId);
+
+            return ServiceResult<AcceptPurchaseResult>.Ok(new AcceptPurchaseResult
+            {
+                MessageId = notificationMessage.Id,
+                BuyerId = buyerId,
+                MessageContent = notificationMessage.Content,
+                MessageCreatedAt = notificationMessage.CreatedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "同意交易時發生錯誤：ConversationId={ConversationId}, ListingId={ListingId}, SellerId={SellerId}",
+                conversationId, listingId, sellerId);
+            return ServiceResult<AcceptPurchaseResult>.Fail("同意交易時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<CompleteTransactionResult>> CompleteTransactionAsync(
+        Guid conversationId,
+        Guid listingId,
+        string buyerId)
+    {
+        try
+        {
+            // 驗證對話
+            var conversation = await _db.Conversations
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+
+            if (conversation == null)
+            {
+                return ServiceResult<CompleteTransactionResult>.Fail("找不到對話");
+            }
+
+            // 驗證當前用戶是否為對話參與者
+            if (conversation.Participant1Id != buyerId && conversation.Participant2Id != buyerId)
+            {
+                return ServiceResult<CompleteTransactionResult>.Fail("無權限訪問此對話");
+            }
+
+            // 驗證商品
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<CompleteTransactionResult>.Fail("找不到商品");
+            }
+
+            // 驗證用戶是買家（不是賣家）
+            if (listing.SellerId == buyerId)
+            {
+                return ServiceResult<CompleteTransactionResult>.Fail("只有買家可以完成交易");
+            }
+
+            // 驗證商品狀態為保留中
+            if (listing.Status != Models.Enums.ListingStatus.Reserved)
+            {
+                return ServiceResult<CompleteTransactionResult>.Fail("商品狀態不允許此操作");
+            }
+
+            // 更新商品狀態為已售出
+            listing.Status = Models.Enums.ListingStatus.Sold;
+            listing.UpdatedAt = TaiwanTime.Now;
+
+            // 發送系統訊息通知賣家
+            var sellerId = listing.SellerId;
+
+            var notificationMessage = new Message
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversation.Id,
+                SenderId = buyerId,
+                Content = "[系統發送] 買家已完成交易，商品狀態已變更為「已售出」。請對買家進行評價。",
+                CreatedAt = TaiwanTime.Now
+            };
+
+            _db.Messages.Add(notificationMessage);
+
+            // 更新對話的最後更新時間
+            conversation.UpdatedAt = TaiwanTime.Now;
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogInformation("買家完成交易：ConversationId={ConversationId}, ListingId={ListingId}, BuyerId={BuyerId}",
+                conversationId, listingId, buyerId);
+
+            return ServiceResult<CompleteTransactionResult>.Ok(new CompleteTransactionResult
+            {
+                MessageId = notificationMessage.Id,
+                SellerId = sellerId,
+                MessageContent = notificationMessage.Content,
+                MessageCreatedAt = notificationMessage.CreatedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "完成交易時發生錯誤：ConversationId={ConversationId}, ListingId={ListingId}, BuyerId={BuyerId}",
+                conversationId, listingId, buyerId);
+            return ServiceResult<CompleteTransactionResult>.Fail("完成交易時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult<Models.ViewModels.ReviewViewModel>> GetReviewInfoAsync(
+        Guid listingId,
+        Guid conversationId,
+        string currentUserId)
+    {
+        try
+        {
+            // 驗證對話
+            var conversation = await _db.Conversations
+                .Include(c => c.Participant1)
+                .Include(c => c.Participant2)
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+
+            if (conversation == null)
+            {
+                return ServiceResult<Models.ViewModels.ReviewViewModel>.Fail("找不到對話");
+            }
+
+            // 驗證當前用戶是否為對話參與者
+            if (conversation.Participant1Id != currentUserId && conversation.Participant2Id != currentUserId)
+            {
+                return ServiceResult<Models.ViewModels.ReviewViewModel>.Fail("無權限訪問此對話");
+            }
+
+            // 驗證商品
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult<Models.ViewModels.ReviewViewModel>.Fail("找不到商品");
+            }
+
+            // 判斷對方是誰
+            var otherUser = conversation.Participant1Id == currentUserId
+                ? conversation.Participant2
+                : conversation.Participant1;
+
+            if (otherUser == null)
+            {
+                return ServiceResult<Models.ViewModels.ReviewViewModel>.Fail("找不到對方用戶");
+            }
+
+            // 判斷當前用戶是買家還是賣家
+            var isBuyer = listing.SellerId != currentUserId;
+            var isBuyerReviewingSeller = isBuyer;
+
+            var viewModel = new Models.ViewModels.ReviewViewModel
+            {
+                ListingId = listing.Id,
+                ConversationId = conversation.Id,
+                ListingTitle = listing.Title,
+                OtherUserId = otherUser.Id,
+                OtherUserDisplayName = otherUser.DisplayName,
+                IsBuyerReviewingSeller = isBuyerReviewingSeller
+            };
+
+            return ServiceResult<Models.ViewModels.ReviewViewModel>.Ok(viewModel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得評價資訊時發生錯誤：ListingId={ListingId}, ConversationId={ConversationId}, UserId={UserId}",
+                listingId, conversationId, currentUserId);
+            return ServiceResult<Models.ViewModels.ReviewViewModel>.Fail("取得評價資訊時發生錯誤，請稍後再試");
+        }
+    }
 }
 
