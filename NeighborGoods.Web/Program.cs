@@ -42,6 +42,16 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     .AddErrorDescriber<ChineseIdentityErrorDescriber>()
     .AddDefaultTokenProviders();
 
+// 設定 Cookie 選項，讓 LINE 用戶記住登入狀態
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.ExpireTimeSpan = TimeSpan.FromDays(30); // Cookie 30 天後過期
+    options.SlidingExpiration = true; // 滑動過期：每次請求時重置過期時間
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // 根據請求決定是否使用 HTTPS
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
+
 // Authentication：在 Identity 既有設定上額外加入 LINE OIDC
 builder.Services.AddAuthentication()
     .AddOpenIdConnect("LINE", "使用 LINE 登入", options =>

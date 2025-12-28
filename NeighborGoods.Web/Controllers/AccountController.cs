@@ -182,7 +182,7 @@ public class AccountController : BaseController
         var signInResult = await _signInManager.ExternalLoginSignInAsync(
             info.LoginProvider,
             info.ProviderKey,
-            isPersistent: false,
+            isPersistent: true,
             bypassTwoFactor: true);
 
         if (signInResult.Succeeded)
@@ -211,7 +211,7 @@ public class AccountController : BaseController
             var loginResult = await UserManager.AddLoginAsync(user, info);
             if (loginResult.Succeeded)
             {
-                await _signInManager.SignInAsync(user, isPersistent: false);
+                await _signInManager.SignInAsync(user, isPersistent: true);
                 return LocalRedirect(returnUrl);
             }
 

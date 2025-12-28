@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,7 @@ using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Models.Configuration;
 using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Utils;
+using System.Diagnostics;
 
 namespace NeighborGoods.Web.Services;
 
@@ -56,86 +58,220 @@ public class NotificationQueueBackgroundService : BackgroundService
             return;
         }
 
-        using var scope = _serviceProvider.CreateScope();
-        var messagingService = scope.ServiceProvider.GetRequiredService<ILineMessagingApiService>();
-        var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
-        var lineOptions = scope.ServiceProvider.GetRequiredService<IOptions<LineMessagingApiOptions>>().Value;
-
-        var now = TaiwanTime.Now;
-        var thresholdTime = now.AddMinutes(-NotificationConstants.MergeWindowMinutes); // 測試用：1 分鐘，正式環境改為 -30
-
-        // 一次查詢找出「有新的未讀訊息」的用戶
-        // 條件：
-        // 1. 未讀訊息超過時間閾值（測試用改為 1 分鐘）
-        // 2. 必須有「新的未讀訊息」（相對於上次通知時間）
-        var usersToNotify = await (
-            from u in db.Users
-            where !string.IsNullOrEmpty(u.LineMessagingApiUserId)
-            from c in db.Conversations
-            where c.Participant1Id == u.Id || c.Participant2Id == u.Id
-            from m in db.Messages
-            where m.ConversationId == c.Id
-                && m.CreatedAt <= thresholdTime  // 超過時間閾值
-                && m.SenderId != u.Id  // 不是自己發的
-                // 檢查是否未讀
-                && ((c.Participant1Id == u.Id && (c.Participant1LastReadAt == null || m.CreatedAt > c.Participant1LastReadAt.Value))
-                    || (c.Participant2Id == u.Id && (c.Participant2LastReadAt == null || m.CreatedAt > c.Participant2LastReadAt.Value)))
-                // 檢查是否有新的未讀訊息（相對於上次通知時間）
-                && (u.LineNotificationLastSentAt == null || m.CreatedAt > u.LineNotificationLastSentAt.Value)
-            select new
-            {
-                UserId = u.Id,
-                LineMessagingApiUserId = u.LineMessagingApiUserId,
-                ConversationId = c.Id
-            }
-        )
-        .Distinct()
-        .ToListAsync(cancellationToken);
-
-        // 對每個用戶發送通知
-        foreach (var userInfo in usersToNotify.GroupBy(x => x.UserId))
+        var stopwatch = Stopwatch.StartNew();
+        
+        try
         {
-            var userId = userInfo.Key;
-            var lineUserId = userInfo.First().LineMessagingApiUserId;
-            var firstConversationId = userInfo.First().ConversationId;
+            using var scope = _serviceProvider.CreateScope();
+            var messagingService = scope.ServiceProvider.GetRequiredService<ILineMessagingApiService>();
+            var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
+            var lineOptions = scope.ServiceProvider.GetRequiredService<IOptions<LineMessagingApiOptions>>().Value;
 
-            try
+            // 設定查詢超時為 30 秒
+            db.Database.SetCommandTimeout(30);
+
+            var now = TaiwanTime.Now;
+            var thresholdTime = now.AddMinutes(-NotificationConstants.MergeWindowMinutes);
+
+            _logger.LogDebug("開始處理通知佇列，時間閾值：{ThresholdTime}", thresholdTime);
+
+            // 第一步：找出所有有 LineMessagingApiUserId 的用戶（簡單查詢，只選必要欄位）
+            var usersWithLine = await db.Users
+                .Where(u => !string.IsNullOrEmpty(u.LineMessagingApiUserId))
+                .Select(u => new
+                {
+                    u.Id,
+                    u.LineMessagingApiUserId,
+                    u.LineNotificationLastSentAt
+                })
+                .ToListAsync(cancellationToken);
+
+            if (!usersWithLine.Any())
             {
-                var user = await db.Users.FindAsync(new object[] { userId }, cancellationToken);
-                if (user == null)
+                _logger.LogDebug("沒有已綁定 LINE Bot 的用戶，跳過通知處理");
+                return;
+            }
+
+            _logger.LogDebug("找到 {Count} 個已綁定 LINE Bot 的用戶", usersWithLine.Count);
+
+            var userIds = usersWithLine.Select(u => u.Id).ToList();
+            var userLastSentDict = usersWithLine.ToDictionary(u => u.Id, u => u.LineNotificationLastSentAt);
+
+            // 第二步：查詢這些用戶參與的對話
+            var userConversations = await db.Conversations
+                .Where(c => userIds.Contains(c.Participant1Id) || userIds.Contains(c.Participant2Id))
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Participant1Id,
+                    c.Participant2Id,
+                    c.Participant1LastReadAt,
+                    c.Participant2LastReadAt
+                })
+                .ToListAsync(cancellationToken);
+
+            if (!userConversations.Any())
+            {
+                _logger.LogDebug("沒有找到相關對話，跳過通知處理");
+                return;
+            }
+
+            var conversationIds = userConversations.Select(c => c.Id).ToList();
+            var conversationDict = userConversations.ToDictionary(c => c.Id);
+
+            // 第三步：查詢未讀訊息
+            var unreadMessages = await db.Messages
+                .Where(m => conversationIds.Contains(m.ConversationId)
+                    && m.CreatedAt <= thresholdTime)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.ConversationId,
+                    m.SenderId,
+                    m.CreatedAt
+                })
+                .ToListAsync(cancellationToken);
+
+            if (!unreadMessages.Any())
+            {
+                _logger.LogDebug("沒有找到未讀訊息，跳過通知處理");
+                return;
+            }
+
+            // 第四步：在記憶體中過濾和處理
+            var usersToNotify = new Dictionary<string, (string LineUserId, Guid ConversationId)>();
+
+            foreach (var message in unreadMessages)
+            {
+                if (!conversationDict.TryGetValue(message.ConversationId, out var conversation))
                 {
                     continue;
                 }
 
-                // 發送通知
-                var chatUrl = $"/Message/Chat?conversationId={firstConversationId}";
-                var baseUrl = lineOptions.BaseUrl?.TrimEnd('/') ?? "https://NeighborGoods.azurewebsites.net";
-                var fullUrl = $"{baseUrl}{chatUrl}";
+                // 判斷訊息是發給哪個參與者的
+                string? targetUserId = null;
+                DateTime? lastReadAt = null;
 
-                await messagingService.SendPushMessageWithLinkAsync(
-                    lineUserId!,
-                    "你有尚未讀取的新訊息",
-                    fullUrl,
-                    "查看訊息",
-                    NotificationPriority.Medium);
+                if (conversation.Participant1Id != message.SenderId)
+                {
+                    targetUserId = conversation.Participant1Id;
+                    lastReadAt = conversation.Participant1LastReadAt;
+                }
+                else if (conversation.Participant2Id != message.SenderId)
+                {
+                    targetUserId = conversation.Participant2Id;
+                    lastReadAt = conversation.Participant2LastReadAt;
+                }
 
-                // 更新最後通知時間
-                user.LineNotificationLastSentAt = now;
+                if (string.IsNullOrEmpty(targetUserId))
+                {
+                    continue; // 訊息是自己發的，跳過
+                }
+
+                // 檢查是否未讀
+                if (lastReadAt.HasValue && message.CreatedAt <= lastReadAt.Value)
+                {
+                    continue; // 已讀，跳過
+                }
+
+                // 檢查是否有新的未讀訊息（相對於上次通知時間）
+                if (userLastSentDict.TryGetValue(targetUserId, out var lastSentAt) 
+                    && lastSentAt.HasValue 
+                    && message.CreatedAt <= lastSentAt.Value)
+                {
+                    continue; // 已經通知過，跳過
+                }
+
+                // 記錄需要通知的用戶（每個用戶只記錄第一個對話）
+                if (!usersToNotify.ContainsKey(targetUserId))
+                {
+                    var user = usersWithLine.FirstOrDefault(u => u.Id == targetUserId);
+                    if (user != null)
+                    {
+                        usersToNotify[targetUserId] = (user.LineMessagingApiUserId!, message.ConversationId);
+                    }
+                }
             }
-            catch (Exception ex)
+
+            if (!usersToNotify.Any())
             {
-                _logger.LogError(ex, "處理用戶 {UserId} 的通知時發生錯誤", userId);
+                _logger.LogDebug("沒有需要通知的用戶");
+                return;
             }
-        }
 
-        // 批次儲存所有更新
-        try
+            _logger.LogInformation("準備通知 {Count} 個用戶", usersToNotify.Count);
+
+            // 第五步：對每個用戶發送通知
+            var notifiedCount = 0;
+            var errorCount = 0;
+
+            foreach (var (userId, (lineUserId, conversationId)) in usersToNotify)
+            {
+                try
+                {
+                    var user = await db.Users.FindAsync(new object[] { userId }, cancellationToken);
+                    if (user == null)
+                    {
+                        _logger.LogWarning("找不到用戶 {UserId}，跳過通知", userId);
+                        continue;
+                    }
+
+                    // 發送通知
+                    var chatUrl = $"/Message/Chat?conversationId={conversationId}";
+                    var baseUrl = lineOptions.BaseUrl?.TrimEnd('/') ?? "https://NeighborGoods.azurewebsites.net";
+                    var fullUrl = $"{baseUrl}{chatUrl}";
+
+                    await messagingService.SendPushMessageWithLinkAsync(
+                        lineUserId,
+                        "你有尚未讀取的新訊息",
+                        fullUrl,
+                        "查看訊息",
+                        NotificationPriority.Medium);
+
+                    // 更新最後通知時間
+                    user.LineNotificationLastSentAt = now;
+                    notifiedCount++;
+                }
+                catch (Exception ex)
+                {
+                    errorCount++;
+                    _logger.LogError(ex, "處理用戶 {UserId} 的通知時發生錯誤", userId);
+                }
+            }
+
+            // 批次儲存所有更新
+            if (notifiedCount > 0)
+            {
+                try
+                {
+                    await db.SaveChangesAsync(cancellationToken);
+                    _logger.LogInformation("成功通知 {NotifiedCount} 個用戶，{ErrorCount} 個失敗", notifiedCount, errorCount);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "儲存通知時間更新時發生錯誤");
+                }
+            }
+
+            stopwatch.Stop();
+            _logger.LogDebug("通知處理完成，耗時 {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+        }
+        catch (SqlException ex) when (ex.Number == -2 || ex.Number == 2)
         {
-            await db.SaveChangesAsync(cancellationToken);
+            // SQL 超時錯誤
+            stopwatch.Stop();
+            _logger.LogWarning(ex, "查詢超時，跳過本次通知處理。耗時 {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+        }
+        catch (SqlException ex) when (ex.Number == 53 || ex.Number == 121 || ex.Number == 10054 || ex.Number == 10060)
+        {
+            // 連線錯誤：53=Network path not found, 121=Semaphore timeout, 10054=Connection reset, 10060=Timeout expired
+            stopwatch.Stop();
+            _logger.LogWarning(ex, "資料庫連線錯誤，跳過本次通知處理。耗時 {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "儲存通知時間更新時發生錯誤");
+            stopwatch.Stop();
+            _logger.LogError(ex, "處理通知佇列時發生未預期的錯誤。耗時 {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         }
     }
 }
