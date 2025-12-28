@@ -113,10 +113,6 @@ if (lineMessagingApiOptions != null &&
         return new LineMessagingApiService(httpClient, options, logger);
     });
     
-    // 註冊通知合併服務
-    builder.Services.AddMemoryCache();
-    builder.Services.AddSingleton<INotificationMergeService, NotificationMergeService>();
-    
     // 註冊背景服務
     builder.Services.AddHostedService<NotificationQueueBackgroundService>();
 }
@@ -132,6 +128,15 @@ builder.Services.AddScoped<IListingService, ListingService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+
+// Session 設定
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(2);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
 // Add services to the container.
 builder.Services.AddControllersWithViews()
@@ -199,6 +204,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.UseSession();
 
 app.UseRouting();
 

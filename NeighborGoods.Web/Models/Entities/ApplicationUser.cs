@@ -34,9 +34,10 @@ public class ApplicationUser : IdentityUser
     public DateTime? LineMessagingApiAuthorizedAt { get; set; }
 
     /// <summary>
-    /// LINE 通知偏好設定（1=即時, 2=摘要, 3=僅重要, 4=關閉）
+    /// LINE 通知最後發送時間（台灣時間，UTC+8）
+    /// 用於防止重複通知，30 分鐘內不重複通知同一用戶
     /// </summary>
-    public int LineNotificationPreference { get; set; } = 1;
+    public DateTime? LineNotificationLastSentAt { get; set; }
 }
 
 

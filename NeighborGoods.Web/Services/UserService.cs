@@ -165,41 +165,6 @@ public class UserService : IUserService
         }
     }
 
-    public async Task<ServiceResult> UpdateNotificationPreferenceAsync(string userId, int preference)
-    {
-        try
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                return ServiceResult.Fail("找不到用戶");
-            }
-
-            // 驗證偏好設定值（1=即時, 2=摘要, 3=僅重要, 4=關閉）
-            if (preference < 1 || preference > 4)
-            {
-                return ServiceResult.Fail("無效的通知偏好設定");
-            }
-
-            user.LineNotificationPreference = preference;
-
-            var result = await _userManager.UpdateAsync(user);
-            if (result.Succeeded)
-            {
-                _logger.LogInformation("用戶 {UserId} 已更新通知偏好設定為 {Preference}", userId, preference);
-                return ServiceResult.Ok();
-            }
-
-            var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
-            return ServiceResult.Fail(errorMessages);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "更新通知偏好設定時發生錯誤：UserId={UserId}, Preference={Preference}", userId, preference);
-            return ServiceResult.Fail("更新通知偏好設定時發生錯誤，請稍後再試");
-        }
-    }
-
     public async Task<bool> GetUserLineMessagingApiStatusAsync(string userId)
     {
         try

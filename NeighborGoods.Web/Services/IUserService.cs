@@ -35,11 +35,6 @@ public interface IUserService
     Task<ServiceResult> UnbindLineMessagingApiAsync(string userId);
 
     /// <summary>
-    /// 更新通知偏好設定
-    /// </summary>
-    Task<ServiceResult> UpdateNotificationPreferenceAsync(string userId, int preference);
-
-    /// <summary>
     /// 取得 LINE Messaging API 綁定狀態
     /// </summary>
     Task<bool> GetUserLineMessagingApiStatusAsync(string userId);

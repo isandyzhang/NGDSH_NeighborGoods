@@ -17,6 +17,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<LineBindingPending> LineBindingPending => Set<LineBindingPending>();
+    public DbSet<AdminMessage> AdminMessages => Set<AdminMessage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -150,5 +151,44 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<LineBindingPending>()
             .Property(p => p.Token)
             .HasMaxLength(32);
+
+        // AdminMessage 與 ApplicationUser 的關聯
+        builder.Entity<AdminMessage>()
+            .HasOne(m => m.Sender)
+            .WithMany()
+            .HasForeignKey(m => m.SenderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // AdminMessage 字串欄位長度限制
+        builder.Entity<AdminMessage>()
+            .Property(m => m.Content)
+            .HasMaxLength(1000);
+
+        // Listing 與 ApplicationUser 的關聯（買家）
+        builder.Entity<Listing>()
+            .HasOne(l => l.Buyer)
+            .WithMany()
+            .HasForeignKey(l => l.BuyerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // 效能索引
+        // Listings 索引
+        builder.Entity<Listing>()
+            .HasIndex(l => l.CreatedAt);
+
+        // Conversations 索引
+        builder.Entity<Conversation>()
+            .HasIndex(c => c.ListingId);
+
+        // AdminMessages 索引
+        builder.Entity<AdminMessage>()
+            .HasIndex(m => m.IsRead);
+
+        builder.Entity<AdminMessage>()
+            .HasIndex(m => m.CreatedAt);
+
+        // Users 索引
+        builder.Entity<ApplicationUser>()
+            .HasIndex(u => u.CreatedAt);
     }
 }

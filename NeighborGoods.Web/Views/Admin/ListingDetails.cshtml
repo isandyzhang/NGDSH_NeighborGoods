@@ -1,0 +1,71 @@
+@model NeighborGoods.Web.Models.ViewModels.AdminListingDetailsViewModel
+@using NeighborGoods.Web.Models.Enums
+
+@{
+    ViewData["Title"] = "商品詳情";
+    Layout = "_AdminLayout";
+}
+
+<div class="mb-4">
+    <h3>@Model.Title</h3>
+    <p><strong>狀態：</strong>
+        @switch (Model.Status)
+        {
+            case ListingStatus.Active:
+                <span class="badge bg-success">上架中</span>
+                break;
+            case ListingStatus.Reserved:
+                <span class="badge bg-warning">保留中</span>
+                break;
+            case ListingStatus.Sold:
+                <span class="badge bg-info">已售出</span>
+                break;
+            case ListingStatus.Donated:
+                <span class="badge bg-primary">已捐贈</span>
+                break;
+            case ListingStatus.Inactive:
+                <span class="badge bg-secondary">已下架</span>
+                break;
+            default:
+                <span class="badge bg-secondary">未知</span>
+                break;
+        }
+    </p>
+    <p><strong>描述：</strong>@Model.Description</p>
+    <p><strong>價格：</strong>@(Model.IsFree ? "免費" : $"${Model.Price:N0}")</p>
+    <p><strong>賣家：</strong>@Model.SellerDisplayName</p>
+    @if (!string.IsNullOrEmpty(Model.BuyerDisplayName))
+    {
+        <p><strong>買家：</strong>@Model.BuyerDisplayName</p>
+    }
+    <p><strong>建立時間：</strong>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</p>
+</div>
+
+@if (Model.Conversations.Any())
+{
+    <h4 class="mt-4 mb-3">相關對話</h4>
+    @foreach (var conv in Model.Conversations)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                參與者：@conv.Participant1DisplayName 與 @conv.Participant2DisplayName
+            </div>
+            <div class="card-body">
+                @foreach (var msg in conv.Messages)
+                {
+                    <div class="mb-2">
+                        <strong>@(msg.IsSeller ? "賣家" : "買家")：</strong>@msg.Content
+                        <small class="text-muted">(@msg.CreatedAt.ToString("yyyy-MM-dd HH:mm"))</small>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+else
+{
+    <p class="text-muted">此商品尚無對話紀錄</p>
+}
+
+<a asp-action="Listings" class="btn btn-secondary">返回列表</a>
+

@@ -1,0 +1,77 @@
+@model NeighborGoods.Web.Models.ViewModels.AdminListingsViewModel
+@using NeighborGoods.Web.Models.Enums
+
+@{
+    ViewData["Title"] = "商品管理";
+    Layout = "_AdminLayout";
+}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>商品名稱</th>
+            <th>狀態</th>
+            <th>販賣者</th>
+            <th>購買者</th>
+            <th>建立時間</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var listing in Model.Listings)
+        {
+            <tr>
+                <td>
+                    <a asp-action="ListingDetails" asp-route-id="@listing.Id">@listing.Title</a>
+                </td>
+                <td>
+                    @switch (listing.Status)
+                    {
+                        case ListingStatus.Active:
+                            <span class="badge bg-success">上架中</span>
+                            break;
+                        case ListingStatus.Reserved:
+                            <span class="badge bg-warning">保留中</span>
+                            break;
+                        case ListingStatus.Sold:
+                            <span class="badge bg-info">已售出</span>
+                            break;
+                        case ListingStatus.Donated:
+                            <span class="badge bg-primary">已捐贈</span>
+                            break;
+                        case ListingStatus.Inactive:
+                            <span class="badge bg-secondary">已下架</span>
+                            break;
+                        default:
+                            <span class="badge bg-secondary">未知</span>
+                            break;
+                    }
+                </td>
+                <td>@listing.SellerDisplayName</td>
+                <td>@(listing.BuyerDisplayName ?? "-")</td>
+                <td>@listing.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>
+                    <form asp-action="DeleteListing" asp-route-id="@listing.Id" method="post" class="d-inline" onsubmit="return confirm('確定要刪除此商品嗎？');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-danger">刪除</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (Model.TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-action="Listings" asp-route-page="@i">@i</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}
+

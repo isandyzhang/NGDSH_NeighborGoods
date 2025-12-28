@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Models;
+using NeighborGoods.Web.Models.Configuration;
 using NeighborGoods.Web.Models.DTOs;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.ViewModels;
@@ -17,18 +19,18 @@ public class MessageService : IMessageService
     private readonly AppDbContext _db;
     private readonly ILogger<MessageService> _logger;
     private readonly ILineMessagingApiService? _lineMessagingApiService;
-    private readonly INotificationMergeService? _notificationMergeService;
+    private readonly LineMessagingApiOptions? _lineOptions;
 
     public MessageService(
         AppDbContext db,
         ILogger<MessageService> logger,
         ILineMessagingApiService? lineMessagingApiService = null,
-        INotificationMergeService? notificationMergeService = null)
+        IOptions<LineMessagingApiOptions>? lineOptions = null)
     {
         _db = db;
         _logger = logger;
         _lineMessagingApiService = lineMessagingApiService;
-        _notificationMergeService = notificationMergeService;
+        _lineOptions = lineOptions?.Value;
     }
 
     public async Task<int> GetUnreadMessageCountAsync(string userId)
@@ -396,16 +398,6 @@ public class MessageService : IMessageService
 
             await _db.SaveChangesAsync();
 
-            // 整合 LINE 通知（不影響主要功能）
-            try
-            {
-                await SendLineNotificationAsync(conversation, senderId, content, message.CreatedAt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "發送 LINE 通知時發生錯誤，但不影響訊息發送");
-            }
-
             return ServiceResult<Guid>.Ok(message.Id);
         }
         catch (Exception ex)
@@ -452,94 +444,6 @@ public class MessageService : IMessageService
         {
             _logger.LogError(ex, "標記對話為已讀時發生錯誤");
             return ServiceResult.Fail("標記對話為已讀時發生錯誤，請稍後再試");
-        }
-    }
-
-    /// <summary>
-    /// 發送 LINE 通知（私有方法）
-    /// </summary>
-    private async Task SendLineNotificationAsync(
-        Conversation conversation,
-        string senderId,
-        string messageContent,
-        DateTime messageCreatedAt)
-    {
-        // 如果服務未注入，則不處理
-        if (_lineMessagingApiService == null || _notificationMergeService == null)
-        {
-            return;
-        }
-
-        // 判斷接收者是誰
-        var receiverId = conversation.Participant1Id == senderId
-            ? conversation.Participant2Id
-            : conversation.Participant1Id;
-
-        if (string.IsNullOrEmpty(receiverId))
-        {
-            return;
-        }
-
-        // 取得接收者資訊
-        var receiver = await _db.Users
-            .FirstOrDefaultAsync(u => u.Id == receiverId);
-
-        if (receiver == null || string.IsNullOrEmpty(receiver.LineMessagingApiUserId))
-        {
-            return;
-        }
-
-        // 檢查用戶的通知偏好設定
-        // 1=即時, 2=摘要, 3=僅重要, 4=關閉
-        if (receiver.LineNotificationPreference == 4)
-        {
-            return; // 用戶已關閉通知
-        }
-
-        // 取得發送者資訊
-        var sender = await _db.Users
-            .FirstOrDefaultAsync(u => u.Id == senderId);
-
-        var senderName = sender?.DisplayName ?? "未知用戶";
-
-        // 一般訊息使用 Medium 優先級（會合併）
-        var priority = Models.Enums.NotificationPriority.Medium;
-
-        // 檢查是否為重要事件（購買請求等）
-        // 這裡可以根據訊息內容判斷，或從其他地方傳入
-        // 目前先使用 Medium 優先級
-
-        // 根據優先級決定立即通知或加入佇列
-        if (priority == Models.Enums.NotificationPriority.High)
-        {
-            // High 優先級：立即發送
-            var notificationMessage = $"{senderName}：{messageContent}";
-            var chatUrl = $"/Message/Chat?conversationId={conversation.Id}";
-            var fullUrl = $"https://your-site.azurewebsites.net{chatUrl}"; // TODO: 從設定檔取得基礎 URL
-
-            await _lineMessagingApiService.SendPushMessageWithLinkAsync(
-                receiver.LineMessagingApiUserId,
-                notificationMessage,
-                fullUrl,
-                "查看對話",
-                priority);
-        }
-        else
-        {
-            // Medium/Low 優先級：加入合併佇列
-            var pendingNotification = new Models.PendingNotification
-            {
-                UserId = receiverId,
-                ConversationId = conversation.Id,
-                SenderName = senderName,
-                MessageCount = 1,
-                LastMessageTime = messageCreatedAt,
-                FirstMessageTime = messageCreatedAt,
-                Priority = priority,
-                MessagePreview = messageContent.Length > 20 ? messageContent.Substring(0, 20) + "..." : messageContent
-            };
-
-            _notificationMergeService.AddNotification(receiverId, pendingNotification);
         }
     }
 
@@ -822,6 +726,8 @@ public class MessageService : IMessageService
             // 更新商品狀態為已售出
             listing.Status = Models.Enums.ListingStatus.Sold;
             listing.UpdatedAt = TaiwanTime.Now;
+            // 記錄買家 ID
+            listing.BuyerId = buyerId;
 
             // 發送系統訊息通知賣家
             var sellerId = listing.SellerId;

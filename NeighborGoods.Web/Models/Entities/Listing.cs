@@ -53,6 +53,16 @@ public class Listing
 
     public ApplicationUser? Seller { get; set; }
 
+    /// <summary>
+    /// 買家使用者 Id（外鍵 → ApplicationUser，交易完成時記錄）。
+    /// </summary>
+    public string? BuyerId { get; set; }
+
+    /// <summary>
+    /// 買家的導航屬性。
+    /// </summary>
+    public ApplicationUser? Buyer { get; set; }
+
     public ICollection<ListingImage> Images { get; set; } = new List<ListingImage>();
 
     /// <summary>

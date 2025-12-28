@@ -1,0 +1,96 @@
+@model NeighborGoods.Web.Models.ViewModels.AdminMailboxViewModel
+
+@{
+    ViewData["Title"] = "管理員信箱";
+    Layout = "_AdminLayout";
+}
+
+<div class="mb-3">
+    <span class="badge bg-warning">未讀訊息：@Model.UnreadCount</span>
+    <a asp-action="Mailbox" asp-route-isRead="false" class="btn btn-sm btn-outline-primary ms-2">只看未讀</a>
+    <a asp-action="Mailbox" asp-route-isRead="true" class="btn btn-sm btn-outline-secondary ms-2">只看已讀</a>
+    <a asp-action="Mailbox" class="btn btn-sm btn-outline-secondary ms-2">全部</a>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>發送者</th>
+            <th>訊息內容</th>
+            <th>發送時間</th>
+            <th>狀態</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var msg in Model.Messages)
+        {
+            <tr class="@(msg.IsRead ? "" : "table-warning")">
+                <td>@msg.SenderDisplayName</td>
+                <td>@msg.Content</td>
+                <td>@msg.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>@(msg.IsRead ? "已讀" : "未讀")</td>
+                <td>
+                    @if (!msg.IsRead)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary mark-read-btn" data-id="@msg.Id">標記已讀</button>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (Model.TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                var isReadQuery = ViewContext.HttpContext.Request.Query["isRead"].ToString();
+                bool? isReadParam = null;
+                if (!string.IsNullOrEmpty(isReadQuery) && bool.TryParse(isReadQuery, out var parsed))
+                {
+                    isReadParam = parsed;
+                }
+                <li class="page-item @(i == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-action="Mailbox" asp-route-page="@i" asp-route-isRead="@isReadParam">@i</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}
+
+@Html.AntiForgeryToken()
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.mark-read-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const messageId = this.getAttribute('data-id');
+                    const row = this.closest('tr');
+                    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                    
+                    fetch('@Url.Action("MarkMessageAsRead")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': token
+                        },
+                        body: JSON.stringify(messageId)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            row.classList.remove('table-warning');
+                            this.remove();
+                            location.reload();
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+}
+

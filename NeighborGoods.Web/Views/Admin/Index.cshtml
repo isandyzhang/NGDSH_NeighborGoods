@@ -1,0 +1,35 @@
+@{
+    ViewData["Title"] = "管理員後台";
+    Layout = "_AdminLayout";
+}
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">商品管理</h5>
+                <p class="card-text">查看和管理所有商品</p>
+                <a asp-action="Listings" class="btn btn-primary">前往</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">用戶管理</h5>
+                <p class="card-text">查看和管理所有用戶</p>
+                <a asp-action="Users" class="btn btn-primary">前往</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">信箱</h5>
+                <p class="card-text">查看用戶發送的訊息</p>
+                <a asp-action="Mailbox" class="btn btn-primary">前往</a>
+            </div>
+        </div>
+    </div>
+</div>
+

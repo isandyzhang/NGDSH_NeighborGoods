@@ -3,6 +3,14 @@
 }
 
 <div class="container mt-4">
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
     <h1 class="mb-4">使用條款與免責聲明</h1>
 
     <div class="card mb-4">
@@ -49,5 +57,50 @@
             <p class="mb-0">使用本平台即表示您已理解並同意以上條款。請務必在交易前仔細檢查商品，並在社區內完成面交，以確保交易安全。</p>
         </div>
     </div>
+
+    <!-- 隱藏的管理員入口 -->
+    <div class="text-center mt-5">
+        <button type="button" class="btn btn-link text-muted" style="font-size: 0.75rem; text-decoration: none;" id="adminEntryBtn">
+            管理員入口
+        </button>
+    </div>
 </div>
+
+<!-- 管理員登入 Modal -->
+<div class="modal fade" id="adminLoginModal" tabindex="-1" aria-labelledby="adminLoginModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminLoginModalLabel">管理員登入</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-controller="Admin" asp-action="Login" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="adminPassword" class="form-label">密碼</label>
+                        <input type="password" class="form-control" id="adminPassword" name="password" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">登入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const adminEntryBtn = document.getElementById('adminEntryBtn');
+        const adminLoginModal = new bootstrap.Modal(document.getElementById('adminLoginModal'));
+        
+        if (adminEntryBtn) {
+            adminEntryBtn.addEventListener('click', function() {
+                adminLoginModal.show();
+            });
+        }
+    });
+</script>
 

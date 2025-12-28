@@ -2,15 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NeighborGoods.Web.Constants;
 using NeighborGoods.Web.Data;
+using NeighborGoods.Web.Models.Configuration;
 using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Utils;
 
 namespace NeighborGoods.Web.Services;
 
 /// <summary>
-/// 通知佇列背景服務，定期處理待合併的通知
+/// 通知佇列背景服務，定期查詢資料庫並發送 LINE 通知
 /// </summary>
 public class NotificationQueueBackgroundService : BackgroundService
 {
@@ -55,68 +57,85 @@ public class NotificationQueueBackgroundService : BackgroundService
         }
 
         using var scope = _serviceProvider.CreateScope();
-        var mergeService = scope.ServiceProvider.GetRequiredService<INotificationMergeService>();
         var messagingService = scope.ServiceProvider.GetRequiredService<ILineMessagingApiService>();
         var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
-
-        // 取得所有待處理的用戶（這裡需要一個機制來追蹤哪些用戶有待處理的通知）
-        // 簡化實作：使用資料庫查詢所有已綁定 LINE Bot 的用戶
-        var usersWithLineBot = await db.Users
-            .Where(u => !string.IsNullOrEmpty(u.LineMessagingApiUserId))
-            .Select(u => new { u.Id, u.LineMessagingApiUserId })
-            .ToListAsync(cancellationToken);
+        var lineOptions = scope.ServiceProvider.GetRequiredService<IOptions<LineMessagingApiOptions>>().Value;
 
         var now = TaiwanTime.Now;
-        var mergeWindow = TimeSpan.FromMinutes(NotificationConstants.MergeWindowMinutes);
+        var thresholdTime = now.AddMinutes(-NotificationConstants.MergeWindowMinutes); // 測試用：1 分鐘，正式環境改為 -30
 
-        foreach (var user in usersWithLineBot)
-        {
-            if (string.IsNullOrEmpty(user.LineMessagingApiUserId))
+        // 一次查詢找出「有新的未讀訊息」的用戶
+        // 條件：
+        // 1. 未讀訊息超過時間閾值（測試用改為 1 分鐘）
+        // 2. 必須有「新的未讀訊息」（相對於上次通知時間）
+        var usersToNotify = await (
+            from u in db.Users
+            where !string.IsNullOrEmpty(u.LineMessagingApiUserId)
+            from c in db.Conversations
+            where c.Participant1Id == u.Id || c.Participant2Id == u.Id
+            from m in db.Messages
+            where m.ConversationId == c.Id
+                && m.CreatedAt <= thresholdTime  // 超過時間閾值
+                && m.SenderId != u.Id  // 不是自己發的
+                // 檢查是否未讀
+                && ((c.Participant1Id == u.Id && (c.Participant1LastReadAt == null || m.CreatedAt > c.Participant1LastReadAt.Value))
+                    || (c.Participant2Id == u.Id && (c.Participant2LastReadAt == null || m.CreatedAt > c.Participant2LastReadAt.Value)))
+                // 檢查是否有新的未讀訊息（相對於上次通知時間）
+                && (u.LineNotificationLastSentAt == null || m.CreatedAt > u.LineNotificationLastSentAt.Value)
+            select new
             {
-                continue;
+                UserId = u.Id,
+                LineMessagingApiUserId = u.LineMessagingApiUserId,
+                ConversationId = c.Id
             }
+        )
+        .Distinct()
+        .ToListAsync(cancellationToken);
+
+        // 對每個用戶發送通知
+        foreach (var userInfo in usersToNotify.GroupBy(x => x.UserId))
+        {
+            var userId = userInfo.Key;
+            var lineUserId = userInfo.First().LineMessagingApiUserId;
+            var firstConversationId = userInfo.First().ConversationId;
 
             try
             {
-                var pendingNotifications = mergeService.GetPendingNotifications(user.Id);
-
-                if (!pendingNotifications.Any())
+                var user = await db.Users.FindAsync(new object[] { userId }, cancellationToken);
+                if (user == null)
                 {
                     continue;
                 }
 
-                // 檢查是否有超過時間窗口的通知
-                var expiredNotifications = pendingNotifications
-                    .Where(n => now - n.FirstMessageTime >= mergeWindow)
-                    .ToList();
+                // 發送通知
+                var chatUrl = $"/Message/Chat?conversationId={firstConversationId}";
+                var baseUrl = lineOptions.BaseUrl?.TrimEnd('/') ?? "https://NeighborGoods.azurewebsites.net";
+                var fullUrl = $"{baseUrl}{chatUrl}";
 
-                if (expiredNotifications.Any())
-                {
-                    // 合併通知
-                    var mergedMessage = mergeService.MergeNotifications(expiredNotifications);
-                    
-                    if (!string.IsNullOrEmpty(mergedMessage))
-                    {
-                        // 發送合併後的通知
-                        var chatUrl = $"/Message/Chat?conversationId={expiredNotifications.First().ConversationId}";
-                        var fullUrl = $"https://your-site.azurewebsites.net{chatUrl}"; // TODO: 從設定檔取得基礎 URL
+                await messagingService.SendPushMessageWithLinkAsync(
+                    lineUserId!,
+                    "你有尚未讀取的新訊息",
+                    fullUrl,
+                    "查看訊息",
+                    NotificationPriority.Medium);
 
-                        await messagingService.SendPushMessageWithLinkAsync(
-                            user.LineMessagingApiUserId,
-                            mergedMessage,
-                            fullUrl,
-                            "查看對話",
-                            NotificationPriority.Medium);
-
-                        // 清除已處理的通知
-                        mergeService.ClearNotifications(user.Id);
-                    }
-                }
+                // 更新最後通知時間
+                user.LineNotificationLastSentAt = now;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "處理用戶 {UserId} 的通知佇列時發生錯誤", user.Id);
+                _logger.LogError(ex, "處理用戶 {UserId} 的通知時發生錯誤", userId);
             }
+        }
+
+        // 批次儲存所有更新
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "儲存通知時間更新時發生錯誤");
         }
     }
 }

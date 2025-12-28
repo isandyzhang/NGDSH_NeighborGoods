@@ -26,5 +26,10 @@ public class LineMessagingApiOptions
     /// Bot ID（用於產生加入 Bot 的連結，格式：@abc123）
     /// </summary>
     public string BotId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 網站基礎 URL（用於產生 LINE 通知中的連結）
+    /// </summary>
+    public string BaseUrl { get; set; } = string.Empty;
 }
 
