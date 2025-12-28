@@ -423,10 +423,97 @@ public class AccountController : BaseController
                 if (evt.Type == "follow" && !string.IsNullOrEmpty(evt.UserId))
                 {
                     // 用戶加入 Bot
-                    // 注意：這裡需要知道是哪個用戶加入的，但 Webhook 只提供 LINE User ID
-                    // 實際綁定應該在用戶掃描 QR Code 後，透過其他機制完成
-                    // 這裡可以記錄日誌或發送歡迎訊息
-                    // 實際綁定邏輯應該在用戶授權流程中處理
+                    var lineUserId = evt.UserId;
+                    
+                    // 檢查用戶是否已經綁定過
+                    var existingUser = await _db.Users
+                        .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == lineUserId);
+                    
+                    if (existingUser != null)
+                    {
+                        // 已經綁定過，發送歡迎訊息
+                        if (_lineMessagingApiService != null)
+                        {
+                            try
+                            {
+                                await _lineMessagingApiService.SendPushMessageAsync(
+                                    lineUserId,
+                                    "歡迎回來！您已經綁定 LINE 通知功能。",
+                                    Models.Enums.NotificationPriority.Low);
+                            }
+                            catch (Exception)
+                            {
+                                // 發送失敗不影響流程
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 查詢資料庫暫存表：找出所有「正在綁定」的記錄（LineUserId 為 null）
+                        var pendingBindings = await _db.LineBindingPending
+                            .Where(p => p.LineUserId == null)
+                            .ToListAsync();
+                        
+                        if (pendingBindings.Count == 1)
+                        {
+                            // 只有一筆記錄，直接更新
+                            var pending = pendingBindings.First();
+                            pending.LineUserId = lineUserId;
+                            await _db.SaveChangesAsync();
+                            
+                            // 發送歡迎訊息，提示用戶返回網站確認
+                            if (_lineMessagingApiService != null)
+                            {
+                                try
+                                {
+                                    await _lineMessagingApiService.SendPushMessageAsync(
+                                        lineUserId,
+                                        "歡迎加入！請返回網站點擊「確認綁定」按鈕完成綁定。",
+                                        Models.Enums.NotificationPriority.Low);
+                                }
+                                catch (Exception)
+                                {
+                                    // 發送失敗不影響流程
+                                }
+                            }
+                        }
+                        else if (pendingBindings.Count > 1)
+                        {
+                            // 有多筆記錄，發送訊息提示用戶返回網站完成綁定
+                            if (_lineMessagingApiService != null)
+                            {
+                                try
+                                {
+                                    await _lineMessagingApiService.SendPushMessageAsync(
+                                        lineUserId,
+                                        "歡迎加入！請返回網站完成 LINE 通知綁定。",
+                                        Models.Enums.NotificationPriority.Low);
+                                }
+                                catch (Exception)
+                                {
+                                    // 發送失敗不影響流程
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // 沒有正在綁定的記錄，發送一般歡迎訊息
+                            if (_lineMessagingApiService != null)
+                            {
+                                try
+                                {
+                                    await _lineMessagingApiService.SendPushMessageAsync(
+                                        lineUserId,
+                                        "歡迎加入！請前往網站個人資料頁面完成 LINE 通知綁定。",
+                                        Models.Enums.NotificationPriority.Low);
+                                }
+                                catch (Exception)
+                                {
+                                    // 發送失敗不影響流程
+                                }
+                            }
+                        }
+                    }
                 }
                 else if (evt.Type == "unfollow" && !string.IsNullOrEmpty(evt.UserId))
                 {
@@ -456,8 +543,37 @@ public class AccountController : BaseController
     /// </summary>
     [HttpGet]
     [Authorize]
-    public IActionResult AuthorizeLineMessagingApi()
+    public async Task<IActionResult> AuthorizeLineMessagingApi()
     {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        // 檢查是否已經綁定過
+        if (!string.IsNullOrEmpty(currentUser.LineMessagingApiUserId))
+        {
+            TempData["InfoMessage"] = "您已經綁定 LINE 通知功能";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        // 產生 Token
+        var token = Guid.NewGuid().ToString("N"); // 32 字元，無連字號
+
+        // 建立暫存記錄
+        var pendingBinding = new Models.Entities.LineBindingPending
+        {
+            Id = Guid.NewGuid(),
+            UserId = currentUser.Id,
+            Token = token,
+            LineUserId = null, // 還不知道
+            CreatedAt = Utils.TaiwanTime.Now
+        };
+
+        _db.LineBindingPending.Add(pendingBinding);
+        await _db.SaveChangesAsync();
+
         // 從設定檔取得 Bot ID
         var botId = _configuration["LineMessagingApi:BotId"] ?? "@559fslxw";
         
@@ -472,6 +588,7 @@ public class AccountController : BaseController
 
         ViewBag.BotLink = botLink;
         ViewBag.QrCodeUrl = qrCodeUrl;
+        ViewBag.PendingBindingId = pendingBinding.Id; // 用於後續查詢
 
         return View();
     }
@@ -581,6 +698,164 @@ public class AccountController : BaseController
         }
 
         return RedirectToAction(nameof(Profile));
+    }
+
+    /// <summary>
+    /// 檢查 LINE 綁定狀態（供前端 JavaScript 呼叫）
+    /// </summary>
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> CheckLineBindingStatus(Guid? pendingBindingId)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Json(new { success = false, message = "未登入" });
+        }
+
+        // 如果用戶已經綁定過，直接返回已完成
+        if (!string.IsNullOrEmpty(currentUser.LineMessagingApiUserId))
+        {
+            return Json(new
+            {
+                success = true,
+                status = "completed",
+                message = "您已經綁定 LINE 通知功能"
+            });
+        }
+
+        // 查詢暫存記錄
+        Models.Entities.LineBindingPending? pending = null;
+        if (pendingBindingId.HasValue)
+        {
+            pending = await _db.LineBindingPending
+                .FirstOrDefaultAsync(p => p.Id == pendingBindingId.Value && p.UserId == currentUser.Id);
+        }
+        else
+        {
+            // 如果沒有提供 ID，查詢該用戶最新的暫存記錄
+            pending = await _db.LineBindingPending
+                .Where(p => p.UserId == currentUser.Id)
+                .OrderByDescending(p => p.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        if (pending == null)
+        {
+            return Json(new
+            {
+                success = false,
+                status = "not_found",
+                message = "找不到綁定記錄，請重新開始"
+            });
+        }
+
+        // 檢查是否已經有 LINE User ID（表示用戶已經加入 Bot）
+        if (!string.IsNullOrEmpty(pending.LineUserId))
+        {
+            return Json(new
+            {
+                success = true,
+                status = "ready",
+                message = "已加入 Bot，請點擊確認綁定",
+                lineUserId = pending.LineUserId
+            });
+        }
+
+        return Json(new
+        {
+            success = true,
+            status = "waiting",
+            message = "正在等待加入 Bot..."
+        });
+    }
+
+    /// <summary>
+    /// 確認 LINE 綁定（使用 Token 機制）
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmLineBinding(Guid pendingBindingId)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        // 查詢暫存記錄
+        var pending = await _db.LineBindingPending
+            .FirstOrDefaultAsync(p => p.Id == pendingBindingId && p.UserId == currentUser.Id);
+
+        if (pending == null)
+        {
+            TempData["ErrorMessage"] = "找不到綁定記錄，請重新開始";
+            return RedirectToAction(nameof(AuthorizeLineMessagingApi));
+        }
+
+        // 檢查是否已經有 LINE User ID
+        if (string.IsNullOrEmpty(pending.LineUserId))
+        {
+            TempData["ErrorMessage"] = "尚未加入 Bot，請先掃描 QR Code 加入 Bot";
+            return RedirectToAction(nameof(AuthorizeLineMessagingApi));
+        }
+
+        // 檢查用戶是否已經綁定過
+        if (!string.IsNullOrEmpty(currentUser.LineMessagingApiUserId))
+        {
+            // 清除暫存記錄
+            _db.LineBindingPending.Remove(pending);
+            await _db.SaveChangesAsync();
+
+            TempData["InfoMessage"] = "您已經綁定 LINE 通知功能";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        // 檢查 LINE User ID 是否已被其他用戶使用
+        var existingUser = await _db.Users
+            .FirstOrDefaultAsync(u => u.LineMessagingApiUserId == pending.LineUserId && u.Id != currentUser.Id);
+
+        if (existingUser != null)
+        {
+            // 清除暫存記錄
+            _db.LineBindingPending.Remove(pending);
+            await _db.SaveChangesAsync();
+
+            TempData["ErrorMessage"] = "此 LINE 帳號已被其他用戶綁定";
+            return RedirectToAction(nameof(AuthorizeLineMessagingApi));
+        }
+
+        // 完成綁定
+        var result = await _userService.BindLineMessagingApiAsync(currentUser.Id, pending.LineUserId);
+        if (result.Success)
+        {
+            // 清除暫存記錄
+            _db.LineBindingPending.Remove(pending);
+            await _db.SaveChangesAsync();
+
+            // 發送歡迎訊息
+            if (_lineMessagingApiService != null)
+            {
+                try
+                {
+                    await _lineMessagingApiService.SendPushMessageAsync(
+                        pending.LineUserId,
+                        "綁定成功！您現在可以透過 LINE 接收訊息通知。",
+                        Models.Enums.NotificationPriority.Low);
+                }
+                catch (Exception)
+                {
+                    // 發送失敗不影響綁定流程
+                }
+            }
+
+            TempData["SuccessMessage"] = "LINE 通知已啟用";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        TempData["ErrorMessage"] = result.ErrorMessage ?? "綁定失敗，請稍後再試";
+        return RedirectToAction(nameof(AuthorizeLineMessagingApi));
     }
 }
 

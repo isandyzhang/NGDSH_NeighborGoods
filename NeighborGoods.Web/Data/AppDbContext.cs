@@ -16,6 +16,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<LineBindingPending> LineBindingPending => Set<LineBindingPending>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -126,5 +127,28 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         // 為了提高查詢效能，可以建立非唯一索引
         builder.Entity<Conversation>()
             .HasIndex(c => new { c.Participant1Id, c.Participant2Id, c.ListingId });
+
+        // LineBindingPending 與 ApplicationUser 的關聯
+        builder.Entity<LineBindingPending>()
+            .HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // LineBindingPending 索引
+        builder.Entity<LineBindingPending>()
+            .HasIndex(p => p.UserId);
+        
+        builder.Entity<LineBindingPending>()
+            .HasIndex(p => p.Token)
+            .IsUnique();
+        
+        builder.Entity<LineBindingPending>()
+            .HasIndex(p => p.LineUserId);
+        
+        // Token 長度限制
+        builder.Entity<LineBindingPending>()
+            .Property(p => p.Token)
+            .HasMaxLength(32);
     }
 }

@@ -1,5 +1,6 @@
 @{
     ViewData["Title"] = "啟用 LINE 通知";
+    var pendingBindingId = ViewBag.PendingBindingId as Guid?;
 }
 
 <div class="container mt-4">
@@ -31,9 +32,24 @@
                 </div>
             }
 
-            <div class="alert alert-info">
-                <strong>提示：</strong>掃描 QR Code 或點擊連結後，請確保已成功加入 Bot，然後返回此頁面點擊「確認綁定」。
+            <!-- 狀態提示 -->
+            <div id="bindingStatus" class="alert alert-info mb-3">
+                <strong>狀態：</strong><span id="statusMessage">正在等待您加入 Bot...</span>
             </div>
+
+            <!-- 確認綁定按鈕 -->
+            @if (pendingBindingId.HasValue)
+            {
+                <form asp-action="ConfirmLineBinding" method="post" id="confirmBindingForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="pendingBindingId" value="@pendingBindingId.Value" />
+                    <div class="d-grid gap-2 mb-3">
+                        <button type="submit" id="confirmBindingBtn" class="btn btn-success btn-lg" disabled>
+                            確認綁定
+                        </button>
+                    </div>
+                </form>
+            }
 
             <div class="d-grid gap-2">
                 <a asp-action="Profile" class="btn btn-secondary">返回個人資料</a>
@@ -41,4 +57,66 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        @if (pendingBindingId.HasValue)
+        {
+            <text>
+            const pendingBindingId = '@pendingBindingId.Value';
+            let checkInterval;
+
+            function checkBindingStatus() {
+                fetch(`/Account/CheckLineBindingStatus?pendingBindingId=${pendingBindingId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const statusDiv = document.getElementById('bindingStatus');
+                        const statusMessage = document.getElementById('statusMessage');
+                        const confirmBtn = document.getElementById('confirmBindingBtn');
+
+                        if (data.success) {
+                            if (data.status === 'completed') {
+                                // 用戶已經綁定過，跳轉到個人資料頁面
+                                clearInterval(checkInterval);
+                                window.location.href = '/Account/Profile';
+                                return;
+                            } else if (data.status === 'ready') {
+                                // 已加入 Bot，啟用確認按鈕
+                                statusDiv.className = 'alert alert-success mb-3';
+                                statusMessage.textContent = data.message;
+                                confirmBtn.disabled = false;
+                                clearInterval(checkInterval);
+                            } else if (data.status === 'waiting') {
+                                // 還在等待
+                                statusDiv.className = 'alert alert-info mb-3';
+                                statusMessage.textContent = data.message;
+                                confirmBtn.disabled = true;
+                            } else if (data.status === 'not_found') {
+                                // 找不到記錄
+                                statusDiv.className = 'alert alert-warning mb-3';
+                                statusMessage.textContent = data.message;
+                                confirmBtn.disabled = true;
+                                clearInterval(checkInterval);
+                            }
+                        } else {
+                            // 錯誤
+                            statusDiv.className = 'alert alert-danger mb-3';
+                            statusMessage.textContent = data.message || '檢查狀態時發生錯誤';
+                            clearInterval(checkInterval);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('檢查綁定狀態時發生錯誤:', error);
+                    });
+            }
+
+            // 每 3 秒檢查一次
+            checkInterval = setInterval(checkBindingStatus, 3000);
+            
+            // 立即檢查一次
+            checkBindingStatus();
+            </text>
+        }
+    </script>
+}
 
