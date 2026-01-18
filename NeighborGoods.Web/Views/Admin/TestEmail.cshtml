@@ -1,0 +1,56 @@
+@{
+    ViewData["Title"] = "測試 Email 發送";
+    Layout = "_AdminLayout";
+}
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">測試 Email 發送</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    輸入 Email 地址後，系統會發送一封測試信來驗證 Email 通知功能是否正常運作。
+                </p>
+
+                <form asp-action="SendTestEmail" method="post">
+                    @Html.AntiForgeryToken()
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email 地址 <span class="text-danger">*</span></label>
+                        <input type="email" 
+                               class="form-control" 
+                               id="email" 
+                               name="email" 
+                               placeholder="example@email.com" 
+                               required 
+                               autofocus>
+                        <div class="form-text">請輸入要接收測試信的 Email 地址</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a asp-action="Index" class="btn btn-secondary me-md-2">返回</a>
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-envelope-paper me-1" viewBox="0 0 16 16">
+                                <path d="M4 0a2 2 0 0 0-2 2v1.133l-.941.502A2 2 0 0 0 0 5.4V14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5.4a2 2 0 0 0-1.059-1.765L14 3.133V2a2 2 0 0 0-2-2zm10 4.267.47.25A1 1 0 0 1 15 5.4v.817l-1 .6zm-1 3.15-3.75 2.25L8 8.917l-1.25.75L3 7.267V5.4a1 1 0 0 1 .53-.882L4 4.267v6.666l3.75-2.25L8 8.5l.25.083L12 10.933V4.267zM2 4.267v5.466l3.75-2.25L7 7.133l.25-.083L11 9.733V4.267L8 2 2 4.267z"/>
+                            </svg>
+                            發送測試信
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">測試信內容</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>主旨：</strong>NeighborGoods 通知</p>
+                <p><strong>內容：</strong>這是一封測試信，用於驗證 Email 通知功能是否正常運作。</p>
+                <p><strong>連結：</strong>前往 NeighborGoods（指向首頁）</p>
+            </div>
+        </div>
+    </div>
+</div>

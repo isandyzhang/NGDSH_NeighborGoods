@@ -17,19 +17,22 @@ public class AdminController : BaseController
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AdminController> _logger;
+    private readonly IEmailNotificationService? _emailNotificationService;
 
     public AdminController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IAdminService adminService,
         IConfiguration configuration,
-        ILogger<AdminController> logger)
+        ILogger<AdminController> logger,
+        IEmailNotificationService? emailNotificationService = null)
         : base(userManager)
     {
         _signInManager = signInManager;
         _adminService = adminService;
         _configuration = configuration;
         _logger = logger;
+        _emailNotificationService = emailNotificationService;
     }
 
     [AllowAnonymous]
@@ -166,6 +169,65 @@ public class AdminController : BaseController
         }
 
         return Json(new { success = false, error = "標記訊息時發生錯誤" });
+    }
+
+    /// <summary>
+    /// 測試發送 Email 頁面
+    /// </summary>
+    public IActionResult TestEmail()
+    {
+        return View();
+    }
+
+    /// <summary>
+    /// 發送測試 Email
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendTestEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            TempData["ErrorMessage"] = "請輸入 Email 地址";
+            return RedirectToAction(nameof(TestEmail));
+        }
+
+        // 簡單的 Email 格式驗證
+        if (!email.Contains("@") || !email.Contains("."))
+        {
+            TempData["ErrorMessage"] = "Email 格式不正確";
+            return RedirectToAction(nameof(TestEmail));
+        }
+
+        if (_emailNotificationService == null)
+        {
+            TempData["ErrorMessage"] = "Email 通知服務未設定，無法發送測試信";
+            return RedirectToAction(nameof(TestEmail));
+        }
+
+        try
+        {
+            var testMessage = "這是一封測試信，用於驗證 Email 通知功能是否正常運作。";
+            var testUrl = "https://neighborgoods.azurewebsites.net";
+            var testLinkText = "前往 NeighborGoods";
+
+            await _emailNotificationService.SendPushMessageWithLinkAsync(
+                email.Trim(),
+                testMessage,
+                testUrl,
+                testLinkText,
+                NotificationPriority.Medium);
+
+            _logger.LogInformation("管理員發送測試 Email 成功：{Email}", email);
+            TempData["SuccessMessage"] = $"測試信已成功發送至 {email}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "發送測試 Email 時發生錯誤：{Email}", email);
+            TempData["ErrorMessage"] = $"發送測試信時發生錯誤：{ex.Message}";
+        }
+
+        return RedirectToAction(nameof(TestEmail));
     }
 }
 
