@@ -630,6 +630,94 @@ public class AccountController : BaseController
     }
 
     /// <summary>
+    /// 啟用 Email 通知
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EnableEmailNotification()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Challenge();
+        }
+
+        var result = await _userService.EnableEmailNotificationAsync(currentUser.Id);
+        if (result.Success)
+        {
+            TempData["SuccessMessage"] = "Email 通知已啟用";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "啟用 Email 通知時發生錯誤";
+        }
+
+        return RedirectToAction(nameof(Profile));
+    }
+
+    /// <summary>
+    /// 停用 Email 通知
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DisableEmailNotification()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Challenge();
+        }
+
+        var result = await _userService.DisableEmailNotificationAsync(currentUser.Id);
+        if (result.Success)
+        {
+            TempData["SuccessMessage"] = "Email 通知已停用";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "停用 Email 通知時發生錯誤";
+        }
+
+        return RedirectToAction(nameof(Profile));
+    }
+
+    /// <summary>
+    /// 設定 Email 並啟用通知（AJAX，不需要驗證 Email）
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> SetEmailAndEnableNotification([FromBody] SetEmailRequest request)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Json(new { success = false, message = "未登入" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return Json(new { success = false, message = "Email 不能為空" });
+        }
+
+        // 簡單的 Email 格式驗證
+        if (!request.Email.Contains("@") || !request.Email.Contains("."))
+        {
+            return Json(new { success = false, message = "Email 格式不正確" });
+        }
+
+        var result = await _userService.SetEmailAndEnableNotificationAsync(currentUser.Id, request.Email.Trim());
+        if (result.Success)
+        {
+            return Json(new { success = true, message = "Email 通知已啟用" });
+        }
+
+        return Json(new { success = false, message = result.ErrorMessage ?? "設定 Email 時發生錯誤" });
+    }
+
+    /// <summary>
     /// 檢查 LINE 綁定狀態（供前端 JavaScript 呼叫）
     /// </summary>
     [HttpGet]
@@ -768,6 +856,14 @@ public class AccountController : BaseController
         TempData["ErrorMessage"] = result.ErrorMessage ?? "綁定失敗，請稍後再試";
         return RedirectToAction(nameof(AuthorizeLineMessagingApi));
     }
+}
+
+/// <summary>
+/// 設定 Email 請求
+/// </summary>
+public class SetEmailRequest
+{
+    public string Email { get; set; } = string.Empty;
 }
 
 

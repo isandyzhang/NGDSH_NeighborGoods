@@ -73,5 +73,25 @@ public interface IUserService
     /// 檢查 LINE User ID 是否已被其他用戶使用
     /// </summary>
     Task<bool> CheckLineUserIdExistsAsync(string lineUserId, string excludeUserId);
+
+    /// <summary>
+    /// 啟用 Email 通知
+    /// </summary>
+    Task<ServiceResult> EnableEmailNotificationAsync(string userId);
+
+    /// <summary>
+    /// 停用 Email 通知
+    /// </summary>
+    Task<ServiceResult> DisableEmailNotificationAsync(string userId);
+
+    /// <summary>
+    /// 取得 Email 通知啟用狀態
+    /// </summary>
+    Task<bool> GetUserEmailNotificationStatusAsync(string userId);
+
+    /// <summary>
+    /// 設定用戶 Email 並啟用通知（不需要驗證）
+    /// </summary>
+    Task<ServiceResult> SetEmailAndEnableNotificationAsync(string userId, string email);
 }
 

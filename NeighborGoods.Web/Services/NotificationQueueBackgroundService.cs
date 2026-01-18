@@ -14,7 +14,7 @@ using System.Diagnostics;
 namespace NeighborGoods.Web.Services;
 
 /// <summary>
-/// 通知佇列背景服務，定期查詢資料庫並發送 LINE 通知
+/// 通知佇列背景服務，定期查詢資料庫並發送 LINE 和 Email 通知
 /// </summary>
 public class NotificationQueueBackgroundService : BackgroundService
 {
@@ -63,9 +63,10 @@ public class NotificationQueueBackgroundService : BackgroundService
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var messagingService = scope.ServiceProvider.GetRequiredService<ILineMessagingApiService>();
+            var lineMessagingService = scope.ServiceProvider.GetService<ILineMessagingApiService>();
+            var emailNotificationService = scope.ServiceProvider.GetService<IEmailNotificationService>();
             var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
-            var lineOptions = scope.ServiceProvider.GetRequiredService<IOptions<LineMessagingApiOptions>>().Value;
+            var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Models.Entities.ApplicationUser>>();
 
             // 設定查詢超時為 30 秒
             db.Database.SetCommandTimeout(30);
@@ -75,27 +76,35 @@ public class NotificationQueueBackgroundService : BackgroundService
 
             _logger.LogDebug("開始處理通知佇列，時間閾值：{ThresholdTime}", thresholdTime);
 
-            // 第一步：找出所有有 LineMessagingApiUserId 的用戶（簡單查詢，只選必要欄位）
-            var usersWithLine = await db.Users
-                .Where(u => !string.IsNullOrEmpty(u.LineMessagingApiUserId))
+            // 第一步：找出所有啟用通知的用戶（LINE 或 Email）
+            var usersWithNotifications = await db.Users
+                .Where(u => (!string.IsNullOrEmpty(u.LineMessagingApiUserId)) || u.EmailNotificationEnabled)
                 .Select(u => new
                 {
                     u.Id,
                     u.LineMessagingApiUserId,
-                    u.LineNotificationLastSentAt
+                    u.LineNotificationLastSentAt,
+                    u.EmailNotificationEnabled,
+                    u.Email,
+                    u.EmailNotificationLastSentAt
                 })
                 .ToListAsync(cancellationToken);
 
-            if (!usersWithLine.Any())
+            if (!usersWithNotifications.Any())
             {
-                _logger.LogDebug("沒有已綁定 LINE Bot 的用戶，跳過通知處理");
+                _logger.LogDebug("沒有啟用通知的用戶，跳過通知處理");
                 return;
             }
 
-            _logger.LogDebug("找到 {Count} 個已綁定 LINE Bot 的用戶", usersWithLine.Count);
+            _logger.LogDebug("找到 {Count} 個啟用通知的用戶", usersWithNotifications.Count);
 
-            var userIds = usersWithLine.Select(u => u.Id).ToList();
-            var userLastSentDict = usersWithLine.ToDictionary(u => u.Id, u => u.LineNotificationLastSentAt);
+            var userIds = usersWithNotifications.Select(u => u.Id).ToList();
+            var userLineLastSentDict = usersWithNotifications
+                .Where(u => !string.IsNullOrEmpty(u.LineMessagingApiUserId))
+                .ToDictionary(u => u.Id, u => u.LineNotificationLastSentAt);
+            var userEmailLastSentDict = usersWithNotifications
+                .Where(u => u.EmailNotificationEnabled && !string.IsNullOrEmpty(u.Email))
+                .ToDictionary(u => u.Id, u => u.EmailNotificationLastSentAt);
 
             // 第二步：查詢這些用戶參與的對話
             var userConversations = await db.Conversations
@@ -139,7 +148,7 @@ public class NotificationQueueBackgroundService : BackgroundService
             }
 
             // 第四步：在記憶體中過濾和處理
-            var usersToNotify = new Dictionary<string, (string LineUserId, Guid ConversationId)>();
+            var usersToNotify = new Dictionary<string, (bool HasLine, string? LineUserId, bool HasEmail, string? Email, Guid ConversationId)>();
 
             foreach (var message in unreadMessages)
             {
@@ -174,21 +183,53 @@ public class NotificationQueueBackgroundService : BackgroundService
                     continue; // 已讀，跳過
                 }
 
-                // 檢查是否有新的未讀訊息（相對於上次通知時間）
-                if (userLastSentDict.TryGetValue(targetUserId, out var lastSentAt) 
-                    && lastSentAt.HasValue 
-                    && message.CreatedAt <= lastSentAt.Value)
+                // 檢查 LINE 通知：是否有新的未讀訊息（相對於上次通知時間）
+                bool shouldNotifyLine = false;
+                if (userLineLastSentDict.TryGetValue(targetUserId, out var lineLastSentAt))
                 {
-                    continue; // 已經通知過，跳過
+                    if (!lineLastSentAt.HasValue || message.CreatedAt > lineLastSentAt.Value)
+                    {
+                        shouldNotifyLine = true;
+                    }
+                }
+                else if (usersWithNotifications.Any(u => u.Id == targetUserId && !string.IsNullOrEmpty(u.LineMessagingApiUserId)))
+                {
+                    shouldNotifyLine = true; // 第一次通知
+                }
+
+                // 檢查 Email 通知：是否有新的未讀訊息（相對於上次通知時間）
+                bool shouldNotifyEmail = false;
+                if (userEmailLastSentDict.TryGetValue(targetUserId, out var emailLastSentAt))
+                {
+                    if (!emailLastSentAt.HasValue || message.CreatedAt > emailLastSentAt.Value)
+                    {
+                        shouldNotifyEmail = true;
+                    }
+                }
+                else if (usersWithNotifications.Any(u => u.Id == targetUserId && u.EmailNotificationEnabled && !string.IsNullOrEmpty(u.Email)))
+                {
+                    shouldNotifyEmail = true; // 第一次通知
+                }
+
+                // 如果兩種通知都不需要，跳過
+                if (!shouldNotifyLine && !shouldNotifyEmail)
+                {
+                    continue;
                 }
 
                 // 記錄需要通知的用戶（每個用戶只記錄第一個對話）
                 if (!usersToNotify.ContainsKey(targetUserId))
                 {
-                    var user = usersWithLine.FirstOrDefault(u => u.Id == targetUserId);
+                    var user = usersWithNotifications.FirstOrDefault(u => u.Id == targetUserId);
                     if (user != null)
                     {
-                        usersToNotify[targetUserId] = (user.LineMessagingApiUserId!, message.ConversationId);
+                        usersToNotify[targetUserId] = (
+                            HasLine: shouldNotifyLine && !string.IsNullOrEmpty(user.LineMessagingApiUserId),
+                            LineUserId: user.LineMessagingApiUserId,
+                            HasEmail: shouldNotifyEmail && user.EmailNotificationEnabled && !string.IsNullOrEmpty(user.Email),
+                            Email: user.Email,
+                            ConversationId: message.ConversationId
+                        );
                     }
                 }
             }
@@ -202,10 +243,11 @@ public class NotificationQueueBackgroundService : BackgroundService
             _logger.LogInformation("準備通知 {Count} 個用戶", usersToNotify.Count);
 
             // 第五步：對每個用戶發送通知
-            var notifiedCount = 0;
+            var lineNotifiedCount = 0;
+            var emailNotifiedCount = 0;
             var errorCount = 0;
 
-            foreach (var (userId, (lineUserId, conversationId)) in usersToNotify)
+            foreach (var (userId, (hasLine, lineUserId, hasEmail, email, conversationId)) in usersToNotify)
             {
                 try
                 {
@@ -216,20 +258,59 @@ public class NotificationQueueBackgroundService : BackgroundService
                         continue;
                     }
 
-                    // 發送通知
+                    // 發送通知的 URL
                     var chatUrl = $"/Message/Chat?conversationId={conversationId}";
                     var fullUrl = $"https://neighborgoods.azurewebsites.net{chatUrl}";
+                    var message = "你有尚未讀取的新訊息";
+                    var linkText = "查看訊息";
 
-                    await messagingService.SendPushMessageWithLinkAsync(
-                        lineUserId,
-                        "你有尚未讀取的新訊息",
-                        fullUrl,
-                        "查看訊息",
-                        NotificationPriority.Medium);
+                    // 發送 LINE 通知
+                    if (hasLine && lineMessagingService != null && !string.IsNullOrEmpty(lineUserId))
+                    {
+                        try
+                        {
+                            await lineMessagingService.SendPushMessageWithLinkAsync(
+                                lineUserId,
+                                message,
+                                fullUrl,
+                                linkText,
+                                NotificationPriority.Medium);
+                            user.LineNotificationLastSentAt = now;
+                            lineNotifiedCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "發送 LINE 通知給用戶 {UserId} 時發生錯誤", userId);
+                        }
+                    }
 
-                    // 更新最後通知時間
-                    user.LineNotificationLastSentAt = now;
-                    notifiedCount++;
+                    // 發送 Email 通知
+                    if (hasEmail && emailNotificationService != null && !string.IsNullOrEmpty(email))
+                    {
+                        try
+                        {
+                            // 確認 Email 已驗證
+                            if (await userManager.IsEmailConfirmedAsync(user))
+                            {
+                                await emailNotificationService.SendPushMessageWithLinkAsync(
+                                    email,
+                                    message,
+                                    fullUrl,
+                                    linkText,
+                                    NotificationPriority.Medium);
+                                user.EmailNotificationLastSentAt = now;
+                                emailNotifiedCount++;
+                            }
+                            else
+                            {
+                                _logger.LogWarning("用戶 {UserId} 的 Email 未驗證，跳過 Email 通知", userId);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "發送 Email 通知給用戶 {UserId} 時發生錯誤", userId);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -239,12 +320,13 @@ public class NotificationQueueBackgroundService : BackgroundService
             }
 
             // 批次儲存所有更新
-            if (notifiedCount > 0)
+            if (lineNotifiedCount > 0 || emailNotifiedCount > 0)
             {
                 try
                 {
                     await db.SaveChangesAsync(cancellationToken);
-                    _logger.LogInformation("成功通知 {NotifiedCount} 個用戶，{ErrorCount} 個失敗", notifiedCount, errorCount);
+                    _logger.LogInformation("成功通知：LINE {LineCount} 個用戶，Email {EmailCount} 個用戶，{ErrorCount} 個失敗", 
+                        lineNotifiedCount, emailNotifiedCount, errorCount);
                 }
                 catch (Exception ex)
                 {

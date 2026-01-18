@@ -115,7 +115,11 @@ public class ListingService : IListingService
                     .Select(img => img.ImageUrl)
                     .FirstOrDefault(),
                 // 只取賣家顯示名稱（EF Core 會自動處理關聯查詢）
-                SellerDisplayName = l.Seller != null ? (l.Seller.DisplayName ?? "未知賣家") : "未知賣家"
+                SellerDisplayName = l.Seller != null ? (l.Seller.DisplayName ?? "未知賣家") : "未知賣家",
+                // 計算該商品的對話數量（興趣計數）
+                InterestCount = _db.Conversations
+                    .Where(c => c.ListingId == l.Id)
+                    .Count()
             })
             .ToListAsync();
 

@@ -122,15 +122,41 @@ if (lineMessagingApiOptions != null &&
         var logger = sp.GetRequiredService<ILogger<LineMessagingApiService>>();
         return new LineMessagingApiService(httpClient, options, logger);
     });
-    
-    // 註冊背景服務
-    builder.Services.AddHostedService<NotificationQueueBackgroundService>();
 }
 else
 {
     // 如果設定不完整，記錄警告但不中斷應用程式啟動
     var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<Program>();
     logger.LogWarning("LINE Messaging API 設定不完整，LINE 通知功能將無法使用。請設定 LineMessagingApi:ChannelAccessToken 和 LineMessagingApi:ChannelSecret");
+}
+
+// Email 通知設定
+var emailNotificationOptions = builder.Configuration.GetSection("EmailNotification").Get<EmailNotificationOptions>();
+if (emailNotificationOptions != null && 
+    !string.IsNullOrEmpty(emailNotificationOptions.ConnectionString) &&
+    !string.IsNullOrEmpty(emailNotificationOptions.FromEmailAddress))
+{
+    builder.Services.Configure<EmailNotificationOptions>(builder.Configuration.GetSection("EmailNotification"));
+    
+    // 註冊 Email 通知服務
+    builder.Services.AddSingleton<IEmailNotificationService, EmailNotificationService>();
+}
+else
+{
+    // 如果設定不完整，記錄警告但不中斷應用程式啟動
+    var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<Program>();
+    logger.LogWarning("Email 通知設定不完整，Email 通知功能將無法使用。請設定 EmailNotification:ConnectionString 和 EmailNotification:FromEmailAddress");
+}
+
+// 註冊通知背景服務（只要 LINE 或 Email 其中一個可用就註冊）
+if ((lineMessagingApiOptions != null && 
+     !string.IsNullOrEmpty(lineMessagingApiOptions.ChannelAccessToken) &&
+     !string.IsNullOrEmpty(lineMessagingApiOptions.ChannelSecret)) ||
+    (emailNotificationOptions != null && 
+     !string.IsNullOrEmpty(emailNotificationOptions.ConnectionString) &&
+     !string.IsNullOrEmpty(emailNotificationOptions.FromEmailAddress)))
+{
+    builder.Services.AddHostedService<NotificationQueueBackgroundService>();
 }
 
 // 註冊服務層

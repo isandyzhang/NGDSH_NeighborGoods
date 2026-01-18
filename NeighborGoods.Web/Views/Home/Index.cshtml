@@ -84,15 +84,32 @@
                     </a>
                 }
             </div>
-            @if (isAuthenticated && ViewBag.IsLineBound != true)
+            @if (isAuthenticated && ViewBag.IsEmailNotificationEnabled != true)
             {
                 <div class="col-12 col-md-4">
-                    <a asp-controller="Account" asp-action="AuthorizeLineMessagingApi" class="btn btn-success quick-action-btn w-100">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-bell me-2" viewBox="0 0 16 16">
-                            <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>
-                        </svg>
-                        啟動Line通知
-                    </a>
+                    @if (ViewBag.HasEmail == true)
+                    {
+                        <form asp-controller="Account" asp-action="EnableEmailNotification" method="post" class="d-inline w-100">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-success quick-action-btn w-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-envelope-check me-2" viewBox="0 0 16 16">
+                                    <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-1 9.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5zm0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m8.5-5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5m-4 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5"/>
+                                    <path d="M15.854 8.354a.5.5 0 0 0-.708-.708L8.5 14.293l-2.646-2.647a.5.5 0 0 0-.708.708l3 3a.5.5 0 0 0 .708 0z"/>
+                                </svg>
+                                啟動Email通知
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-success quick-action-btn w-100" data-bs-toggle="modal" data-bs-target="#emailNotificationModal">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-envelope-plus me-2" viewBox="0 0 16 16">
+                                <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-1 9.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5zm0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m8.5-5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5"/>
+                                <path d="M8.5 2a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0V6h3a.5.5 0 0 0 0-1h-3z"/>
+                            </svg>
+                            啟動Email通知
+                        </button>
+                    }
                 </div>
             }
         </div>
@@ -275,6 +292,16 @@
                                     <span class="badge bg-danger ms-1">愛心商品</span>
                                 }
                             </div>
+                            @if (listing.InterestCount > 0)
+                            {
+                                <div class="listing-card-interest">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                                    </svg>
+                                    <span>@listing.InterestCount 人有興趣</span>
+                                </div>
+                            }
                         </div>
                         <div class="listing-card-meta">
                             <div>賣家：@listing.SellerDisplayName</div>
@@ -297,6 +324,38 @@
         }
     }
 </div>
+
+<!-- Email 通知設定 Modal -->
+@if (isAuthenticated && ViewBag.HasEmail != true)
+{
+    <div class="modal fade" id="emailNotificationModal" tabindex="-1" aria-labelledby="emailNotificationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="emailNotificationModalLabel">啟動 Email 通知</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">請輸入您的 Email 地址以啟用通知功能：</p>
+                    <form id="emailNotificationForm">
+                        <div class="mb-3">
+                            <label for="emailInput" class="form-label">Email 地址</label>
+                            <input type="email" class="form-control" id="emailInput" name="email" placeholder="example@email.com" required>
+                            <div class="invalid-feedback" id="emailError"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-success" id="submitEmailBtn">
+                        <span id="submitEmailText">確認</span>
+                        <span id="submitEmailSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @section Scripts {
     <script>
@@ -472,6 +531,16 @@
                                                     : ''
                                                 }
                                             </div>
+                                            ${listing.interestCount > 0 
+                                                ? `<div class="listing-card-interest">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                                                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                                                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                                                    </svg>
+                                                    <span>${listing.interestCount} 人有興趣</span>
+                                                </div>`
+                                                : ''
+                                            }
                                         </div>
                                         <div class="listing-card-meta">
                                             <div>賣家：${escapeHtml(listing.sellerDisplayName)}</div>
@@ -658,6 +727,108 @@
                         connection.stop();
                     }
                 });
+            })();
+        </script>
+    }
+
+    @if (isAuthenticated && ViewBag.HasEmail != true)
+    {
+        <script>
+            (function() {
+                const emailModal = document.getElementById('emailNotificationModal');
+                const emailInput = document.getElementById('emailInput');
+                const submitEmailBtn = document.getElementById('submitEmailBtn');
+                const submitEmailText = document.getElementById('submitEmailText');
+                const submitEmailSpinner = document.getElementById('submitEmailSpinner');
+                const emailError = document.getElementById("emailError");
+                const emailForm = document.getElementById("emailNotificationForm");
+
+                // 當 Modal 顯示時，聚焦到 Email 輸入框
+                if (emailModal) {
+                    emailModal.addEventListener('shown.bs.modal', function() {
+                        emailInput.focus();
+                    });
+
+                    // 當 Modal 關閉時，清除表單
+                    emailModal.addEventListener('hidden.bs.modal', function() {
+                            emailForm.reset();
+                            emailInput.classList.remove("is-invalid");
+                            emailError.textContent = "";
+                    });
+                }
+
+                // 提交 Email
+                if (submitEmailBtn) {
+                    submitEmailBtn.addEventListener('click', async function() {
+                        const email = emailInput.value.trim();
+
+                        if (!email) {
+                            emailInput.classList.add("is-invalid");
+                            emailError.textContent = "請輸入 Email 地址";
+                            return;
+                        }
+
+                        // 簡單的 Email 格式驗證
+                        if (!email.includes("@@") || !email.includes(".")) {
+                            emailInput.classList.add("is-invalid");
+                            emailError.textContent = "Email 格式不正確";
+                            return;
+                        }
+
+                        // 顯示載入狀態
+                        submitEmailBtn.disabled = true;
+                        submitEmailText.textContent = "處理中...";
+                        submitEmailSpinner.classList.remove("d-none");
+                        emailInput.classList.remove("is-invalid");
+                        emailError.textContent = "";
+
+                        try {
+                            const response = await fetch("@Url.Action("SetEmailAndEnableNotification", "Account")", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify({ email: email })
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                // 成功：關閉 Modal 並重新載入頁面
+                                const bsModal = bootstrap.Modal.getInstance(emailModal);
+                                bsModal.hide();
+                                
+                                // 顯示成功訊息
+                                alert("Email 通知已啟用！");
+                                
+                                // 重新載入頁面以更新按鈕狀態
+                                window.location.reload();
+                            } else {
+                                // 失敗：顯示錯誤訊息
+                                emailInput.classList.add("is-invalid");
+                                emailError.textContent = data.message || "設定失敗，請稍後再試";
+                            }
+                        } catch (error) {
+                            console.error("設定 Email 時發生錯誤:", error);
+                            emailInput.classList.add("is-invalid");
+                            emailError.textContent = "發生錯誤，請稍後再試";
+                        } finally {
+                            submitEmailBtn.disabled = false;
+                            submitEmailText.textContent = "確認";
+                            submitEmailSpinner.classList.add("d-none");
+                        }
+                    });
+                }
+
+                // Enter 鍵提交
+                if (emailInput) {
+                    emailInput.addEventListener("keypress", function(e) {
+                        if (e.key === "Enter") {
+                            e.preventDefault();
+                            submitEmailBtn.click();
+                        }
+                    });
+                }
             })();
         </script>
     }

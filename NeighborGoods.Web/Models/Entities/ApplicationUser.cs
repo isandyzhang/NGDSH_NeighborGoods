@@ -38,6 +38,17 @@ public class ApplicationUser : IdentityUser
     /// 用於防止重複通知，30 分鐘內不重複通知同一用戶
     /// </summary>
     public DateTime? LineNotificationLastSentAt { get; set; }
+
+    /// <summary>
+    /// 是否啟用 Email 通知
+    /// </summary>
+    public bool EmailNotificationEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Email 通知最後發送時間（台灣時間，UTC+8）
+    /// 用於防止重複通知，30 分鐘內不重複通知同一用戶
+    /// </summary>
+    public DateTime? EmailNotificationLastSentAt { get; set; }
 }
 
 

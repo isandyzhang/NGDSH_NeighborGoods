@@ -89,8 +89,19 @@ public class HomeController : BaseController
             });
         }
 
-        // 檢查用戶的 Line 綁定狀態
-        ViewBag.IsLineBound = currentUser != null && !string.IsNullOrEmpty(currentUser.LineMessagingApiUserId);
+        // 檢查用戶的 Email 通知狀態
+        if (currentUser != null)
+        {
+            ViewBag.IsEmailNotificationEnabled = currentUser.EmailNotificationEnabled && 
+                                                 !string.IsNullOrEmpty(currentUser.Email) && 
+                                                 currentUser.EmailConfirmed;
+            ViewBag.HasEmail = !string.IsNullOrEmpty(currentUser.Email) && currentUser.EmailConfirmed;
+        }
+        else
+        {
+            ViewBag.IsEmailNotificationEnabled = false;
+            ViewBag.HasEmail = false;
+        }
 
         return View(searchViewModel);
     }

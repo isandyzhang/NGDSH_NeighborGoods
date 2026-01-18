@@ -34,5 +34,10 @@ public class ListingIndexViewModel
     /// 刊登時間（台灣時間）。
     /// </summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// 對此商品有興趣的人數（基於該商品的對話數量）。
+    /// </summary>
+    public int InterestCount { get; set; }
 }
 

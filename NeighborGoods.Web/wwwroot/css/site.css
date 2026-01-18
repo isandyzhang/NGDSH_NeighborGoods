@@ -315,6 +315,19 @@ body {
   margin-top: 0.25rem;
 }
 
+.listing-card-interest {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+.listing-card-interest svg {
+  flex-shrink: 0;
+  color: #ffc107;
+}
+
 /* 商品列表頁面標題優化 */
 .container-fluid h2 {
   font-weight: 600;

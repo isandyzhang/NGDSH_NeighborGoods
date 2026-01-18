@@ -96,6 +96,39 @@ else
             <span class="badge bg-success ms-2">@GetConditionText(Model.Condition)</span>
         </div>
 
+        <!-- 分享按鈕 -->
+        <div class="listing-share-section mt-3">
+            @{
+                var scheme = Context.Request.Scheme;
+                var host = Context.Request.Host;
+                var listingUrl = $"{scheme}://{host}{Url.Action("Details", "Listing", new { id = Model.Id })}";
+                var shareText = $"{Model.Title}";
+                if (Model.IsFree)
+                {
+                    shareText += " - 免費";
+                }
+                else
+                {
+                    shareText += $" - NT$ {Model.Price:N0}";
+                }
+                if (!string.IsNullOrEmpty(Model.Description) && Model.Description.Length > 50)
+                {
+                    shareText += $" - {Model.Description.Substring(0, 50)}...";
+                }
+                else if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    shareText += $" - {Model.Description}";
+                }
+                var lineShareUrl = $"https://social-plugins.line.me/lineit/share?url={Uri.EscapeDataString(listingUrl)}&text={Uri.EscapeDataString(shareText)}";
+            }
+            <a href="@lineShareUrl" target="_blank" class="btn btn-success listing-share-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                    <path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5m-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"/>
+                </svg>
+                分享到 Line
+            </a>
+        </div>
+
         <hr class="listing-divider" />
 
         <!-- 商品描述 -->
@@ -484,6 +517,43 @@ else
         .listing-seller-info a:hover {
             color: #0a58ca;
             text-decoration: underline;
+        }
+
+        /* 分享按鈕樣式 */
+        .listing-share-section {
+            display: flex;
+            align-items: center;
+        }
+
+        .listing-share-btn {
+            display: inline-flex;
+            align-items: center;
+            background-color: #06c755;
+            border-color: #06c755;
+            color: white;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .listing-share-btn:hover {
+            background-color: #05b048;
+            border-color: #05b048;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+            text-decoration: none;
+        }
+
+        .listing-share-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .listing-share-btn svg {
+            flex-shrink: 0;
         }
 
         /* 底部固定操作欄 */

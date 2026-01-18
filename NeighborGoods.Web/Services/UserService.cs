@@ -333,5 +333,117 @@ public class UserService : IUserService
             return false;
         }
     }
+
+    public async Task<ServiceResult> EnableEmailNotificationAsync(string userId)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return ServiceResult.Fail("找不到用戶");
+            }
+
+            // 檢查 Email 是否已驗證
+            if (string.IsNullOrEmpty(user.Email) || !await _userManager.IsEmailConfirmedAsync(user))
+            {
+                return ServiceResult.Fail("請先設定並驗證您的 Email 地址");
+            }
+
+            user.EmailNotificationEnabled = true;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("用戶 {UserId} 已啟用 Email 通知", userId);
+                return ServiceResult.Ok();
+            }
+
+            var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
+            return ServiceResult.Fail(errorMessages);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "啟用 Email 通知時發生錯誤：UserId={UserId}", userId);
+            return ServiceResult.Fail("啟用 Email 通知時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<ServiceResult> DisableEmailNotificationAsync(string userId)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return ServiceResult.Fail("找不到用戶");
+            }
+
+            user.EmailNotificationEnabled = false;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("用戶 {UserId} 已停用 Email 通知", userId);
+                return ServiceResult.Ok();
+            }
+
+            var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
+            return ServiceResult.Fail(errorMessages);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "停用 Email 通知時發生錯誤：UserId={UserId}", userId);
+            return ServiceResult.Fail("停用 Email 通知時發生錯誤，請稍後再試");
+        }
+    }
+
+    public async Task<bool> GetUserEmailNotificationStatusAsync(string userId)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            return user != null && user.EmailNotificationEnabled && 
+                   !string.IsNullOrEmpty(user.Email) && 
+                   await _userManager.IsEmailConfirmedAsync(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取得 Email 通知狀態時發生錯誤：UserId={UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task<ServiceResult> SetEmailAndEnableNotificationAsync(string userId, string email)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return ServiceResult.Fail("找不到用戶");
+            }
+
+            // 設定 Email（不需要驗證）
+            user.Email = email;
+            user.EmailConfirmed = true; // 直接標記為已驗證
+            user.EmailNotificationEnabled = true;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("用戶 {UserId} 已設定 Email 並啟用通知：Email={Email}", userId, email);
+                return ServiceResult.Ok();
+            }
+
+            var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
+            return ServiceResult.Fail(errorMessages);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "設定 Email 並啟用通知時發生錯誤：UserId={UserId}, Email={Email}", userId, email);
+            return ServiceResult.Fail("設定 Email 時發生錯誤，請稍後再試");
+        }
+    }
 }
 
