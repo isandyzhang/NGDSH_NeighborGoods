@@ -313,10 +313,10 @@ public class ListingService : IListingService
                 return ServiceResult.Fail("無權限修改此商品");
             }
 
-            // 只有刊登中的商品可以編輯
-            if (listing.Status != ListingStatus.Active)
+            // 只有刊登中或已下架的商品可以編輯
+            if (listing.Status != ListingStatus.Active && listing.Status != ListingStatus.Inactive)
             {
-                return ServiceResult.Fail("只有刊登中的商品才能編輯");
+                return ServiceResult.Fail("只有刊登中或已下架的商品才能編輯");
             }
 
             // 處理免費邏輯
@@ -568,6 +568,54 @@ public class ListingService : IListingService
         }
     }
 
+    public async Task<ServiceResult> ReactivateListingAsync(
+        Guid listingId,
+        string userId)
+    {
+        try
+        {
+            var listing = await _db.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId);
+
+            if (listing == null)
+            {
+                return ServiceResult.Fail("找不到商品");
+            }
+
+            // 驗證是否為商品擁有者
+            if (listing.SellerId != userId)
+            {
+                return ServiceResult.Fail("無權限上架此商品");
+            }
+
+            // 只有已下架的商品可以重新上架
+            if (listing.Status != ListingStatus.Inactive)
+            {
+                return ServiceResult.Fail("只有已下架的商品才能重新上架");
+            }
+
+            // 檢查刊登中商品數量限制
+            var activeListingCount = await _db.Listings
+                .CountAsync(l => l.SellerId == userId && l.Status == ListingStatus.Active);
+
+            if (activeListingCount >= ListingConstants.MaxActiveListingsPerUser)
+            {
+                return ServiceResult.Fail($"您目前已有 {ListingConstants.MaxActiveListingsPerUser} 個刊登中的商品，請先下架或售出部分商品後再重新上架");
+            }
+
+            listing.Status = ListingStatus.Active;
+            listing.UpdatedAt = TaiwanTime.Now;
+            await _db.SaveChangesAsync();
+
+            return ServiceResult.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "重新上架商品 {ListingId} 時發生錯誤", listingId);
+            return ServiceResult.Fail("重新上架商品時發生錯誤，請稍後再試");
+        }
+    }
+
     public async Task<ServiceResult<ListingDetailsViewModel>> GetListingDetailsAsync(
         Guid listingId,
         string? currentUserId)
@@ -694,10 +742,10 @@ public class ListingService : IListingService
                 return ServiceResult<ListingEditViewModel>.Fail("無權限修改此商品");
             }
 
-            // 只有刊登中的商品可以編輯
-            if (listing.Status != ListingStatus.Active)
+            // 只有刊登中或已下架的商品可以編輯
+            if (listing.Status != ListingStatus.Active && listing.Status != ListingStatus.Inactive)
             {
-                return ServiceResult<ListingEditViewModel>.Fail("只有刊登中的商品才能編輯");
+                return ServiceResult<ListingEditViewModel>.Fail("只有刊登中或已下架的商品才能編輯");
             }
 
             var viewModel = new ListingEditViewModel

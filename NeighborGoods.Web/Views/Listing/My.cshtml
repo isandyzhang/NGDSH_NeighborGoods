@@ -115,10 +115,22 @@
                                 }
                                 else if (listing.Status == ListingStatus.Inactive)
                                 {
+                                    <div class="d-flex gap-2" onclick="event.stopPropagation();">
+                                        <a asp-action="Edit" asp-route-id="@listing.Id" 
+                                           class="btn btn-sm btn-outline-primary flex-fill">
+                                            編輯
+                                        </a>
+                                        <form asp-action="Reactivate" asp-route-id="@listing.Id" method="post" 
+                                              class="flex-fill">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-success w-100">
+                                                重新上架
+                                            </button>
+                                        </form>
+                                    </div>
                                     <form asp-action="Delete" asp-route-id="@listing.Id" method="post" 
                                           onsubmit="return confirm('確定要永久刪除這個商品嗎？此操作無法復原，所有商品圖片也會被刪除。');"
-                                          onclick="event.stopPropagation();"
-                                          class="w-100">
+                                          class="w-100 mt-2">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-sm btn-danger w-100">
                                             永久刪除

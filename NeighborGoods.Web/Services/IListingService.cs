@@ -48,6 +48,13 @@ public interface IListingService
         string userId);
 
     /// <summary>
+    /// 重新上架商品
+    /// </summary>
+    Task<ServiceResult> ReactivateListingAsync(
+        Guid listingId,
+        string userId);
+
+    /// <summary>
     /// 取得商品詳情（包含賣家統計）
     /// </summary>
     Task<ServiceResult<ListingDetailsViewModel>> GetListingDetailsAsync(

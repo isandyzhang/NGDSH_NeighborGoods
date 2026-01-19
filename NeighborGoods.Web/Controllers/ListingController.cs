@@ -125,7 +125,7 @@ public class ListingController : BaseController
             {
                 return Forbid();
             }
-            if (result.ErrorMessage?.Contains("只有刊登中的商品才能編輯") == true)
+            if (result.ErrorMessage?.Contains("只有刊登中或已下架的商品才能編輯") == true)
             {
                 TempData["ErrorMessage"] = result.ErrorMessage;
                 return RedirectToAction(nameof(Details), new { id });
@@ -173,7 +173,7 @@ public class ListingController : BaseController
             {
                 return Forbid();
             }
-            if (result.ErrorMessage?.Contains("只有刊登中的商品才能編輯") == true)
+            if (result.ErrorMessage?.Contains("只有刊登中或已下架的商品才能編輯") == true)
             {
                 TempData["ErrorMessage"] = result.ErrorMessage;
                 return RedirectToAction(nameof(Details), new { id });
@@ -265,6 +265,38 @@ public class ListingController : BaseController
 
         // 如果有警告訊息（例如有 Conversation 但直接標記為交易完成），返回警告但不阻止操作
         return Json(new { success = true, warning = result.Data });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reactivate(Guid id)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return Challenge();
+        }
+
+        // 使用服務層重新上架商品
+        var result = await _listingService.ReactivateListingAsync(id, user.Id);
+
+        if (!result.Success)
+        {
+            if (result.ErrorMessage == "找不到商品")
+            {
+                return NotFound();
+            }
+            if (result.ErrorMessage == "無權限上架此商品")
+            {
+                return Forbid();
+            }
+
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "重新上架商品時發生錯誤，請稍後再試";
+            return RedirectToAction("My");
+        }
+
+        TempData["SuccessMessage"] = "商品已重新上架";
+        return RedirectToAction("My");
     }
 }
 
