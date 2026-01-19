@@ -21,5 +21,15 @@ public class EmailNotificationOptions
     /// <summary>
     /// 發送者顯示名稱（可選）
     /// </summary>
-    public string FromDisplayName { get; set; } = "NeighborGoods";
+    public string FromDisplayName { get; set; } = "南港社宅交易平台";
+
+    /// <summary>
+    /// Logo 圖片 URL（可選）
+    /// </summary>
+    public string LogoUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 網站基礎 URL
+    /// </summary>
+    public string BaseUrl { get; set; } = string.Empty;
 }

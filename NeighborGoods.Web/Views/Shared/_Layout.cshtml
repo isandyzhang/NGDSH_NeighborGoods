@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Identity
 @using NeighborGoods.Web.Models.Entities
 @inject UserManager<ApplicationUser> UserManager
 
@@ -19,7 +19,10 @@
     <!-- 側邊欄選單 -->
     <div class="sidebar-menu" id="sidebarMenu">
         <div class="sidebar-header">
-            <h5 class="mb-0">選單</h5>
+            <div class="d-flex align-items-center">
+                <img src="~/logo.jpg" alt="NeighborGoods Logo" style="height: 30px; margin-right: 10px;">
+                <h5 class="mb-0">選單</h5>
+            </div>
             <button type="button" class="btn-close" id="sidebarClose" aria-label="Close"></button>
         </div>
         <div class="sidebar-content">
@@ -174,7 +177,10 @@
                 <button class="navbar-toggler me-2" type="button" id="sidebarToggle" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">南港社宅社區專屬二手交易平台</a>
+                <a class="navbar-brand d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
+                    <img src="~/logo.jpg" alt="NeighborGoods Logo" style="height: 40px; margin-right: 10px;">
+                    <span>南港社宅社區專屬二手交易平台</span>
+                </a>
             </div>
         </nav>
     </header>

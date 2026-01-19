@@ -1,4 +1,4 @@
-﻿@model NeighborGoods.Web.Models.ViewModels.ListingSearchViewModel
+@model NeighborGoods.Web.Models.ViewModels.ListingSearchViewModel
 @using NeighborGoods.Web.Utils
 
 @{
@@ -336,7 +336,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-3">請輸入您的 Email 地址以啟用通知功能：</p>
+                    <p class="mb-3">請輸入您的 Email 地址，我們會在有新訊息或商品更新時通知您：</p>
                     <form id="emailNotificationForm">
                         <div class="mb-3">
                             <label for="emailInput" class="form-label">Email 地址</label>
@@ -344,6 +344,15 @@
                             <div class="invalid-feedback" id="emailError"></div>
                         </div>
                     </form>
+                    <div class="alert alert-info mb-0" role="alert">
+                        <small>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle me-1" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                            </svg>
+                            <strong>溫馨提醒：</strong>通知郵件可能會被歸類到垃圾郵件，如果收件匣找不到，請檢查垃圾信件夾。若仍有問題，歡迎透過「<a asp-controller="ContactAdmin" asp-action="Index" class="alert-link">聯絡管理員</a>」與我們聯繫。
+                        </small>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>

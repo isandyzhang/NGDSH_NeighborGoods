@@ -33,9 +33,66 @@ public class EmailNotificationService : IEmailNotificationService
     {
         try
         {
-            var emailContent = new EmailContent("NeighborGoods 通知")
+            // 建立 HTML Email 內容
+            var htmlContent = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        .container {{
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .message {{
+            font-size: 16px;
+            margin-bottom: 30px;
+            white-space: pre-line;
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }}
+        .footer a {{
+            color: #007bff;
+            text-decoration: none;
+        }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <div class=""message"">
+            {WebUtility.HtmlEncode(message)}
+        </div>
+        <div class=""footer"">
+            <p><strong>南港社宅社區專屬二手交易平台</strong></p>
+            <p>此郵件由系統自動發送，請勿直接回覆</p>
+            <p>如不想再收到通知，請至<a href=""https://neighborgoods.azurewebsites.net/Account/Profile"">帳戶設定</a>關閉郵件通知</p>
+        </div>
+    </div>
+</body>
+</html>";
+
+            var emailContent = new EmailContent("南港社宅社區專屬二手交易平台 - 通知")
             {
-                PlainText = message
+                PlainText = message,
+                Html = htmlContent
             };
 
             var emailRecipients = new EmailRecipients(new[] { new EmailAddress(email) });
@@ -105,12 +162,13 @@ public class EmailNotificationService : IEmailNotificationService
         .message {{
             margin-bottom: 30px;
             font-size: 16px;
+            white-space: pre-line;
         }}
         .button {{
             display: inline-block;
             padding: 12px 24px;
             background-color: #007bff;
-            color: #ffffff;
+            color: #ffffff !important;
             text-decoration: none;
             border-radius: 4px;
             font-weight: 500;
@@ -119,6 +177,22 @@ public class EmailNotificationService : IEmailNotificationService
         .button:hover {{
             background-color: #0056b3;
         }}
+        .button-container {{
+            text-align: center;
+            margin: 30px 0;
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }}
+        .footer a {{
+            color: #007bff;
+            text-decoration: none;
+        }}
     </style>
 </head>
 <body>
@@ -126,16 +200,23 @@ public class EmailNotificationService : IEmailNotificationService
         <div class=""message"">
             {WebUtility.HtmlEncode(message)}
         </div>
-        <a href=""{WebUtility.HtmlEncode(linkUrl)}"" class=""button"">
-            {WebUtility.HtmlEncode(linkText)}
-        </a>
+        <div class=""button-container"">
+            <a href=""{WebUtility.HtmlEncode(linkUrl)}"" class=""button"">
+                {WebUtility.HtmlEncode(linkText)}
+            </a>
+        </div>
+        <div class=""footer"">
+            <p><strong>南港社宅社區專屬二手交易平台</strong></p>
+            <p>此郵件由系統自動發送，請勿直接回覆</p>
+            <p>如不想再收到通知，請至<a href=""https://neighborgoods.azurewebsites.net/Account/Profile"">帳戶設定</a>關閉郵件通知</p>
+        </div>
     </div>
 </body>
 </html>";
 
             var plainTextContent = $"{message}\n\n{linkText}: {linkUrl}";
 
-            var emailContent = new EmailContent("NeighborGoods 通知")
+            var emailContent = new EmailContent("南港社宅社區專屬二手交易平台 - 通知")
             {
                 PlainText = plainTextContent,
                 Html = htmlContent
