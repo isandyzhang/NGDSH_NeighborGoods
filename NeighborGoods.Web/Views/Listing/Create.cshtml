@@ -6,6 +6,16 @@
 
 <h2 class="mt-4 mb-3">刊登商品</h2>
 
+<!-- 刊登送出時的載入遮罩 -->
+<div id="submitLoadingOverlay" class="submit-loading-overlay d-none" aria-hidden="true">
+    <div class="submit-loading-content">
+        <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">載入中</span>
+        </div>
+        <p class="mt-3 mb-0 text-white fw-bold">刊登商品中，請稍候...</p>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-8">
         <form asp-action="Create" method="post" enctype="multipart/form-data">
@@ -215,25 +225,40 @@
         const submitBtn = document.getElementById('submitBtn');
         const submitBtnText = document.getElementById('submitBtnText');
         const submitBtnSpinner = document.getElementById('submitBtnSpinner');
+        const submitLoadingOverlay = document.getElementById('submitLoadingOverlay');
         let isSubmitting = false;
         
-        // 顯示載入狀態
+        // 顯示載入狀態（按鈕 + 全畫面遮罩）
         function showLoadingState() {
             if (submitBtn && submitBtnText && submitBtnSpinner) {
                 submitBtn.disabled = true;
                 submitBtnText.textContent = '刊登商品中...';
                 submitBtnSpinner.classList.remove('d-none');
             }
+            if (submitLoadingOverlay) {
+                submitLoadingOverlay.classList.remove('d-none');
+                submitLoadingOverlay.setAttribute('aria-hidden', 'false');
+            }
         }
         
-        // 重置按鈕狀態
+        // 重置按鈕狀態（含隱藏遮罩）
         function resetButtonState() {
             if (submitBtn && submitBtnText && submitBtnSpinner) {
                 submitBtn.disabled = false;
                 submitBtnText.textContent = '送出刊登';
                 submitBtnSpinner.classList.add('d-none');
             }
+            if (submitLoadingOverlay) {
+                submitLoadingOverlay.classList.add('d-none');
+                submitLoadingOverlay.setAttribute('aria-hidden', 'true');
+            }
             isSubmitting = false;
+        }
+        
+        // 頁面載入時隱藏遮罩（例如驗證失敗回到本頁）
+        if (submitLoadingOverlay) {
+            submitLoadingOverlay.classList.add('d-none');
+            submitLoadingOverlay.setAttribute('aria-hidden', 'true');
         }
         
         if (form) {
@@ -292,10 +317,33 @@
     </script>
 
     <style>
+        /* 刊登送出時的載入遮罩 */
+        .submit-loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .submit-loading-overlay.submit-loading-overlay.d-none {
+            display: none !important;
+        }
+        .submit-loading-content {
+            text-align: center;
+        }
+        .submit-loading-content .spinner-border {
+            border-width: 0.3em;
+        }
+
         /* 手機觸控優化 */
         @@media (max-width: 576px) {
             .image-upload-card .card {
-                border-radius: 12px;
+                border-radius: 8px;
                 transition: all 0.2s;
             }
             
