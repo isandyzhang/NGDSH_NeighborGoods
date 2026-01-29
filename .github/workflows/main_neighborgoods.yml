@@ -60,6 +60,6 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'NeighborGoods'
-          slot-name: 'Production'
           package: .
+
           
