@@ -54,12 +54,12 @@ public class HomeController : BaseController
             ExcludeUserId = currentUserId
         };
 
-        // 使用服務層搜尋商品
+        // 使用服務層搜尋商品（每頁 12 筆 ≈ 電腦版 3 行 × 4 欄）
         var result = await _listingService.SearchListingsAsync(
             criteria,
             currentUserId,
             page,
-            PaginationConstants.DefaultPageSize);
+            PaginationConstants.HomeListingPageSize);
 
         // 建立搜尋 ViewModel
         var searchViewModel = new ListingSearchViewModel
