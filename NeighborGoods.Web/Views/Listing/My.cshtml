@@ -68,23 +68,21 @@
                 <div class="col-12 col-md-6 col-lg-4 listing-item" 
                      data-status="@((int)listing.Status)" 
                      data-completed="@(isCompleted ? "true" : "false")">
-                    <div class="card h-100" style="cursor: pointer; transition: transform 0.2s;" 
+                    <div class="card h-100 my-listing-card" 
                          onclick="window.location.href='@Url.Action("Details", "Listing", new { id = listing.Id })'">
                         @if (!string.IsNullOrEmpty(listing.FirstImageUrl))
                         {
-                            <img src="@listing.FirstImageUrl" class="card-img-top" alt="@listing.Title" 
-                                 style="height: 200px; object-fit: cover;" loading="lazy">
+                            <img src="@listing.FirstImageUrl" class="card-img-top my-listing-card-image" alt="@listing.Title" loading="lazy">
                         }
                         else
                         {
-                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
-                                 style="height: 200px;">
+                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center my-listing-card-image">
                                 <span class="text-muted">無圖片</span>
                             </div>
                         }
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title mb-2">@listing.Title</h5>
-                            <div class="mb-2">
+                            <div class="mb-2 my-listing-price-section">
                                 @if (listing.IsFree)
                                 {
                                     <span class="badge bg-success">免費</span>
@@ -176,12 +174,8 @@
     <style>
         /* 手機友善設計 */
         @@media (max-width: 576px) {
-            .card {
-                border-radius: 12px;
-            }
-            
-            .card:active {
-                transform: scale(0.98);
+            .my-listing-card {
+                border-radius: 8px;
             }
             
             .btn-group {

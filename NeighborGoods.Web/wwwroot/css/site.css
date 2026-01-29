@@ -1,3 +1,35 @@
+:root {
+  --bs-body-font-family: "Noto Sans TC", sans-serif;
+  --bs-primary: #495057;
+  --bs-primary-rgb: 73, 80, 87;
+}
+
+/* 主色按鈕改為深灰色 */
+.btn {
+  border-radius: 8px;
+}
+.btn-primary {
+  background-color: #495057;
+  border-color: #495057;
+}
+.btn-primary:hover {
+  background-color: #343a40;
+  border-color: #343a40;
+}
+.btn-outline-primary {
+  color: #495057;
+  border-color: #495057;
+}
+.btn-outline-primary:hover {
+  color: #fff;
+  background-color: #495057;
+  border-color: #495057;
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #495057;
+}
+
 html {
   font-size: 16px;
 }
@@ -8,9 +40,6 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
 
 html {
   position: relative;
@@ -25,6 +54,55 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   max-width: 100%;
+  background-color: #EAE2D6;
+  font-family: "Noto Sans TC", sans-serif;
+}
+
+/* 統一卡片與輸入框圓角 */
+.card,
+.form-control,
+.form-select {
+  border-radius: 8px;
+}
+
+/* 頂部導覽列 */
+header .navbar {
+  background-color: #E29A7A !important;
+}
+header .navbar .navbar-brand {
+  font-weight: 700;
+}
+/* Logo（左側） */
+.navbar-brand-logo-block {
+  margin-right: 12px;
+}
+.navbar-brand-img {
+  height: 40px;
+  display: block;
+}
+/* 中文字在上、英文字在下 */
+.navbar-brand-text-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+.navbar-brand-en {
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #212529;
+  text-align: left;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+/* 中文標題：粗體、斜體、漸層 */
+header .navbar .navbar-brand .navbar-brand-title {
+  font-style: italic;
+  background: linear-gradient(180deg, #212529 0%, #495057 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* 側邊欄樣式 */
@@ -52,7 +130,7 @@ body {
   left: -300px;
   width: 300px;
   height: 100vh;
-  background: white;
+  background: #EAE2D6;
   z-index: 1050;
   transition: left 0.3s ease;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
@@ -246,12 +324,13 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   text-decoration: none;
   color: inherit;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
   overflow: hidden;
 }
 
 .listing-card:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  transform: scale(1.03);
   color: inherit;
   text-decoration: none;
 }
@@ -283,13 +362,14 @@ body {
   justify-content: space-between;
   padding: 0.75rem;
   min-width: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .listing-card-title {
   font-size: 0.95rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
-  color: #212529;
+  color: #6b6b6b;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -301,13 +381,16 @@ body {
 .listing-card-price {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #0d6efd;
+  color: #6b6b6b;
   margin-bottom: 0.5rem;
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .listing-card-meta {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: #8a8a8a;
   margin-top: auto;
 }
 
@@ -326,6 +409,69 @@ body {
 .listing-card-interest svg {
   flex-shrink: 0;
   color: #ffc107;
+}
+
+/* 我的商品卡片樣式，參考商品列表卡片 */
+.my-listing-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin-bottom: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.my-listing-card:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  transform: scale(1.03);
+  color: inherit;
+  text-decoration: none;
+}
+
+.my-listing-card-image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.my-listing-card .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.my-listing-price-section {
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.my-listing-card .card-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #6b6b6b;
+  line-height: 1.4;
+}
+
+.my-listing-card .text-primary.fw-bold {
+  color: #6b6b6b !important;
+}
+
+.my-listing-card small.text-muted {
+  color: #8a8a8a !important;
 }
 
 /* 商品列表頁面標題優化 */
@@ -361,25 +507,25 @@ body {
 
 @media (min-width: 992px) {
   .listing-list {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
   }
   
   .listing-card-image,
   .listing-card-image-placeholder {
-    height: 220px;
+    height: 200px;
   }
   
   .listing-card-content {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
   }
   
   .listing-card-title {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
   
   .listing-card-price {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
   
   .container-fluid h2 {
