@@ -14,7 +14,7 @@
         </div>
         <p class="mt-3 mb-0 text-white fw-bold">刊登商品中，請稍候...</p>
     </div>
-</div>
+}</div>
 
 <div class="row">
     <div class="col-md-8">
@@ -46,6 +46,21 @@
                         style="font-size: 16px;">
                 </select>
                 <span asp-validation-for="Condition" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Residence" class="form-label fw-bold">商品位於的社宅</label>
+                @{
+                    var residenceItems = Html
+                        .GetEnumSelectList<NeighborGoods.Web.Models.Enums.ListingResidence>()
+                        .Where(item => item.Value != ((int)NeighborGoods.Web.Models.Enums.ListingResidence.Unknown).ToString());
+                }
+                <select asp-for="Residence"
+                        asp-items="residenceItems"
+                        class="form-select form-select-lg"
+                        style="font-size: 16px;">
+                </select>
+                <span asp-validation-for="Residence" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
@@ -313,7 +328,6 @@
                     }
                 }, 30000);
             });
-        }
     </script>
 
     <style>

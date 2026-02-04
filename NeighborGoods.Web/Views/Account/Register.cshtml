@@ -9,6 +9,13 @@
 <div class="row">
     <div class="col-md-6">
         <div class="alert alert-info">
+            <p class="mb-2">
+                <strong>建議：</strong>推薦使用 LINE 登入，流程最簡單，不需要先驗證 Email。
+            </p>
+            <p class="mb-2">
+                若選擇使用「帳號密碼」註冊，必須提供可收信的 Email，並完成 Email 驗證後才能登入與刊登商品。
+            </p>
+            <hr />
             <strong>密碼規則：</strong>
             <ul class="mb-0">
                 <li>至少 6 個字元</li>
@@ -24,6 +31,11 @@
                 <label asp-for="UserName" class="form-label"></label>
                 <input asp-for="UserName" class="form-control" />
                 <span asp-validation-for="UserName" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
             </div>
             <div class="mb-3">
                 <label asp-for="DisplayName" class="form-label"></label>

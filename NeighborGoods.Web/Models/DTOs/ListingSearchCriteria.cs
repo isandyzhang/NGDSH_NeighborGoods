@@ -10,6 +10,7 @@ public class ListingSearchCriteria
     public string? SearchTerm { get; set; }
     public ListingCategory? Category { get; set; }
     public ListingCondition? Condition { get; set; }
+    public ListingResidence? Residence { get; set; }
     public int? MinPrice { get; set; }
     public int? MaxPrice { get; set; }
     public bool? IsFree { get; set; }

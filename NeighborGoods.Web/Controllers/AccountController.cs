@@ -19,6 +19,7 @@ public class AccountController : BaseController
     private readonly IReviewService _reviewService;
     private readonly ILineMessagingApiService? _lineMessagingApiService;
     private readonly IConfiguration _configuration;
+    private readonly IEmailNotificationService? _emailNotificationService;
 
     public AccountController(
         UserManager<ApplicationUser> userManager,
@@ -26,7 +27,8 @@ public class AccountController : BaseController
         IUserService userService,
         IReviewService reviewService,
         IConfiguration configuration,
-        ILineMessagingApiService? lineMessagingApiService = null)
+        ILineMessagingApiService? lineMessagingApiService = null,
+        IEmailNotificationService? emailNotificationService = null)
         : base(userManager)
     {
         _signInManager = signInManager;
@@ -34,6 +36,7 @@ public class AccountController : BaseController
         _reviewService = reviewService;
         _configuration = configuration;
         _lineMessagingApiService = lineMessagingApiService;
+        _emailNotificationService = emailNotificationService;
     }
 
     [HttpGet]
@@ -58,9 +61,32 @@ public class AccountController : BaseController
         var result = await _userService.RegisterUserAsync(model);
         if (result.Success && result.Data != null)
         {
-            // SignIn 保留在 Controller 層（屬於認證流程）
-            await _signInManager.SignInAsync(result.Data, isPersistent: false);
-            return RedirectToAction("Index", "Home");
+            var user = result.Data;
+
+            // 產生 Email 驗證 Token
+            var token = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+            var callbackUrl = Url.Action(
+                nameof(ConfirmEmail),
+                "Account",
+                new { userId = user.Id, token },
+                protocol: Request.Scheme);
+
+            // 寄送驗證信（若 Email 通知服務可用）
+            if (!string.IsNullOrEmpty(user.Email) && _emailNotificationService != null)
+            {
+                var message = "感謝您註冊南港社宅社區專屬二手交易平台，請點擊下面的連結完成 Email 驗證：";
+                var linkText = "點此完成 Email 驗證";
+                await _emailNotificationService.SendPushMessageWithLinkAsync(
+                    user.Email,
+                    message,
+                    callbackUrl ?? string.Empty,
+                    linkText,
+                    NeighborGoods.Web.Models.Enums.NotificationPriority.High);
+            }
+
+            // 顯示提示：請前往信箱完成驗證
+            TempData["SuccessMessage"] = "註冊成功，請前往您的 Email 收信並完成驗證後再登入。";
+            return RedirectToAction(nameof(Login));
         }
 
         // 處理錯誤
@@ -78,6 +104,42 @@ public class AccountController : BaseController
     {
         ViewData["ReturnUrl"] = returnUrl;
         return View(new LoginViewModel());
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmEmail(string userId, string token)
+    {
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+        {
+            TempData["ErrorMessage"] = "Email 驗證連結無效，請重新嘗試或要求重寄驗證信。";
+            return RedirectToAction(nameof(Login));
+        }
+
+        var user = await UserManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            TempData["ErrorMessage"] = "找不到對應的帳號，請確認連結是否正確。";
+            return RedirectToAction(nameof(Login));
+        }
+
+        if (user.EmailConfirmed)
+        {
+            TempData["InfoMessage"] = "您的 Email 已經完成驗證，可以直接登入。";
+            return RedirectToAction(nameof(Login));
+        }
+
+        var result = await UserManager.ConfirmEmailAsync(user, token);
+        if (result.Succeeded)
+        {
+            TempData["SuccessMessage"] = "Email 驗證成功，現在可以使用帳號密碼登入，並刊登商品。";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = "Email 驗證失敗，連結可能已過期或無效，請重新登入後要求重寄驗證信。";
+        }
+
+        return RedirectToAction(nameof(Login));
     }
 
     [HttpPost]
@@ -101,6 +163,15 @@ public class AccountController : BaseController
 
         if (result.Succeeded)
         {
+            // 成功登入後，若該帳號的 Email 尚未驗證，立即登出並提示
+            var signedInUser = await UserManager.FindByNameAsync(model.UserName);
+            if (signedInUser != null && !signedInUser.EmailConfirmed)
+            {
+                await _signInManager.SignOutAsync();
+                ModelState.AddModelError(string.Empty, "此帳號的 Email 尚未完成驗證，請先前往信箱完成驗證後再登入。");
+                return View(model);
+            }
+
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
@@ -718,6 +789,146 @@ public class AccountController : BaseController
     }
 
     /// <summary>
+    /// 刊登商品用：發送 Email 驗證碼
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> SendListingEmailCode([FromBody] SetEmailRequest request)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Json(new { success = false, message = "未登入" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return Json(new { success = false, message = "Email 不能為空" });
+        }
+
+        var email = request.Email.Trim();
+        if (!email.Contains("@") || !email.Contains("."))
+        {
+            return Json(new { success = false, message = "Email 格式不正確" });
+        }
+
+        // 產生 6 位數驗證碼
+        var random = new Random();
+        var code = random.Next(100000, 999999).ToString();
+
+        // 將驗證碼與 Email 暫存於 Session（僅用於本次瀏覽器會話）
+        HttpContext.Session.SetString("ListingEmail", email);
+        HttpContext.Session.SetString("ListingEmailCode", code);
+        HttpContext.Session.SetString("ListingEmailCodeExpiresAt", DateTime.UtcNow.AddMinutes(10).ToString("O"));
+
+        if (_emailNotificationService != null)
+        {
+            var message = $"您正在驗證刊登商品用的 Email，您的驗證碼為：{code}（10 分鐘內有效）。";
+            await _emailNotificationService.SendPushMessageAsync(
+                email,
+                message,
+                NeighborGoods.Web.Models.Enums.NotificationPriority.High);
+        }
+
+        return Json(new { success = true, message = "驗證碼已寄出，請至信箱查收。" });
+    }
+
+    /// <summary>
+    /// 顯示刊登前 Email 驗證頁面
+    /// </summary>
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> VerifyListingEmail(string? returnUrl = null)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Challenge();
+        }
+
+        // 如果已經有驗證過的 Email，就直接導回原頁
+        if (!string.IsNullOrEmpty(currentUser.Email) && currentUser.EmailConfirmed)
+        {
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+
+            return RedirectToAction("Index", "Home");
+        }
+
+        // 預設回到刊登頁
+        if (string.IsNullOrEmpty(returnUrl) || !Url.IsLocalUrl(returnUrl))
+        {
+            returnUrl = Url.Action("Create", "Listing");
+        }
+
+        ViewBag.ReturnUrl = returnUrl;
+        return View();
+    }
+
+    /// <summary>
+    /// 刊登商品用：驗證 Email 驗證碼並更新帳號 EmailConfirmed
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> VerifyListingEmailCode([FromBody] VerifyEmailCodeRequest request)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            return Json(new { success = false, message = "未登入" });
+        }
+
+        var sessionEmail = HttpContext.Session.GetString("ListingEmail");
+        var sessionCode = HttpContext.Session.GetString("ListingEmailCode");
+        var expiresAtString = HttpContext.Session.GetString("ListingEmailCodeExpiresAt");
+
+        if (string.IsNullOrEmpty(sessionEmail) ||
+            string.IsNullOrEmpty(sessionCode) ||
+            string.IsNullOrEmpty(expiresAtString))
+        {
+            return Json(new { success = false, message = "請先寄送驗證碼。" });
+        }
+
+        if (!DateTime.TryParse(expiresAtString, null, System.Globalization.DateTimeStyles.RoundtripKind, out var expiresAtUtc) ||
+            DateTime.UtcNow > expiresAtUtc)
+        {
+            return Json(new { success = false, message = "驗證碼已過期，請重新寄送。" });
+        }
+
+        if (!string.Equals(sessionEmail, request.Email?.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return Json(new { success = false, message = "Email 不一致，請重新確認。" });
+        }
+
+        if (!string.Equals(sessionCode, request.Code?.Trim(), StringComparison.Ordinal))
+        {
+            return Json(new { success = false, message = "驗證碼錯誤，請重新輸入。" });
+        }
+
+        // 驗證成功：更新使用者 Email 與 EmailConfirmed
+        currentUser.Email = sessionEmail;
+        currentUser.EmailConfirmed = true;
+
+        var updateResult = await UserManager.UpdateAsync(currentUser);
+        if (!updateResult.Succeeded)
+        {
+            var error = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+            return Json(new { success = false, message = $"更新帳號 Email 時發生錯誤：{error}" });
+        }
+
+        // 清除 Session 中的驗證資訊
+        HttpContext.Session.Remove("ListingEmail");
+        HttpContext.Session.Remove("ListingEmailCode");
+        HttpContext.Session.Remove("ListingEmailCodeExpiresAt");
+
+        return Json(new { success = true, message = "Email 驗證成功，現在可以刊登商品了。" });
+    }
+
+    /// <summary>
     /// 檢查 LINE 綁定狀態（供前端 JavaScript 呼叫）
     /// </summary>
     [HttpGet]
@@ -864,6 +1075,12 @@ public class AccountController : BaseController
 public class SetEmailRequest
 {
     public string Email { get; set; } = string.Empty;
+}
+
+public class VerifyEmailCodeRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
 }
 
 

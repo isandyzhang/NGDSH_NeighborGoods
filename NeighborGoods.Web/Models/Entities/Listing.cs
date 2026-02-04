@@ -35,12 +35,17 @@ public class Listing
     /// 商品類別（家具家飾 / 電子產品 / 服飾配件 / 書籍文具 / 運動用品 / 玩具遊戲 / 廚房用品 / 生活用品 / 嬰幼兒用品 / 其他）。
     /// </summary>
     public ListingCategory Category { get; set; } = ListingCategory.Other;
-
+    
     /// <summary>
     /// 商品新舊程度（全新 / 近全新 / 良好 / 普通 / 歲月痕跡）。
     /// </summary>
     public ListingCondition Condition { get; set; } = ListingCondition.Good;
 
+    /// <summary>
+    /// 商品位於的社宅（機廠 / 東明 / 小彎 / 未指定）。
+    /// </summary>
+    public ListingResidence Residence { get; set; } = ListingResidence.Factory;
+    
     /// <summary>
     /// 面交地點（北棟管理室 / 南棟管理室 / 風雨操場 / 私訊）。
     /// </summary>

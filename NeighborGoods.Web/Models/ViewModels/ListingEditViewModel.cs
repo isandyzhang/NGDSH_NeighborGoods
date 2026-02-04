@@ -26,6 +26,10 @@ public class ListingEditViewModel
     [Display(Name = "新舊程度")]
     public ListingCondition Condition { get; set; } = ListingCondition.Good;
 
+    [Required(ErrorMessage = "請選擇商品位於的社宅，方便鄰居知道商品在哪個社宅")]
+    [Display(Name = "商品位於的社宅")]
+    public ListingResidence Residence { get; set; } = ListingResidence.Factory;
+
     [Range(0, 999999, ErrorMessage = "價格請設定在 0 到 999,999 元之間")]
     [Display(Name = "價格")]
     public decimal Price { get; set; }

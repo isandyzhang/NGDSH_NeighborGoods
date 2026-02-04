@@ -11,9 +11,11 @@ public class ListingDetailsViewModel
     public string Description { get; set; } = string.Empty;
 
     public ListingCategory Category { get; set; }
-
+    
     public ListingCondition Condition { get; set; }
 
+    public ListingResidence Residence { get; set; }
+    
     public ListingPickupLocation PickupLocation { get; set; }
 
     public decimal Price { get; set; }

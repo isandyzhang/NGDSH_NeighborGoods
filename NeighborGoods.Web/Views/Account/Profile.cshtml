@@ -118,12 +118,9 @@
                     <strong>Email 地址：</strong>
                     <span class="text-muted">@Model.User.Email</span>
                 </div>
-                <form asp-action="DisableEmailNotification" method="post" class="d-inline">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-outline-danger w-100" style="min-height: 44px;">
-                        停用 Email 通知
-                    </button>
-                </form>
+                <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#removeEmailModal" style="min-height: 44px;">
+                    移除 Email
+                </button>
             }
         </div>
     </div>
@@ -195,6 +192,34 @@
                 <form asp-action="DeleteAccount" method="post" class="d-inline">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="btn btn-danger">確認刪除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 移除 Email 確認 Modal -->
+<div class="modal fade" id="removeEmailModal" tabindex="-1" aria-labelledby="removeEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-danger">
+                <h5 class="modal-title text-danger" id="removeEmailModalLabel">確認移除 Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="fw-bold text-danger">您確定要移除目前設定的 Email 嗎？</p>
+                <ul>
+                    <li>移除後將無法再收到 Email 通知。</li>
+                    <li>之後要刊登或編輯商品時，必須重新完成 Email 驗證。</li>
+                    <li>若使用帳號密碼登入，也需要重新驗證 Email 才能登入。</li>
+                </ul>
+                <p class="text-danger fw-bold mb-0">此操作不會刪除帳號，但會清除目前的 Email 設定。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form asp-action="DisableEmailNotification" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">確認移除 Email</button>
                 </form>
             </div>
         </div>

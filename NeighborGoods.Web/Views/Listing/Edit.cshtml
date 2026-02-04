@@ -40,6 +40,21 @@
             </div>
 
             <div class="mb-3">
+                <label asp-for="Residence" class="form-label fw-bold">商品位於的社宅</label>
+                @{
+                    var residenceItems = Html
+                        .GetEnumSelectList<NeighborGoods.Web.Models.Enums.ListingResidence>()
+                        .Where(item => item.Value != ((int)NeighborGoods.Web.Models.Enums.ListingResidence.Unknown).ToString());
+                }
+                <select asp-for="Residence"
+                        asp-items="residenceItems"
+                        class="form-select form-select-lg"
+                        style="font-size: 16px;">
+                </select>
+                <span asp-validation-for="Residence" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
                 <label asp-for="Description" class="form-label fw-bold">描述</label>
                 <textarea asp-for="Description" class="form-control" rows="5" maxlength="500"></textarea>
                 <div class="form-text">最多 500 個字元</div>

@@ -175,22 +175,44 @@
     <header>
         <nav class="navbar navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
-                <button class="navbar-toggler me-2" type="button" id="sidebarToggle" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <a class="navbar-brand d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
-                    <div class="navbar-brand-logo-block">
-                        <img src="~/logo.png" alt="NeighborGoods Logo" class="navbar-brand-img">
-                    </div>
-                    <div class="navbar-brand-text-block">
-                        <span class="navbar-brand-title">南港社宅社區專屬二手交易平台</span>
-                    </div>
-                </a>
+                <div class="d-flex align-items-center flex-grow-1">
+                    <button class="navbar-toggler me-2" type="button" id="sidebarToggle" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <a class="navbar-brand d-flex align-items-center" asp-area="" asp-controller="Home" asp-action="Index">
+                        <div class="navbar-brand-logo-block">
+                            <img src="~/logo.png" alt="NeighborGoods Logo" class="navbar-brand-img">
+                        </div>
+                        <div class="navbar-brand-text-block">
+                            <span class="navbar-brand-title">南港社宅社區專屬二手交易平台</span>
+                            <span class="navbar-brand-subtitle"> 社區聯繫 ｜ 循環利用 ｜ 現金交易 </span>
+                        </div>
+                    </a>
+                </div>
             </div>
         </nav>
     </header>
     @{
         var hideFooter = ViewData["HideFooter"] as bool? ?? false;
+        var isAuthenticated = User?.Identity?.IsAuthenticated ?? false;
+        var shouldShowEmailReminder = ViewBag.ShouldShowEmailReminder as bool? ?? false;
+    }
+
+    @if (isAuthenticated && shouldShowEmailReminder)
+    {
+        <div class="alert alert-warning text-center mb-0 rounded-0 small" id="emailReminderBanner">
+            <span class="me-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-envelope-exclamation" viewBox="0 0 16 16">
+                    <path d="M2 2a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 1.5 13h6.707A5.483 5.483 0 0 1 8 11.5a5.5 5.5 0 0 1 9-4.478V4a2 2 0 0 0-2-2z"/>
+                    <path d="M2.243 3.05A1 1 0 0 0 2 3h12a1 1 0 0 0-.243-.95L8 7z"/>
+                    <path d="M16 12.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0M8.5 9.5a.5.5 0 0 0-1 0v2.5a.5.5 0 0 0 1 0zm-.5 4a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5"/>
+                </svg>
+            </span>
+            <span>您目前尚未設定或驗證 Email，建議儘快補上以便接收通知與重要訊息。</span>
+            <button type="button" class="btn btn-link p-0 ms-2 fw-bold text-decoration-underline align-baseline" id="emailReminderBannerLink">
+                立即完成 Email 驗證
+            </button>
+        </div>
     }
     <div class="@(hideFooter ? "container-fluid px-0" : "container")">
         <main role="main" class="@(hideFooter ? "" : "pb-3")">
@@ -236,6 +258,21 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        // 黃色 Banner 按鈕：導向獨立的 Email 驗證頁面
+        (function () {
+            document.addEventListener('DOMContentLoaded', function () {
+                var linkButton = document.getElementById('emailReminderBannerLink');
+                if (!linkButton) {
+                    return;
+                }
+
+                linkButton.addEventListener('click', function () {
+                    window.location.href = '@Url.Action("VerifyListingEmail", "Account")';
+                });
+            });
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

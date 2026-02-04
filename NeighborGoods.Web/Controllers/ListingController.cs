@@ -27,8 +27,24 @@ public class ListingController : BaseController
     }
 
     [HttpGet]
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return Challenge();
+        }
+
+        // 若尚未完成 Email 驗證，導向獨立的驗證頁面
+        if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
+        {
+            var verifyUrl = Url.Action(
+                "VerifyListingEmail",
+                "Account",
+                new { returnUrl = Url.Action(nameof(Create), "Listing") });
+            return Redirect(verifyUrl!);
+        }
+
         return View(new ListingCreateViewModel());
     }
 
@@ -45,6 +61,16 @@ public class ListingController : BaseController
         if (user == null)
         {
             return Challenge(); // 要求重新登入
+        }
+
+        // 伺服器端保護：刊登前一定要有已驗證的 Email
+        if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
+        {
+            var verifyUrl = Url.Action(
+                "VerifyListingEmail",
+                "Account",
+                new { returnUrl = Url.Action(nameof(Create), "Listing") });
+            return Redirect(verifyUrl!);
         }
 
         // 使用服務層建立商品
@@ -112,6 +138,13 @@ public class ListingController : BaseController
             return Challenge();
         }
 
+        // 編輯商品前同樣要求已驗證 Email，避免未驗證帳號持續變更刊登內容
+        if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
+        {
+            TempData["ErrorMessage"] = "編輯商品前，請先設定並完成 Email 驗證。";
+            return RedirectToAction("Profile", "Account");
+        }
+
         // 使用服務層取得商品編輯資料
         var result = await _listingService.GetListingForEditAsync(id, user.Id);
 
@@ -146,6 +179,13 @@ public class ListingController : BaseController
         if (user == null)
         {
             return Challenge();
+        }
+
+        // 防止繞過 GET：POST 時也檢查 Email 驗證狀態
+        if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
+        {
+            TempData["ErrorMessage"] = "編輯商品前，請先設定並完成 Email 驗證。";
+            return RedirectToAction("Profile", "Account");
         }
 
         if (!ModelState.IsValid)

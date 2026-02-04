@@ -31,6 +31,7 @@ public class HomeController : BaseController
         string? search,
         ListingCategory? category,
         ListingCondition? condition,
+        ListingResidence? residence,
         int? minPrice,
         int? maxPrice,
         bool? isFree,
@@ -47,6 +48,7 @@ public class HomeController : BaseController
             SearchTerm = search,
             Category = category,
             Condition = condition,
+            Residence = residence,
             MinPrice = minPrice,
             MaxPrice = maxPrice,
             IsFree = isFree,
@@ -67,6 +69,7 @@ public class HomeController : BaseController
             Search = search,
             Category = category,
             Condition = condition,
+            Residence = residence,
             MinPrice = minPrice,
             MaxPrice = maxPrice,
             IsFree = isFree,
@@ -92,15 +95,16 @@ public class HomeController : BaseController
         // 檢查用戶的 Email 通知狀態
         if (currentUser != null)
         {
-            ViewBag.IsEmailNotificationEnabled = currentUser.EmailNotificationEnabled && 
-                                                 !string.IsNullOrEmpty(currentUser.Email) && 
-                                                 currentUser.EmailConfirmed;
-            ViewBag.HasEmail = !string.IsNullOrEmpty(currentUser.Email) && currentUser.EmailConfirmed;
+            var hasEmail = !string.IsNullOrEmpty(currentUser.Email);
+            var isEmailConfirmed = currentUser.EmailConfirmed;
+
+            // 是否已啟用 Email 通知：需要同時有 Email、已驗證且使用者有開啟通知
+            ViewBag.IsEmailNotificationEnabled =
+                currentUser.EmailNotificationEnabled && hasEmail && isEmailConfirmed;
         }
         else
         {
             ViewBag.IsEmailNotificationEnabled = false;
-            ViewBag.HasEmail = false;
         }
 
         return View(searchViewModel);

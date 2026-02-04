@@ -69,6 +69,10 @@ body {
 header .navbar {
   background-color: #E29A7A !important;
 }
+header .navbar .container-fluid {
+  display: flex;
+  align-items: center;
+}
 header .navbar .navbar-brand {
   font-weight: 700;
 }
@@ -77,7 +81,7 @@ header .navbar .navbar-brand {
   margin-right: 12px;
 }
 .navbar-brand-img {
-  height: 40px;
+  height: 40px; /* 28px × 1.15 ≈ 32px */
   display: block;
 }
 /* 中文字在上、英文字在下 */
@@ -98,11 +102,36 @@ header .navbar .navbar-brand {
 }
 /* 中文標題：粗體、斜體、漸層 */
 header .navbar .navbar-brand .navbar-brand-title {
-  font-style: italic;
+  font-style: normal;
+  font-size: 1.1rem;
   background: linear-gradient(180deg, #212529 0%, #495057 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+header .navbar .navbar-brand .navbar-brand-subtitle {
+  font-size: 0.8rem;
+  color: #495057;
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  align-self: center;
+}
+
+/* 網頁版：整個標題＋LOGO 區塊靠右（與手機版順序相同，LOGO 在左、文字在右，一起移到右邊） */
+@media (min-width: 992px) {
+  /* 左邊是漢堡，右邊是品牌（文字＋LOGO 一起） */
+  header .navbar .container-fluid > .d-flex {
+    justify-content: space-between;
+  }
+  /* 品牌區塊維持 LOGO 在左、文字在右的排列 */
+  header .navbar .navbar-brand {
+    flex-direction: row;
+  }
+  .navbar-brand-logo-block {
+    margin-right: 12px;
+    margin-left: 0;
+  }
 }
 
 /* 側邊欄樣式 */
@@ -196,9 +225,11 @@ header .navbar .navbar-brand .navbar-brand-title {
   color: #6c757d;
 }
 
-/* 確保選單按鈕在所有螢幕尺寸都顯示 */
+/* 確保選單按鈕在所有螢幕尺寸都顯示，並與 LOGO 同一行垂直置中 */
 .navbar-toggler {
-  display: block !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 未讀訊息紅點樣式 */
@@ -220,6 +251,13 @@ header .navbar .navbar-brand .navbar-brand-title {
 
 /* 手機友善設計 */
 @media (max-width: 576px) {
+  header .navbar {
+    min-height: 56px;
+    align-items: center;
+  }
+  header .navbar .container-fluid {
+    align-items: center;
+  }
   .sidebar-menu {
     width: 280px;
     left: -280px;
@@ -363,6 +401,35 @@ header .navbar .navbar-brand .navbar-brand-title {
   padding: 0.75rem;
   min-width: 0;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.listing-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.listing-card-tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #fff;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.listing-card-tag-category {
+  background-color: #0dcaf0;
+}
+
+.listing-card-tag-condition {
+  background-color: #198754;
+}
+
+.listing-card-tag-residence {
+  background-color: #6c757d;
 }
 
 .listing-card-title {

@@ -9,8 +9,25 @@ public class ListingIndexViewModel
     public string Title { get; set; } = string.Empty;
 
     public ListingCategory Category { get; set; }
-
+    
     public ListingCondition? Condition { get; set; }
+
+    public ListingResidence Residence { get; set; }
+
+    /// <summary>
+    /// 類別顯示名稱（供列表標籤與 JSON 使用）。
+    /// </summary>
+    public string CategoryDisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 新舊程度顯示名稱（供列表標籤與 JSON 使用）；無值時為 null。
+    /// </summary>
+    public string? ConditionDisplayName { get; set; }
+
+    /// <summary>
+    /// 社宅名稱顯示文字。
+    /// </summary>
+    public string ResidenceDisplayName { get; set; } = string.Empty;
 
     public decimal Price { get; set; }
 

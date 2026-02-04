@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NeighborGoods.Web.Constants;
@@ -60,11 +62,17 @@ public class ListingService : IListingService
         {
             query = query.Where(l => l.Category == criteria.Category.Value);
         }
-
+        
         // 新舊程度篩選
         if (criteria.Condition.HasValue)
         {
             query = query.Where(l => l.Condition == criteria.Condition.Value);
+        }
+
+        // 社宅名稱篩選
+        if (criteria.Residence.HasValue)
+        {
+            query = query.Where(l => l.Residence == criteria.Residence.Value);
         }
 
         // 價格範圍篩選
@@ -104,6 +112,7 @@ public class ListingService : IListingService
                 Title = l.Title,
                 Category = l.Category,
                 Condition = l.Condition,
+                Residence = l.Residence,
                 Price = l.Price,
                 IsFree = l.IsFree,
                 IsCharity = l.IsCharity,
@@ -122,6 +131,13 @@ public class ListingService : IListingService
                     .Count()
             })
             .ToListAsync();
+
+        foreach (var vm in viewModels)
+        {
+            vm.CategoryDisplayName = GetEnumDisplayName(vm.Category);
+            vm.ConditionDisplayName = vm.Condition.HasValue ? GetEnumDisplayName(vm.Condition.Value) : null;
+            vm.ResidenceDisplayName = GetEnumDisplayName(vm.Residence);
+        }
 
         return new SearchResult<ListingIndexViewModel>
         {
@@ -196,6 +212,7 @@ public class ListingService : IListingService
                     Description = model.Description,
                     Category = model.Category,
                     Condition = model.Condition,
+                    Residence = model.Residence,
                     PickupLocation = model.PickupLocation,
                     Price = price,
                     IsFree = isFree,
@@ -337,6 +354,7 @@ public class ListingService : IListingService
             listing.Description = model.Description;
             listing.Category = model.Category;
             listing.Condition = model.Condition;
+            listing.Residence = model.Residence;
             listing.Price = price;
             listing.IsFree = isFree;
             listing.IsCharity = model.IsCharity;
@@ -655,6 +673,7 @@ public class ListingService : IListingService
                 Description = listing.Description,
                 Category = listing.Category,
                 Condition = listing.Condition,
+                Residence = listing.Residence,
                 PickupLocation = listing.PickupLocation,
                 Price = listing.Price,
                 IsFree = listing.IsFree,
@@ -755,6 +774,7 @@ public class ListingService : IListingService
                 Description = listing.Description,
                 Category = listing.Category,
                 Condition = listing.Condition,
+                Residence = listing.Residence,
                 Price = listing.Price,
                 IsFree = listing.IsFree,
                 IsCharity = listing.IsCharity,
@@ -837,6 +857,13 @@ public class ListingService : IListingService
             _logger.LogError(ex, "更新商品狀態時發生錯誤：ListingId={ListingId}, UserId={UserId}, NewStatus={NewStatus}", listingId, userId, newStatus);
             return ServiceResult<string?>.Fail("更新商品狀態時發生錯誤，請稍後再試");
         }
+    }
+
+    private static string GetEnumDisplayName(Enum value)
+    {
+        var field = value.GetType().GetField(value.ToString());
+        var attr = field?.GetCustomAttribute<DisplayAttribute>();
+        return attr?.GetName() ?? value.ToString();
     }
 }
 

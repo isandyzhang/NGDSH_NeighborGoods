@@ -91,7 +91,7 @@
                     {
                         <form asp-controller="Account" asp-action="EnableEmailNotification" method="post" class="d-inline w-100">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-success quick-action-btn w-100">
+                            <button type="submit" class="btn btn-success quick-action-btn w-100 email-notification-btn">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-envelope-check me-2" viewBox="0 0 16 16">
                                     <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-1 9.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5zm0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m8.5-5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5m-4 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5"/>
                                     <path d="M15.854 8.354a.5.5 0 0 0-.708-.708L8.5 14.293l-2.646-2.647a.5.5 0 0 0-.708.708l3 3a.5.5 0 0 0 .708 0z"/>
@@ -102,7 +102,7 @@
                     }
                     else
                     {
-                        <button type="button" class="btn btn-success quick-action-btn w-100" data-bs-toggle="modal" data-bs-target="#emailNotificationModal">
+                        <button type="button" class="btn btn-success quick-action-btn w-100 email-notification-btn" data-bs-toggle="modal" data-bs-target="#emailNotificationModal">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-envelope-plus me-2" viewBox="0 0 16 16">
                                 <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-1 9.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5zm0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-1a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m8.5-5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5"/>
                                 <path d="M8.5 2a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0V6h3a.5.5 0 0 0 0-1h-3z"/>
@@ -169,6 +169,17 @@
                                 @foreach (var cond in Html.GetEnumSelectList<NeighborGoods.Web.Models.Enums.ListingCondition>())
                                 {
                                     <option value="@cond.Value" selected="@(Model?.Condition?.ToString() == cond.Value)">@cond.Text</option>
+                                }
+                            </select>
+                        </div>
+                        
+                        <div class="col-6 col-md-3">
+                            <label for="residence" class="form-label">社宅名稱</label>
+                            <select class="form-select" id="residence" name="residence">
+                                <option value="">全部</option>
+                                @foreach (var res in Html.GetEnumSelectList<NeighborGoods.Web.Models.Enums.ListingResidence>())
+                                {
+                                    <option value="@res.Value" selected="@(Model?.Residence?.ToString() == res.Value)">@res.Text</option>
                                 }
                             </select>
                         </div>
@@ -276,6 +287,17 @@
                         </div>
                     }
                     <div class="listing-card-content">
+                        <div class="listing-card-tags">
+                            <span class="listing-card-tag listing-card-tag-category">@listing.CategoryDisplayName</span>
+                            @if (!string.IsNullOrEmpty(listing.ConditionDisplayName))
+                            {
+                                <span class="listing-card-tag listing-card-tag-condition">@listing.ConditionDisplayName</span>
+                            }
+                            @if (!string.IsNullOrEmpty(listing.ResidenceDisplayName))
+                            {
+                                <span class="listing-card-tag listing-card-tag-residence">@listing.ResidenceDisplayName</span>
+                            }
+                        </div>
                         <div>
                             <h5 class="listing-card-title">@listing.Title</h5>
                             <div class="listing-card-price">
@@ -511,6 +533,11 @@
                                 return div.innerHTML;
                             };
                             
+                            const tagsHtml = `<div class="listing-card-tags">
+                                <span class="listing-card-tag listing-card-tag-category">${escapeHtml(listing.categoryDisplayName || '')}</span>
+                                ${listing.conditionDisplayName ? `<span class="listing-card-tag listing-card-tag-condition">${escapeHtml(listing.conditionDisplayName)}</span>` : ''}
+                                ${listing.residenceDisplayName ? `<span class="listing-card-tag listing-card-tag-residence">${escapeHtml(listing.residenceDisplayName)}</span>` : ''}
+                            </div>`;
                             const cardHtml = `
                                 <a href="@Url.Action("Details", "Listing")/${listing.id}" class="listing-card">
                                     ${listing.firstImageUrl 
@@ -518,6 +545,7 @@
                                         : `<div class="listing-card-image-placeholder"><span>無圖片</span></div>`
                                     }
                                     <div class="listing-card-content">
+                                        ${tagsHtml}
                                         <div>
                                             <h5 class="listing-card-title">${escapeHtml(listing.title)}</h5>
                                             <div class="listing-card-price">
@@ -614,6 +642,10 @@
                 font-size: 0.875rem;
                 padding: 0.5rem 0.75rem;
             }
+        }
+
+        .email-notification-btn {
+            white-space: nowrap;
         }
 
         /* 未讀訊息 Badge 樣式 */

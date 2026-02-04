@@ -137,10 +137,11 @@ else
             <p class="listing-description-text">@Model.Description</p>
         </div>
 
-        <!-- 面交地點 -->
+        <!-- 面交地點與社宅名稱 -->
         <div class="listing-pickup">
             <h5 class="listing-section-title">面交地點</h5>
             <p class="listing-pickup-text">@GetPickupLocationText(Model.PickupLocation)</p>
+            <p class="listing-pickup-text mt-1"><strong>社宅名稱：</strong>@GetResidenceText(Model.Residence)</p>
         </div>
 
         <hr class="listing-divider" />
@@ -294,6 +295,18 @@ else
             NeighborGoods.Web.Models.Enums.ListingPickupLocation.Gym => "風雨操場",
             NeighborGoods.Web.Models.Enums.ListingPickupLocation.Message => "私訊",
             _ => location.ToString()
+        };
+    }
+
+    string GetResidenceText(NeighborGoods.Web.Models.Enums.ListingResidence residence)
+    {
+        return residence switch
+        {
+            NeighborGoods.Web.Models.Enums.ListingResidence.Factory => "機廠",
+            NeighborGoods.Web.Models.Enums.ListingResidence.DongMing => "東明",
+            NeighborGoods.Web.Models.Enums.ListingResidence.XiaoWan => "小彎",
+            NeighborGoods.Web.Models.Enums.ListingResidence.Unknown => "未指定",
+            _ => residence.ToString()
         };
     }
 

@@ -57,7 +57,7 @@ public class UserService : IUserService
             {
                 UserName = model.UserName,
                 DisplayName = model.DisplayName,
-                Email = null, // 之後如需 Email 再擴充
+                Email = model.Email.Trim(),
                 CreatedAt = TaiwanTime.Now
             };
 
@@ -379,12 +379,15 @@ public class UserService : IUserService
                 return ServiceResult.Fail("找不到用戶");
             }
 
+            // 移除 Email 並關閉通知，之後若要再次使用需重新驗證
             user.EmailNotificationEnabled = false;
+            user.Email = null;
+            user.EmailConfirmed = false;
 
             var result = await _userManager.UpdateAsync(user);
             if (result.Succeeded)
             {
-                _logger.LogInformation("用戶 {UserId} 已停用 Email 通知", userId);
+                _logger.LogInformation("用戶 {UserId} 已移除 Email 並停用 Email 通知", userId);
                 return ServiceResult.Ok();
             }
 

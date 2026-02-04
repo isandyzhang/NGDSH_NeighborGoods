@@ -20,6 +20,11 @@ public class ListingSearchViewModel
     public ListingCondition? Condition { get; set; }
 
     /// <summary>
+    /// 社宅名稱篩選
+    /// </summary>
+    public ListingResidence? Residence { get; set; }
+
+    /// <summary>
     /// 最低價格
     /// </summary>
     public int? MinPrice { get; set; }

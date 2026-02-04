@@ -9,6 +9,11 @@ public class RegisterViewModel
     public string UserName { get; set; } = string.Empty;
 
     [Required]
+    [EmailAddress(ErrorMessage = "請輸入有效的 Email 地址")]
+    [Display(Name = "Email")]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
     [StringLength(50, ErrorMessage = "顯示名稱不能超過 50 個字元")]
     [Display(Name = "顯示名稱")]
     public string DisplayName { get; set; } = string.Empty;

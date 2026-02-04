@@ -1,0 +1,182 @@
+@{
+    ViewData["Title"] = "刊登前請先驗證 Email";
+    var returnUrl = ViewBag.ReturnUrl as string ?? Url.Action("Create", "Listing");
+}
+
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h4 class="mb-3 fw-bold">刊登前請先驗證 Email</h4>
+                    <p class="mb-3">
+                        為了保障交易安全與通知順利送達，刊登商品前需要先完成 Email 驗證。
+                    </p>
+
+                    <div class="mb-3">
+                        <label for="listingEmailInput" class="form-label">Email 地址</label>
+                        <input type="email" id="listingEmailInput" class="form-control" placeholder="example@email.com" />
+                        <div class="invalid-feedback" id="listingEmailError"></div>
+                    </div>
+                    <div class="d-grid gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-primary" id="sendListingEmailCodeBtn">
+                            寄送驗證碼
+                        </button>
+                    </div>
+                    <div id="listingCodeSection" class="d-none">
+                        <div class="mb-3">
+                            <label for="listingEmailCodeInput" class="form-label">驗證碼</label>
+                            <input type="text" id="listingEmailCodeInput" class="form-control" placeholder="請輸入 6 位數驗證碼" />
+                            <div class="invalid-feedback" id="listingEmailCodeError"></div>
+                        </div>
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="button" class="btn btn-primary" id="verifyListingEmailCodeBtn">
+                                確認驗證
+                            </button>
+                        </div>
+                    </div>
+                    <div class="small text-muted mb-3">
+                        驗證碼將在 10 分鐘後失效；若未收到郵件，請檢查垃圾信件匣。
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a href="@Url.Action("Index", "Home")" class="btn btn-outline-secondary">
+                            稍後再說，先回首頁
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const emailInput = document.getElementById('listingEmailInput');
+            const emailError = document.getElementById('listingEmailError');
+            const sendCodeBtn = document.getElementById('sendListingEmailCodeBtn');
+            const codeSection = document.getElementById('listingCodeSection');
+            const codeInput = document.getElementById('listingEmailCodeInput');
+            const codeError = document.getElementById('listingEmailCodeError');
+            const verifyCodeBtn = document.getElementById('verifyListingEmailCodeBtn');
+            const returnUrl = '@(returnUrl ?? "/")';
+
+            function clearEmailError() {
+                if (emailInput && emailError) {
+                    emailInput.classList.remove('is-invalid');
+                    emailError.textContent = '';
+                }
+            }
+
+            function clearCodeError() {
+                if (codeInput && codeError) {
+                    codeInput.classList.remove('is-invalid');
+                    codeError.textContent = '';
+                }
+            }
+
+            if (emailInput) {
+                emailInput.addEventListener('input', clearEmailError);
+            }
+
+            if (codeInput) {
+                codeInput.addEventListener('input', clearCodeError);
+            }
+
+            if (sendCodeBtn) {
+                sendCodeBtn.addEventListener('click', function () {
+                    clearEmailError();
+                    const email = (emailInput?.value || '').trim();
+                    if (!email) {
+                        emailInput.classList.add('is-invalid');
+                        emailError.textContent = '請先輸入 Email。';
+                        return;
+                    }
+
+                    if (!email.includes('@@') || !email.includes('.')) {
+                        emailInput.classList.add('is-invalid');
+                        emailError.textContent = 'Email 格式不正確。';
+                        return;
+                    }
+
+                    sendCodeBtn.disabled = true;
+
+                    fetch('@Url.Action("SendListingEmailCode", "Account")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email: email })
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                codeSection.classList.remove('d-none');
+                                alert('驗證碼已寄出，請至信箱查收。');
+                            } else {
+                                emailInput.classList.add('is-invalid');
+                                emailError.textContent = data.message || '寄送驗證碼時發生錯誤。';
+                            }
+                        })
+                        .catch(() => {
+                            emailInput.classList.add('is-invalid');
+                            emailError.textContent = '寄送驗證碼時發生錯誤，請稍後再試。';
+                        })
+                        .finally(() => {
+                            sendCodeBtn.disabled = false;
+                        });
+                });
+            }
+
+            if (verifyCodeBtn) {
+                verifyCodeBtn.addEventListener('click', function () {
+                    clearCodeError();
+                    clearEmailError();
+
+                    const email = (emailInput?.value || '').trim();
+                    const code = (codeInput?.value || '').trim();
+
+                    if (!email) {
+                        emailInput.classList.add('is-invalid');
+                        emailError.textContent = '請先輸入 Email。';
+                        return;
+                    }
+                    if (!code) {
+                        codeInput.classList.add('is-invalid');
+                        codeError.textContent = '請輸入驗證碼。';
+                        return;
+                    }
+
+                    verifyCodeBtn.disabled = true;
+
+                    fetch('@Url.Action("VerifyListingEmailCode", "Account")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email: email, code: code })
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert('Email 驗證成功，現在可以刊登商品了。');
+                                window.location.href = returnUrl || '@Url.Action("Index", "Home")';
+                            } else {
+                                codeInput.classList.add('is-invalid');
+                                codeError.textContent = data.message || '驗證失敗，請確認後再試。';
+                            }
+                        })
+                        .catch(() => {
+                            codeInput.classList.add('is-invalid');
+                            codeError.textContent = '驗證時發生錯誤，請稍後再試。';
+                        })
+                        .finally(() => {
+                            verifyCodeBtn.disabled = false;
+                        });
+                });
+            }
+        })();
+    </script>
+}
+
