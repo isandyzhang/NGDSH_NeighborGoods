@@ -45,6 +45,11 @@ public class ListingSearchViewModel
     public bool? IsCharity { get; set; }
 
     /// <summary>
+    /// 只看可否以物易物的商品
+    /// </summary>
+    public bool? IsTradeable { get; set; }
+
+    /// <summary>
     /// 搜尋結果列表
     /// </summary>
     public List<ListingIndexViewModel> Listings { get; set; } = new List<ListingIndexViewModel>();

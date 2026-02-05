@@ -33,6 +33,7 @@
     </p>
     <p><strong>描述：</strong>@Model.Description</p>
     <p><strong>價格：</strong>@(Model.IsFree ? "免費" : $"${Model.Price:N0}")</p>
+    <p><strong>可否以物易物：</strong>@(Model.IsTradeable ? "可以" : "否")</p>
     <p><strong>賣家：</strong>@Model.SellerDisplayName</p>
     @if (!string.IsNullOrEmpty(Model.BuyerDisplayName))
     {

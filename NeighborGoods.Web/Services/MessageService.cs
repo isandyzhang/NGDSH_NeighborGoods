@@ -281,6 +281,7 @@ public class MessageService : IMessageService
             viewModel.ListingStatus = listing.Status;
             viewModel.ListingIsFree = listing.IsFree;
             viewModel.ListingIsCharity = listing.IsCharity;
+            viewModel.ListingIsTradeable = listing.IsTradeable;
             viewModel.ListingSellerId = listing.SellerId;
             viewModel.IsSeller = listing.SellerId == userId;
 

@@ -35,6 +35,8 @@ public class ListingIndexViewModel
 
     public bool IsCharity { get; set; }
 
+    public bool IsTradeable { get; set; }
+
     public ListingStatus Status { get; set; }
 
     /// <summary>

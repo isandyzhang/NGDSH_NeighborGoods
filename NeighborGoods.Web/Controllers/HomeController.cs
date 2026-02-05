@@ -36,6 +36,7 @@ public class HomeController : BaseController
         int? maxPrice,
         bool? isFree,
         bool? isCharity,
+        bool? isTradeable,
         int page = 1)
     {
         // 取得當前登入用戶（如果有的話）
@@ -53,6 +54,7 @@ public class HomeController : BaseController
             MaxPrice = maxPrice,
             IsFree = isFree,
             IsCharity = isCharity,
+            IsTradeable = isTradeable,
             ExcludeUserId = currentUserId
         };
 
@@ -74,6 +76,7 @@ public class HomeController : BaseController
             MaxPrice = maxPrice,
             IsFree = isFree,
             IsCharity = isCharity,
+            IsTradeable = isTradeable,
             Listings = result.Items,
             Page = result.Page,
             PageSize = result.PageSize,

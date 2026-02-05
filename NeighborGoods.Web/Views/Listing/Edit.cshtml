@@ -85,6 +85,14 @@
                 </div>
             </div>
 
+            <div class="mb-3 form-check form-check-lg">
+                <input asp-for="IsTradeable" id="IsTradeable" class="form-check-input" type="checkbox" style="width: 1.5rem; height: 1.5rem;" />
+                <label asp-for="IsTradeable" class="form-check-label fs-5">可否以物易物</label>
+                <div class="form-text mt-1">
+                    <small class="text-muted">勾選後代表您願意接受以物易物或交換的方式，價格仍照一般方式顯示。</small>
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label asp-for="PickupLocation" class="form-label fw-bold">面交地點</label>
                 <select asp-for="PickupLocation" 

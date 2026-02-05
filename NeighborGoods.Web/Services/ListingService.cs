@@ -98,6 +98,12 @@ public class ListingService : IListingService
             query = query.Where(l => l.IsCharity == true);
         }
 
+        // 可否以物易物篩選
+        if (criteria.IsTradeable == true)
+        {
+            query = query.Where(l => l.IsTradeable == true);
+        }
+
         // 計算總數
         var totalCount = await query.CountAsync();
 
@@ -116,6 +122,7 @@ public class ListingService : IListingService
                 Price = l.Price,
                 IsFree = l.IsFree,
                 IsCharity = l.IsCharity,
+                IsTradeable = l.IsTradeable,
                 Status = l.Status,
                 CreatedAt = l.CreatedAt,
                 // 只取第一張圖片的 URL（資料庫端處理）
@@ -217,6 +224,7 @@ public class ListingService : IListingService
                     Price = price,
                     IsFree = isFree,
                     IsCharity = model.IsCharity,
+                    IsTradeable = model.IsTradeable,
                     Status = ListingStatus.Active,
                     SellerId = userId,
                     CreatedAt = now,
@@ -358,6 +366,7 @@ public class ListingService : IListingService
             listing.Price = price;
             listing.IsFree = isFree;
             listing.IsCharity = model.IsCharity;
+            listing.IsTradeable = model.IsTradeable;
             listing.PickupLocation = model.PickupLocation;
             listing.UpdatedAt = TaiwanTime.Now;
 
@@ -678,6 +687,7 @@ public class ListingService : IListingService
                 Price = listing.Price,
                 IsFree = listing.IsFree,
                 IsCharity = listing.IsCharity,
+                IsTradeable = listing.IsTradeable,
                 Status = listing.Status,
                 Images = listing.Images
                     .OrderBy(img => img.SortOrder)
@@ -720,6 +730,7 @@ public class ListingService : IListingService
                 Price = l.Price,
                 IsFree = l.IsFree,
                 IsCharity = l.IsCharity,
+                IsTradeable = l.IsTradeable,
                 Status = l.Status,
                 FirstImageUrl = l.Images.OrderBy(img => img.SortOrder).FirstOrDefault()?.ImageUrl,
                 CreatedAt = l.CreatedAt,
@@ -778,6 +789,7 @@ public class ListingService : IListingService
                 Price = listing.Price,
                 IsFree = listing.IsFree,
                 IsCharity = listing.IsCharity,
+                IsTradeable = listing.IsTradeable,
                 PickupLocation = listing.PickupLocation,
                 ExistingImages = listing.Images
                     .OrderBy(img => img.SortOrder)

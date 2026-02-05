@@ -40,6 +40,9 @@ public class ListingEditViewModel
     [Display(Name = "愛心商品")]
     public bool IsCharity { get; set; }
 
+    [Display(Name = "可否以物易物")]
+    public bool IsTradeable { get; set; }
+
     [Required(ErrorMessage = "請選擇面交地點，方便買家與您聯繫")]
     [Display(Name = "面交地點")]
     public ListingPickupLocation PickupLocation { get; set; } = ListingPickupLocation.Message;

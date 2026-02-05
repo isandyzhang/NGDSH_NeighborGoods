@@ -226,6 +226,15 @@
                                     愛心商品
                                 </button>
                                 <input type="hidden" name="isCharity" id="isCharityInput" value="@(Model?.IsCharity == true ? "true" : "")">
+                                
+                                <!-- 可否以物易物切換按鈕 -->
+                                <button type="button"
+                                        class="btn @(Model?.IsTradeable == true ? "btn-info" : "btn-outline-info") filter-toggle-btn"
+                                        data-filter="isTradeable"
+                                        id="isTradeableBtn">
+                                    可否以物易物
+                                </button>
+                                <input type="hidden" name="isTradeable" id="isTradeableInput" value="@(Model?.IsTradeable == true ? "true" : "")">
                             </div>
                         </div>
                     </div>
@@ -313,6 +322,10 @@
                                 {
                                     <span class="badge bg-danger ms-1">愛心商品</span>
                                 }
+                                @if (listing.IsTradeable)
+                                {
+                                    <span class="badge bg-info ms-1">可易物</span>
+                                }
                             </div>
                         </div>
                         <div class="listing-card-meta">
@@ -391,6 +404,8 @@
             const isFreeInput = document.getElementById('isFreeInput');
             const isCharityBtn = document.getElementById('isCharityBtn');
             const isCharityInput = document.getElementById('isCharityInput');
+            const isTradeableBtn = document.getElementById('isTradeableBtn');
+            const isTradeableInput = document.getElementById('isTradeableInput');
             const advancedFilters = document.getElementById('advancedFilters');
             const advancedFilterBtn = document.getElementById('advancedFilterBtn');
             const advancedFilterBtnText = document.getElementById('advancedFilterBtnText');
@@ -405,6 +420,7 @@
                 if (maxPriceInput && maxPriceInput.value) count++;
                 if (isFreeInput && isFreeInput.value === 'true') count++;
                 if (isCharityInput && isCharityInput.value === 'true') count++;
+                if (isTradeableInput && isTradeableInput.value === 'true') count++;
                 return count;
             }
 
@@ -439,6 +455,14 @@
                 isCharityBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     toggleFilterButton(isCharityBtn, isCharityInput, 'danger');
+                });
+            }
+
+            // 可否以物易物按鈕點擊事件
+            if (isTradeableBtn) {
+                isTradeableBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    toggleFilterButton(isTradeableBtn, isTradeableInput, 'info');
                 });
             }
 
@@ -508,6 +532,9 @@
                         if (isCharityInput && isCharityInput.value === 'true') {
                             params.append('isCharity', 'true');
                         }
+                        if (isTradeableInput && isTradeableInput.value === 'true') {
+                            params.append('isTradeable', 'true');
+                        }
                         params.append('page', currentPage + 1);
 
                         const response = await fetch(`@Url.Action("Index", "Home")?${params.toString()}`, {
@@ -555,6 +582,10 @@
                                                 }
                                                 ${listing.isCharity 
                                                     ? '<span class="badge bg-danger ms-1">愛心商品</span>'
+                                                    : ''
+                                                }
+                                                ${listing.isTradeable
+                                                    ? '<span class="badge bg-info ms-1">可易物</span>'
                                                     : ''
                                                 }
                                             </div>

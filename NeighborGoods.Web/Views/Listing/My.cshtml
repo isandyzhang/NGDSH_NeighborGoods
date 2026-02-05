@@ -95,6 +95,10 @@
                                 {
                                     <span class="badge bg-danger ms-1">愛心商品</span>
                                 }
+                                @if (listing.IsTradeable)
+                                {
+                                    <span class="badge bg-info ms-1">可易物</span>
+                                }
                             </div>
                             <div class="mb-2">
                                 <span class="badge bg-@statusClass">@statusText</span>

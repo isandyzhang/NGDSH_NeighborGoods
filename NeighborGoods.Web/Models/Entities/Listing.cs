@@ -27,6 +27,11 @@ public class Listing
     public bool IsCharity { get; set; }
 
     /// <summary>
+    /// 是否可接受以物易物／交換。
+    /// </summary>
+    public bool IsTradeable { get; set; }
+
+    /// <summary>
     /// 商品狀態（上架中 / 保留中 / 已售出 / 已捐贈 / 已下架）。
     /// </summary>
     public ListingStatus Status { get; set; } = ListingStatus.Active;

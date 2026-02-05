@@ -75,6 +75,10 @@ else
             {
                 <span class="badge bg-danger ms-2">愛心商品</span>
             }
+            @if (Model.IsTradeable)
+            {
+                <span class="badge bg-info ms-2">可接受以物易物</span>
+            }
         </div>
 
         <!-- 發布信息 -->

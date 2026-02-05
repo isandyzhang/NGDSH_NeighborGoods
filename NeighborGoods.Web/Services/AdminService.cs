@@ -118,6 +118,7 @@ public class AdminService : IAdminService
             Price = listing.Price,
             IsFree = listing.IsFree,
             IsCharity = listing.IsCharity,
+            IsTradeable = listing.IsTradeable,
             Status = listing.Status,
             Category = listing.Category,
             Condition = listing.Condition,

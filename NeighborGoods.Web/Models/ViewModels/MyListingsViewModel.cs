@@ -16,6 +16,7 @@ public class ListingItem
     public decimal Price { get; set; }
     public bool IsFree { get; set; }
     public bool IsCharity { get; set; }
+    public bool IsTradeable { get; set; }
     public ListingStatus Status { get; set; }
     public string? FirstImageUrl { get; set; }
     public DateTime CreatedAt { get; set; }

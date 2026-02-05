@@ -15,6 +15,7 @@ public class ListingSearchCriteria
     public int? MaxPrice { get; set; }
     public bool? IsFree { get; set; }
     public bool? IsCharity { get; set; }
+    public bool? IsTradeable { get; set; }
     public string? ExcludeUserId { get; set; }
 }
 

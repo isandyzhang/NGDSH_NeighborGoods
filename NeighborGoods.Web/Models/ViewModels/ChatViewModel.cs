@@ -18,6 +18,7 @@ public class ChatViewModel
     public ListingStatus? ListingStatus { get; set; }
     public bool? ListingIsFree { get; set; }
     public bool? ListingIsCharity { get; set; }
+    public bool? ListingIsTradeable { get; set; }
     public string? ListingSellerId { get; set; }
     
     /// <summary>

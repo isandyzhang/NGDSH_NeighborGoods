@@ -47,6 +47,10 @@
                             {
                                 <span class="badge bg-danger listing-charity-badge">愛心商品</span>
                             }
+                            @if (Model.ListingIsTradeable == true)
+                            {
+                                <span class="badge bg-info listing-charity-badge">可易物</span>
+                            }
                         </div>
                         @if (Model.ListingStatus.HasValue)
                         {

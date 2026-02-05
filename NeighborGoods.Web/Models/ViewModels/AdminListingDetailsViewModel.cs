@@ -10,6 +10,7 @@ public class AdminListingDetailsViewModel
     public decimal Price { get; set; }
     public bool IsFree { get; set; }
     public bool IsCharity { get; set; }
+    public bool IsTradeable { get; set; }
     public ListingStatus Status { get; set; }
     public ListingCategory Category { get; set; }
     public ListingCondition Condition { get; set; }
