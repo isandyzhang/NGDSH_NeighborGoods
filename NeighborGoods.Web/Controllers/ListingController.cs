@@ -45,6 +45,13 @@ public class ListingController : BaseController
             return Redirect(verifyUrl!);
         }
 
+        // 刊登商品前需已開啟通知
+        if (!user.EmailNotificationEnabled)
+        {
+            TempData["ErrorMessage"] = "刊登商品前，請先於個人資料頁面開啟通知。";
+            return RedirectToAction("Profile", "Account");
+        }
+
         return View(new ListingCreateViewModel());
     }
 
@@ -71,6 +78,13 @@ public class ListingController : BaseController
                 "Account",
                 new { returnUrl = Url.Action(nameof(Create), "Listing") });
             return Redirect(verifyUrl!);
+        }
+
+        // 伺服器端保護：刊登前需已開啟通知
+        if (!user.EmailNotificationEnabled)
+        {
+            TempData["ErrorMessage"] = "刊登商品前，請先於個人資料頁面開啟通知。";
+            return RedirectToAction("Profile", "Account");
         }
 
         // 使用服務層建立商品
@@ -145,6 +159,13 @@ public class ListingController : BaseController
             return RedirectToAction("Profile", "Account");
         }
 
+        // 編輯商品前需已開啟通知
+        if (!user.EmailNotificationEnabled)
+        {
+            TempData["ErrorMessage"] = "編輯商品前，請先於個人資料頁面開啟通知。";
+            return RedirectToAction("Profile", "Account");
+        }
+
         // 使用服務層取得商品編輯資料
         var result = await _listingService.GetListingForEditAsync(id, user.Id);
 
@@ -185,6 +206,13 @@ public class ListingController : BaseController
         if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
         {
             TempData["ErrorMessage"] = "編輯商品前，請先設定並完成 Email 驗證。";
+            return RedirectToAction("Profile", "Account");
+        }
+
+        // 防止繞過 GET：POST 時也檢查通知已開啟
+        if (!user.EmailNotificationEnabled)
+        {
+            TempData["ErrorMessage"] = "編輯商品前，請先於個人資料頁面開啟通知。";
             return RedirectToAction("Profile", "Account");
         }
 

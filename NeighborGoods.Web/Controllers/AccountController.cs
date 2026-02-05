@@ -909,9 +909,10 @@ public class AccountController : BaseController
             return Json(new { success = false, message = "驗證碼錯誤，請重新輸入。" });
         }
 
-        // 驗證成功：更新使用者 Email 與 EmailConfirmed
+        // 驗證成功：更新使用者 Email、EmailConfirmed，並一併開啟通知
         currentUser.Email = sessionEmail;
         currentUser.EmailConfirmed = true;
+        currentUser.EmailNotificationEnabled = true;
 
         var updateResult = await UserManager.UpdateAsync(currentUser);
         if (!updateResult.Succeeded)
@@ -925,7 +926,7 @@ public class AccountController : BaseController
         HttpContext.Session.Remove("ListingEmailCode");
         HttpContext.Session.Remove("ListingEmailCodeExpiresAt");
 
-        return Json(new { success = true, message = "Email 驗證成功，現在可以刊登商品了。" });
+        return Json(new { success = true, message = "Email 驗證成功，通知已開啟，現在可以刊登商品了。" });
     }
 
     /// <summary>
