@@ -13,6 +13,9 @@ public class RegisterViewModel
     [Display(Name = "Email")]
     public string Email { get; set; } = string.Empty;
 
+    [Display(Name = "Email 驗證碼")]
+    public string? EmailVerificationCode { get; set; }
+
     [Required]
     [StringLength(50, ErrorMessage = "顯示名稱不能超過 50 個字元")]
     [Display(Name = "顯示名稱")]

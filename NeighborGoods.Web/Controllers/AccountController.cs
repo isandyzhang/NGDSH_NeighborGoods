@@ -46,6 +46,43 @@ public class AccountController : BaseController
         return View();
     }
 
+    /// <summary>
+    /// 註冊頁面：發送 Email 驗證碼（本頁面完成驗證用）
+    /// </summary>
+    [HttpPost]
+    [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
+    [EnableRateLimiting("SendEmailCode")]
+    public async Task<IActionResult> SendRegisterEmailCode([FromBody] SetEmailRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return Json(new { success = false, message = "Email 不能為空" });
+        }
+
+        var email = request.Email.Trim();
+        if (!email.Contains("@") || !email.Contains("."))
+        {
+            return Json(new { success = false, message = "Email 格式不正確" });
+        }
+
+        var code = new Random().Next(100000, 999999).ToString();
+        HttpContext.Session.SetString("RegisterEmail", email);
+        HttpContext.Session.SetString("RegisterEmailCode", code);
+        HttpContext.Session.SetString("RegisterEmailCodeExpiresAt", DateTime.UtcNow.AddMinutes(10).ToString("O"));
+
+        if (_emailNotificationService != null)
+        {
+            var message = $"您正在註冊南港社宅社區專屬二手交易平台，您的 Email 驗證碼為：{code}（10 分鐘內有效）。";
+            await _emailNotificationService.SendPushMessageAsync(
+                email,
+                message,
+                NeighborGoods.Web.Models.Enums.NotificationPriority.High);
+        }
+
+        return Json(new { success = true, message = "驗證碼已寄出，請至信箱查收。" });
+    }
+
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
@@ -57,36 +94,62 @@ public class AccountController : BaseController
             return View(model);
         }
 
+        // 本頁面 Email 驗證：檢查 Session 中的驗證碼
+        var sessionEmail = HttpContext.Session.GetString("RegisterEmail");
+        var sessionCode = HttpContext.Session.GetString("RegisterEmailCode");
+        var expiresAtString = HttpContext.Session.GetString("RegisterEmailCodeExpiresAt");
+
+        if (string.IsNullOrEmpty(sessionEmail) || string.IsNullOrEmpty(sessionCode) || string.IsNullOrEmpty(expiresAtString))
+        {
+            ModelState.AddModelError(string.Empty, "請先在下方取得並輸入 Email 驗證碼。");
+            return View(model);
+        }
+
+        if (!DateTime.TryParse(expiresAtString, null, System.Globalization.DateTimeStyles.RoundtripKind, out var expiresAtUtc) || DateTime.UtcNow > expiresAtUtc)
+        {
+            ModelState.AddModelError(string.Empty, "驗證碼已過期，請重新寄送驗證碼。");
+            return View(model);
+        }
+
+        if (!string.Equals(sessionEmail, model.Email?.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError(string.Empty, "驗證碼與填寫的 Email 不符，請確認 Email 一致後再送出。");
+            return View(model);
+        }
+
+        var code = (model.EmailVerificationCode ?? "").Trim();
+        if (string.IsNullOrEmpty(code))
+        {
+            ModelState.AddModelError(string.Empty, "請輸入 Email 驗證碼。");
+            return View(model);
+        }
+
+        if (!string.Equals(sessionCode, code, StringComparison.Ordinal))
+        {
+            ModelState.AddModelError(string.Empty, "驗證碼錯誤，請重新輸入。");
+            return View(model);
+        }
+
         // 使用服務層註冊用戶
         var result = await _userService.RegisterUserAsync(model);
         if (result.Success && result.Data != null)
         {
             var user = result.Data;
 
-            // 產生 Email 驗證 Token
-            var token = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-            var callbackUrl = Url.Action(
-                nameof(ConfirmEmail),
-                "Account",
-                new { userId = user.Id, token },
-                protocol: Request.Scheme);
+            // 本頁已驗證 Email，直接標記為已驗證
+            user.EmailConfirmed = true;
+            await UserManager.UpdateAsync(user);
 
-            // 寄送驗證信（若 Email 通知服務可用）
-            if (!string.IsNullOrEmpty(user.Email) && _emailNotificationService != null)
-            {
-                var message = "感謝您註冊南港社宅社區專屬二手交易平台，請點擊下面的連結完成 Email 驗證：";
-                var linkText = "點此完成 Email 驗證";
-                await _emailNotificationService.SendPushMessageWithLinkAsync(
-                    user.Email,
-                    message,
-                    callbackUrl ?? string.Empty,
-                    linkText,
-                    NeighborGoods.Web.Models.Enums.NotificationPriority.High);
-            }
+            // 清除 Session 中的註冊驗證資料
+            HttpContext.Session.Remove("RegisterEmail");
+            HttpContext.Session.Remove("RegisterEmailCode");
+            HttpContext.Session.Remove("RegisterEmailCodeExpiresAt");
 
-            // 顯示提示：請前往信箱完成驗證
-            TempData["SuccessMessage"] = "註冊成功，請前往您的 Email 收信並完成驗證後再登入。";
-            return RedirectToAction(nameof(Login));
+            // 自動登入
+            await _signInManager.SignInAsync(user, isPersistent: false);
+
+            TempData["SuccessMessage"] = "註冊成功，已為您自動登入，歡迎使用！";
+            return RedirectToAction("Index", "Home");
         }
 
         // 處理錯誤

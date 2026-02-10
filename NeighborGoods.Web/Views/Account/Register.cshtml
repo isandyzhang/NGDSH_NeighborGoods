@@ -13,7 +13,7 @@
                 <strong>建議：</strong>推薦使用 LINE 登入，流程最簡單，不需要先驗證 Email。
             </p>
             <p class="mb-2">
-                若選擇使用「帳號密碼」註冊，必須提供可收信的 Email，並完成 Email 驗證後才能登入與刊登商品。
+                若選擇使用「帳號密碼」註冊，請輸入可收信的 Email，並在本頁取得驗證碼完成驗證後即可註冊並登入、刊登商品。
             </p>
             <hr />
             <strong>密碼規則：</strong>
@@ -34,8 +34,17 @@
             </div>
             <div class="mb-3">
                 <label asp-for="Email" class="form-label"></label>
-                <input asp-for="Email" class="form-control" />
+                <div class="input-group">
+                    <input asp-for="Email" class="form-control" id="registerEmail" />
+                    <button type="button" class="btn btn-outline-primary" id="sendEmailCodeBtn">發送驗證碼</button>
+                </div>
                 <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div id="emailCodeSection" class="mb-3 @(ViewData.ModelState["EmailVerificationCode"]?.Errors?.Count > 0 || !string.IsNullOrEmpty(Model?.EmailVerificationCode) ? "" : "d-none")">
+                <label asp-for="EmailVerificationCode" class="form-label"></label>
+                <input asp-for="EmailVerificationCode" class="form-control" placeholder="請輸入 6 位數驗證碼" maxlength="6" autocomplete="one-time-code" />
+                <span asp-validation-for="EmailVerificationCode" class="text-danger"></span>
+                <div class="form-text">驗證碼已寄至您填寫的 Email，10 分鐘內有效；若未收到請檢查垃圾信件匣。</div>
             </div>
             <div class="mb-3">
                 <label asp-for="DisplayName" class="form-label"></label>
@@ -60,6 +69,50 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var emailInput = document.getElementById('registerEmail');
+            var sendCodeBtn = document.getElementById('sendEmailCodeBtn');
+            var codeSection = document.getElementById('emailCodeSection');
+
+            if (sendCodeBtn && emailInput) {
+                sendCodeBtn.addEventListener('click', function () {
+                    var email = (emailInput.value || '').trim();
+                    if (!email) {
+                        alert('請先輸入 Email。');
+                        return;
+                    }
+                    if (!email.includes('@@') || !email.includes('.')) {
+                        alert('請輸入有效的 Email 地址。');
+                        return;
+                    }
+
+                    sendCodeBtn.disabled = true;
+
+                    fetch('@Url.Action("SendRegisterEmailCode", "Account")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email })
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (data.success) {
+                                codeSection.classList.remove('d-none');
+                                alert('驗證碼已寄出，請至信箱查收。');
+                            } else {
+                                alert(data.message || '寄送驗證碼時發生錯誤。');
+                            }
+                        })
+                        .catch(function () {
+                            alert('無法連線，請稍後再試。');
+                        })
+                        .finally(function () {
+                            sendCodeBtn.disabled = false;
+                        });
+                });
+            }
+        })();
+    </script>
 }
 
 

@@ -6,6 +6,7 @@
 }
 
 <div class="container mt-4">
+    <form id="myListingsAntiForgeryForm" style="display: none;">@Html.AntiForgeryToken()</form>
     <h2 class="mb-4">我的商品</h2>
 
     @if (Model.Listings == null || !Model.Listings.Any())
@@ -67,7 +68,8 @@
 
                 <div class="col-12 col-md-6 col-lg-4 listing-item" 
                      data-status="@((int)listing.Status)" 
-                     data-completed="@(isCompleted ? "true" : "false")">
+                     data-completed="@(isCompleted ? "true" : "false")"
+                     data-listing-id="@listing.Id">
                     <div class="card h-100 my-listing-card" 
                          onclick="window.location.href='@Url.Action("Details", "Listing", new { id = listing.Id })'">
                         @if (!string.IsNullOrEmpty(listing.FirstImageUrl))
@@ -109,11 +111,22 @@
                                 </small>
                                 @if (listing.Status == ListingStatus.Active)
                                 {
-                                    <a asp-action="Edit" asp-route-id="@listing.Id" 
-                                       class="btn btn-sm btn-outline-primary w-100"
-                                       onclick="event.stopPropagation();">
-                                        編輯商品
-                                    </a>
+                                    <div class="d-flex gap-2" onclick="event.stopPropagation();">
+                                        <a asp-action="Edit" asp-route-id="@listing.Id" 
+                                           class="btn btn-sm btn-outline-primary flex-fill">
+                                            編輯商品
+                                        </a>
+                                        <div class="dropdown flex-fill">
+                                            <button class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                變更商品狀態
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Reserved)">保留中</a></li>
+                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Sold)">交易完成</a></li>
+                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Inactive)">下架商品</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                 }
                                 else if (listing.Status == ListingStatus.Inactive)
                                 {
@@ -150,6 +163,49 @@
 
 @section Scripts {
     <script>
+        // 變更商品狀態（上架中卡片）
+        document.querySelectorAll('.my-status-option').forEach(option => {
+            option.addEventListener('click', function(e) {
+                e.preventDefault();
+                const listingId = this.closest('.listing-item').dataset.listingId;
+                const newStatus = parseInt(this.dataset.status, 10);
+                const statusText = this.textContent.trim();
+                updateMyListingStatus(listingId, newStatus, statusText);
+            });
+        });
+
+        async function updateMyListingStatus(listingId, newStatus, statusText) {
+            const token = document.querySelector('#myListingsAntiForgeryForm input[name="__RequestVerificationToken"]')?.value;
+            if (!token) {
+                alert('無法取得驗證令牌，請重新整理頁面後再試');
+                return;
+            }
+            try {
+                const response = await fetch('/Listing/UpdateStatus?id=' + listingId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({ newStatus: newStatus })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    if (result.warning) {
+                        if (confirm(result.warning + '\n\n是否繼續？')) window.location.reload();
+                    } else {
+                        alert('商品狀態已更新為「' + statusText + '」');
+                        window.location.reload();
+                    }
+                } else {
+                    alert(result.error || '更新狀態時發生錯誤');
+                }
+            } catch (err) {
+                console.error('更新狀態時發生錯誤:', err);
+                alert('更新狀態時發生錯誤，請稍後再試');
+            }
+        }
+
         // 篩選功能
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', function() {

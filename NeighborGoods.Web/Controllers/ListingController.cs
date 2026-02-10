@@ -38,6 +38,7 @@ public class ListingController : BaseController
         // 若尚未完成 Email 驗證，導向獨立的驗證頁面
         if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
         {
+            TempData["InfoMessage"] = "請先完成 Email 驗證後才能刊登商品。";
             var verifyUrl = Url.Action(
                 "VerifyListingEmail",
                 "Account",
@@ -73,6 +74,7 @@ public class ListingController : BaseController
         // 伺服器端保護：刊登前一定要有已驗證的 Email
         if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
         {
+            TempData["InfoMessage"] = "請先完成 Email 驗證後才能刊登商品。";
             var verifyUrl = Url.Action(
                 "VerifyListingEmail",
                 "Account",
@@ -152,11 +154,15 @@ public class ListingController : BaseController
             return Challenge();
         }
 
-        // 編輯商品前同樣要求已驗證 Email，避免未驗證帳號持續變更刊登內容
+        // 編輯商品前同樣要求已驗證 Email，導向驗證頁並顯示通知
         if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
         {
-            TempData["ErrorMessage"] = "編輯商品前，請先設定並完成 Email 驗證。";
-            return RedirectToAction("Profile", "Account");
+            TempData["InfoMessage"] = "請先完成 Email 驗證後才能編輯商品。";
+            var verifyUrl = Url.Action(
+                "VerifyListingEmail",
+                "Account",
+                new { returnUrl = Url.Action(nameof(Edit), "Listing", new { id }) });
+            return Redirect(verifyUrl!);
         }
 
         // 編輯商品前需已開啟通知
@@ -205,8 +211,12 @@ public class ListingController : BaseController
         // 防止繞過 GET：POST 時也檢查 Email 驗證狀態
         if (string.IsNullOrEmpty(user.Email) || !user.EmailConfirmed)
         {
-            TempData["ErrorMessage"] = "編輯商品前，請先設定並完成 Email 驗證。";
-            return RedirectToAction("Profile", "Account");
+            TempData["InfoMessage"] = "請先完成 Email 驗證後才能編輯商品。";
+            var verifyUrl = Url.Action(
+                "VerifyListingEmail",
+                "Account",
+                new { returnUrl = Url.Action(nameof(Edit), "Listing", new { id }) });
+            return Redirect(verifyUrl!);
         }
 
         // 防止繞過 GET：POST 時也檢查通知已開啟

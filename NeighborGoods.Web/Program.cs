@@ -207,6 +207,15 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.QueueLimit = 1;
     });
 
+    // 發送 Email 驗證碼（註冊用）：每分鐘最多 5 次
+    options.AddFixedWindowLimiter("SendEmailCode", limiterOptions =>
+    {
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 1;
+    });
+
     // 發送訊息速率限制：每 10 秒最多 10 次
     options.AddFixedWindowLimiter("SendMessage", limiterOptions =>
     {
