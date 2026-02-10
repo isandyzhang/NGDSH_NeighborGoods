@@ -686,7 +686,7 @@
             line-height: 1.4;
         }
 
-        /* 快捷按鈕區 RWD：同一區塊、手機 2x2、觸控友善 */
+        /* 快捷按鈕區 RWD：同一區塊、手機 2x2、觸控友善；電腦畫面不換行、佔滿寬度 */
         .quick-actions-buttons .quick-action-btn {
             min-height: 44px;
             display: inline-flex;
@@ -694,8 +694,15 @@
             justify-content: center;
         }
         @@media (min-width: 768px) {
+            .quick-actions {
+                width: 100vw;
+                margin-left: calc(50% - 50vw);
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
             .quick-actions-buttons .quick-action-btn {
                 min-height: 38px;
+                white-space: nowrap;
             }
         }
 
