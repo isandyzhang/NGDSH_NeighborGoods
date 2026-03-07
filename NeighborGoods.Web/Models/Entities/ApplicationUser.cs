@@ -49,6 +49,11 @@ public class ApplicationUser : IdentityUser
     /// 用於防止重複通知，30 分鐘內不重複通知同一用戶
     /// </summary>
     public DateTime? EmailNotificationLastSentAt { get; set; }
+
+    /// <summary>
+    /// 剩餘可用置頂次數（投稿審核通過時增加）
+    /// </summary>
+    public int TopPinCredits { get; set; } = 0;
 }
 
 

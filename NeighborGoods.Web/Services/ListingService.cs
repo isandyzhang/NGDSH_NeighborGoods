@@ -108,8 +108,11 @@ public class ListingService : IListingService
         var totalCount = await query.CountAsync();
 
         // 使用投影查詢，只選擇需要的欄位
+        // 排序規則：先排置頂中的商品（IsPinned = true 且 PinnedEndDate >= 今天），再排其他商品
+        var today = TaiwanTime.Now.Date;
         var viewModels = await query
-            .OrderByDescending(l => l.CreatedAt)
+            .OrderByDescending(l => l.IsPinned && l.PinnedEndDate.HasValue && l.PinnedEndDate.Value.Date >= today)
+            .ThenByDescending(l => l.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(l => new ListingIndexViewModel
@@ -135,7 +138,10 @@ public class ListingService : IListingService
                 // 計算該商品的對話數量（興趣計數）
                 InterestCount = _db.Conversations
                     .Where(c => c.ListingId == l.Id)
-                    .Count()
+                    .Count(),
+                // 置頂資訊
+                IsPinned = l.IsPinned,
+                PinnedEndDate = l.PinnedEndDate
             })
             .ToListAsync();
 
@@ -778,6 +784,10 @@ public class ListingService : IListingService
                 return ServiceResult<ListingEditViewModel>.Fail("只有刊登中或已下架的商品才能編輯");
             }
 
+            // 取得使用者的置頂次數
+            var user = await _db.Users.FindAsync(userId);
+            var availableCredits = user?.TopPinCredits ?? 0;
+
             var viewModel = new ListingEditViewModel
             {
                 Id = listing.Id,
@@ -794,7 +804,11 @@ public class ListingService : IListingService
                 ExistingImages = listing.Images
                     .OrderBy(img => img.SortOrder)
                     .Select(img => img.ImageUrl)
-                    .ToList()
+                    .ToList(),
+                AvailableTopPinCredits = availableCredits,
+                IsPinned = listing.IsPinned,
+                PinnedStartDate = listing.PinnedStartDate,
+                PinnedEndDate = listing.PinnedEndDate
             };
 
             return ServiceResult<ListingEditViewModel>.Ok(viewModel);

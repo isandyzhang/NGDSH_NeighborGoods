@@ -58,5 +58,15 @@ public class ListingIndexViewModel
     /// 對此商品有興趣的人數（基於該商品的對話數量）。
     /// </summary>
     public int InterestCount { get; set; }
+
+    /// <summary>
+    /// 是否置頂中
+    /// </summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>
+    /// 置頂結束時間
+    /// </summary>
+    public DateTime? PinnedEndDate { get; set; }
 }
 

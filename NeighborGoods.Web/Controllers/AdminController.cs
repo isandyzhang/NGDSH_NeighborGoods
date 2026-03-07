@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NeighborGoods.Web.Constants;
+using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
@@ -18,6 +20,9 @@ public class AdminController : BaseController
     private readonly IConfiguration _configuration;
     private readonly ILogger<AdminController> _logger;
     private readonly IEmailNotificationService? _emailNotificationService;
+    private readonly ITopListingService _topListingService;
+    private readonly AppDbContext _dbContext;
+    private readonly Microsoft.Extensions.Options.IOptions<NeighborGoods.Web.Models.Configuration.EmailNotificationOptions>? _emailOptions;
 
     public AdminController(
         UserManager<ApplicationUser> userManager,
@@ -25,14 +30,20 @@ public class AdminController : BaseController
         IAdminService adminService,
         IConfiguration configuration,
         ILogger<AdminController> logger,
-        IEmailNotificationService? emailNotificationService = null)
+        ITopListingService topListingService,
+        AppDbContext dbContext,
+        IEmailNotificationService? emailNotificationService = null,
+        Microsoft.Extensions.Options.IOptions<NeighborGoods.Web.Models.Configuration.EmailNotificationOptions>? emailOptions = null)
         : base(userManager)
     {
         _signInManager = signInManager;
         _adminService = adminService;
         _configuration = configuration;
         _logger = logger;
+        _topListingService = topListingService;
+        _dbContext = dbContext;
         _emailNotificationService = emailNotificationService;
+        _emailOptions = emailOptions;
     }
 
     [AllowAnonymous]
@@ -208,7 +219,7 @@ public class AdminController : BaseController
         try
         {
             var testMessage = "這是一封測試信，用於驗證 Email 通知功能是否正常運作。";
-            var testUrl = "https://neighborgoods.azurewebsites.net";
+            var testUrl = _emailOptions?.Value?.BaseUrl ?? "https://neighborgoodstw.com";
             var testLinkText = "前往 NeighborGoods";
 
             await _emailNotificationService.SendPushMessageWithLinkAsync(
@@ -228,6 +239,115 @@ public class AdminController : BaseController
         }
 
         return RedirectToAction(nameof(TestEmail));
+    }
+
+    /// <summary>
+    /// 置頂投稿列表頁
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> TopSubmissions(string? statusFilter = null)
+    {
+        var query = _dbContext.ListingTopSubmissions
+            .Include(s => s.User)
+            .Include(s => s.Listing)
+            .Include(s => s.ReviewedByAdmin)
+            .AsQueryable();
+
+        // 如果沒有指定狀態或為 "All"，顯示全部；否則只顯示待審核
+        if (string.IsNullOrEmpty(statusFilter) || statusFilter == "All")
+        {
+            // 顯示全部，不做篩選
+        }
+        else if (Enum.TryParse<TopSubmissionStatus>(statusFilter, out var status))
+        {
+            query = query.Where(s => s.Status == status);
+        }
+        else
+        {
+            // 預設只顯示待審核
+            query = query.Where(s => s.Status == TopSubmissionStatus.Pending);
+        }
+
+        var submissions = await query
+            .OrderByDescending(s => s.CreatedAt)
+            .ToListAsync();
+
+        ViewBag.StatusFilter = statusFilter;
+        return View(submissions);
+    }
+
+    /// <summary>
+    /// 置頂投稿詳情頁
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> TopSubmissionDetail(int id)
+    {
+        var submission = await _dbContext.ListingTopSubmissions
+            .Include(s => s.User)
+            .Include(s => s.Listing)
+            .Include(s => s.ReviewedByAdmin)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (submission == null)
+        {
+            return NotFound();
+        }
+
+        return View(submission);
+    }
+
+    /// <summary>
+    /// 核准置頂投稿
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveTopSubmission(int id, int grantedCredits = 7)
+    {
+        var admin = await GetCurrentUserAsync();
+        if (admin == null)
+        {
+            return Challenge();
+        }
+
+        var result = await _topListingService.ApproveSubmissionAsync(id, grantedCredits, admin.Id);
+        
+        if (result.Success)
+        {
+            TempData["SuccessMessage"] = "投稿已核准，使用者已獲得置頂次數。";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "核准失敗";
+        }
+
+        return RedirectToAction(nameof(TopSubmissions));
+    }
+
+    /// <summary>
+    /// 駁回置頂投稿
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectTopSubmission(int id, string? reason = null)
+    {
+        var admin = await GetCurrentUserAsync();
+        if (admin == null)
+        {
+            return Challenge();
+        }
+
+        var result = await _topListingService.RejectSubmissionAsync(id, admin.Id, reason);
+        
+        if (result.Success)
+        {
+            TempData["SuccessMessage"] = "投稿已駁回。";
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.ErrorMessage ?? "駁回失敗";
+        }
+
+        return RedirectToAction(nameof(TopSubmissions));
     }
 }
 

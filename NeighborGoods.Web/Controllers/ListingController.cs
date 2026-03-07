@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Web.Constants;
+using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Models.ViewModels;
 using NeighborGoods.Web.Services;
+using NeighborGoods.Web.Utils;
 
 namespace NeighborGoods.Web.Controllers;
 
@@ -15,15 +18,18 @@ public class ListingController : BaseController
 {
     private readonly IListingService _listingService;
     private readonly ILogger<ListingController> _logger;
+    private readonly AppDbContext _dbContext;
 
     public ListingController(
         UserManager<ApplicationUser> userManager,
         IListingService listingService,
-        ILogger<ListingController> logger)
+        ILogger<ListingController> logger,
+        AppDbContext dbContext)
         : base(userManager)
     {
         _listingService = listingService;
         _logger = logger;
+        _dbContext = dbContext;
     }
 
     [HttpGet]
@@ -375,6 +381,92 @@ public class ListingController : BaseController
 
         TempData["SuccessMessage"] = "商品已重新上架";
         return RedirectToAction("My");
+    }
+
+    /// <summary>
+    /// 使用置頂次數
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UseTopPin(Guid listingId)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return Challenge();
+        }
+
+        var listing = await _dbContext.Listings.FindAsync(listingId);
+        if (listing == null)
+        {
+            return NotFound();
+        }
+
+        // 確認商品屬於目前使用者
+        if (listing.SellerId != user.Id)
+        {
+            return Forbid();
+        }
+
+        // 檢查使用者是否有足夠的置頂次數
+        if (user.TopPinCredits <= 0)
+        {
+            TempData["ErrorMessage"] = "您沒有可用的置頂次數";
+            return RedirectToAction(nameof(Edit), new { id = listingId });
+        }
+
+        // 檢查商品是否已經在置頂中
+        if (listing.IsPinned && listing.PinnedEndDate.HasValue && listing.PinnedEndDate.Value >= TaiwanTime.Now)
+        {
+            TempData["ErrorMessage"] = "此商品已經在置頂中";
+            return RedirectToAction(nameof(Edit), new { id = listingId });
+        }
+
+        // 扣除置頂次數並設定置頂
+        user.TopPinCredits -= 1;
+        listing.IsPinned = true;
+        listing.PinnedStartDate = TaiwanTime.Now;
+        listing.PinnedEndDate = TaiwanTime.Now.AddDays(7);
+
+        await _dbContext.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = "商品已置頂，將在首頁置頂 7 天";
+        return RedirectToAction(nameof(Edit), new { id = listingId });
+    }
+
+    /// <summary>
+    /// 結束置頂
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EndTopPin(Guid listingId)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return Challenge();
+        }
+
+        var listing = await _dbContext.Listings.FindAsync(listingId);
+        if (listing == null)
+        {
+            return NotFound();
+        }
+
+        // 確認商品屬於目前使用者
+        if (listing.SellerId != user.Id)
+        {
+            return Forbid();
+        }
+
+        // 結束置頂（不退回次數）
+        listing.IsPinned = false;
+        listing.PinnedEndDate = TaiwanTime.Now;
+
+        await _dbContext.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = "置頂已結束";
+        return RedirectToAction(nameof(Edit), new { id = listingId });
     }
 }
 

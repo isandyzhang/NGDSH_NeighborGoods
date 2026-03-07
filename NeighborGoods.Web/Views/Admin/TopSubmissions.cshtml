@@ -1,0 +1,94 @@
+@model List<NeighborGoods.Web.Models.Entities.ListingTopSubmission>
+@using NeighborGoods.Web.Models.Enums
+
+@{
+    ViewData["Title"] = "置頂投稿審核";
+    Layout = "_AdminLayout";
+}
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="mb-3">
+    <h2>置頂投稿審核</h2>
+    <div class="btn-group" role="group">
+        <a asp-action="TopSubmissions" asp-route-statusFilter="" class="btn btn-outline-primary @(ViewBag.StatusFilter == null ? "active" : "")">待審核</a>
+        <a asp-action="TopSubmissions" asp-route-statusFilter="Approved" class="btn btn-outline-success @(ViewBag.StatusFilter == "Approved" ? "active" : "")">已核准</a>
+        <a asp-action="TopSubmissions" asp-route-statusFilter="Rejected" class="btn btn-outline-danger @(ViewBag.StatusFilter == "Rejected" ? "active" : "")">已駁回</a>
+        <a asp-action="TopSubmissions" asp-route-statusFilter="All" class="btn btn-outline-secondary @(ViewBag.StatusFilter == "All" ? "active" : "")">全部</a>
+    </div>
+</div>
+
+@if (Model == null || !Model.Any())
+{
+    <div class="alert alert-info">
+        目前沒有投稿記錄。
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>投稿者</th>
+                <th>商品名稱</th>
+                <th>是否同意宣傳</th>
+                <th>狀態</th>
+                <th>建立時間</th>
+                <th>審核時間</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var submission in Model)
+            {
+                <tr>
+                    <td>@(submission.User?.DisplayName ?? submission.User?.UserName ?? "未知")</td>
+                    <td>@submission.FeedbackTitle</td>
+                    <td>
+                        @if (submission.AllowPromotion)
+                        {
+                            <span class="badge bg-success">是</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">否</span>
+                        }
+                    </td>
+                    <td>
+                        @switch (submission.Status)
+                        {
+                            case TopSubmissionStatus.Pending:
+                                <span class="badge bg-warning">待審核</span>
+                                break;
+                            case TopSubmissionStatus.Approved:
+                                <span class="badge bg-success">已核准</span>
+                                break;
+                            case TopSubmissionStatus.Rejected:
+                                <span class="badge bg-danger">已駁回</span>
+                                break;
+                        }
+                    </td>
+                    <td>@submission.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>@(submission.ReviewedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                    <td>
+                        <a asp-action="TopSubmissionDetail" asp-route-id="@submission.Id" class="btn btn-sm btn-primary">查看詳情</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

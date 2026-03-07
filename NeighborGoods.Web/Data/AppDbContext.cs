@@ -18,6 +18,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<LineBindingPending> LineBindingPending => Set<LineBindingPending>();
     public DbSet<AdminMessage> AdminMessages => Set<AdminMessage>();
+    public DbSet<ListingTopSubmission> ListingTopSubmissions => Set<ListingTopSubmission>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -190,5 +191,49 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         // Users 索引
         builder.Entity<ApplicationUser>()
             .HasIndex(u => u.CreatedAt);
+
+        // ListingTopSubmission 與 ApplicationUser 的關聯（投稿者）
+        builder.Entity<ListingTopSubmission>()
+            .HasOne(s => s.User)
+            .WithMany()
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ListingTopSubmission 與 Listing 的關聯（可選）
+        builder.Entity<ListingTopSubmission>()
+            .HasOne(s => s.Listing)
+            .WithMany()
+            .HasForeignKey(s => s.ListingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ListingTopSubmission 與 ApplicationUser 的關聯（審核管理員）
+        builder.Entity<ListingTopSubmission>()
+            .HasOne(s => s.ReviewedByAdmin)
+            .WithMany()
+            .HasForeignKey(s => s.ReviewedByAdminId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ListingTopSubmission 字串欄位長度限制
+        builder.Entity<ListingTopSubmission>()
+            .Property(s => s.PhotoBlobName)
+            .HasMaxLength(500);
+
+        builder.Entity<ListingTopSubmission>()
+            .Property(s => s.FeedbackTitle)
+            .HasMaxLength(200);
+
+        builder.Entity<ListingTopSubmission>()
+            .Property(s => s.FeedbackDetail)
+            .HasMaxLength(1000);
+
+        // ListingTopSubmission 索引
+        builder.Entity<ListingTopSubmission>()
+            .HasIndex(s => s.Status);
+
+        builder.Entity<ListingTopSubmission>()
+            .HasIndex(s => s.CreatedAt);
+
+        builder.Entity<ListingTopSubmission>()
+            .HasIndex(s => s.UserId);
     }
 }

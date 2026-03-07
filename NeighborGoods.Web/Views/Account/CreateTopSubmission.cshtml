@@ -1,0 +1,74 @@
+@model NeighborGoods.Web.Models.ViewModels.TopSubmissionCreateViewModel
+
+@{
+    ViewData["Title"] = "投稿合照換置頂次數";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">投稿合照換置頂次數</h2>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">投稿說明</h5>
+            <ul class="mb-0">
+                <li>投稿一張交易合照（兩人與商品自拍）</li>
+                <li>可以不用露臉，但需要拍到商品</li>
+                <li>經管理員審核通過後可獲得 7 次置頂機會</li>
+                <li>每次置頂可讓商品在首頁置頂 7 天</li>
+            </ul>
+        </div>
+    </div>
+
+    <form asp-action="CreateTopSubmission" method="post" enctype="multipart/form-data">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label asp-for="FeedbackTitle" class="form-label"></label>
+                    <input asp-for="FeedbackTitle" class="form-control" />
+                    <span asp-validation-for="FeedbackTitle" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="FeedbackDetail" class="form-label"></label>
+                    <textarea asp-for="FeedbackDetail" class="form-control" rows="5"></textarea>
+                    <span asp-validation-for="FeedbackDetail" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Photo" class="form-label"></label>
+                    <input asp-for="Photo" type="file" class="form-control" accept="image/*" />
+                    <span asp-validation-for="Photo" class="text-danger"></span>
+                    <div class="form-text">請上傳合照照片（兩人與商品自拍）</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input asp-for="AllowPromotion" class="form-check-input" type="checkbox" />
+                        <label asp-for="AllowPromotion" class="form-check-label">
+                            同意宣傳（可能會發到 FB）
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a asp-action="Profile" class="btn btn-secondary">取消</a>
+            <button type="submit" class="btn btn-primary">送出投稿</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

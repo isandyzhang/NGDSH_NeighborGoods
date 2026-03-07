@@ -83,7 +83,7 @@ public class EmailNotificationService : IEmailNotificationService
         <div class=""footer"">
             <p><strong>南港社宅社區專屬二手交易平台</strong></p>
             <p>此郵件由系統自動發送，請勿直接回覆</p>
-            <p>如不想再收到通知，請至<a href=""https://neighborgoods.azurewebsites.net/Account/Profile"">帳戶設定</a>關閉郵件通知</p>
+            <p>如不想再收到通知，請至<a href=""{_options.BaseUrl}/Account/Profile"">帳戶設定</a>關閉郵件通知</p>
         </div>
     </div>
 </body>
@@ -208,7 +208,7 @@ public class EmailNotificationService : IEmailNotificationService
         <div class=""footer"">
             <p><strong>南港社宅社區專屬二手交易平台</strong></p>
             <p>此郵件由系統自動發送，請勿直接回覆</p>
-            <p>如不想再收到通知，請至<a href=""https://neighborgoods.azurewebsites.net/Account/Profile"">帳戶設定</a>關閉郵件通知</p>
+            <p>如不想再收到通知，請至<a href=""{_options.BaseUrl}/Account/Profile"">帳戶設定</a>關閉郵件通知</p>
         </div>
     </div>
 </body>

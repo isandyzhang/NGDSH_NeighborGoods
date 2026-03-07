@@ -6,6 +6,22 @@
 
 <h2 class="mt-4 mb-3">編輯商品</h2>
 
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
 <div class="row">
     <div class="col-md-8">
         <form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data">
@@ -196,6 +212,53 @@
                 </a>
             </div>
         </form>
+    </div>
+    <div class="col-md-4">
+        <!-- 置頂功能區塊 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">置頂功能</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    <strong>目前可用置頂次數：</strong>
+                    <span class="text-warning fw-bold">@Model.AvailableTopPinCredits 次</span>
+                </p>
+                
+                @if (Model.IsPinned && Model.PinnedEndDate.HasValue && Model.PinnedEndDate.Value >= DateTime.Now)
+                {
+                    <div class="alert alert-info mb-3">
+                        <strong>置頂中</strong><br />
+                        期間：@Model.PinnedStartDate?.ToString("yyyy-MM-dd") ~ @Model.PinnedEndDate?.ToString("yyyy-MM-dd")
+                    </div>
+                    <form asp-action="EndTopPin" asp-route-listingId="@Model.Id" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('確定要結束本次置頂嗎？結束後不會退回置頂次數。');">
+                            結束本次置頂
+                        </button>
+                    </form>
+                }
+                else if (Model.AvailableTopPinCredits > 0)
+                {
+                    <p class="text-muted mb-3">
+                        使用 1 次置頂機會，可讓此商品在首頁置頂 7 天。
+                    </p>
+                    <form asp-action="UseTopPin" asp-route-listingId="@Model.Id" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('確定要使用 1 次置頂機會嗎？此商品將在首頁置頂 7 天。');">
+                            使用 1 次置頂（7 天）
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <div class="alert alert-warning mb-0">
+                        您目前沒有可用的置頂次數。<br />
+                        <a asp-controller="Account" asp-action="CreateTopSubmission" class="alert-link">投稿合照換置頂次數</a>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>
 

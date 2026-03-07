@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Microsoft.AspNetCore.Http;
 using NeighborGoods.Web.Models.Configuration;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
@@ -167,6 +168,57 @@ public class BlobService : IBlobService
             "image/webp" => ".webp",
             _ => ".jpg" // 預設使用 .jpg
         };
+    }
+
+    public async Task<string> UploadTopSubmissionPhotoAsync(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            throw new ArgumentException("檔案不能為空", nameof(file));
+        }
+
+        // 確保 Container 存在，並設為公開讀取（Blob 層級）
+        var containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
+        await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob);
+
+        // 壓縮圖片
+        Stream compressedStream;
+        Stream originalStream = file.OpenReadStream();
+        try
+        {
+            compressedStream = await CompressImageAsync(originalStream);
+        }
+        catch (Exception)
+        {
+            // 如果壓縮失敗，使用原圖（降級處理）
+            originalStream.Position = 0;
+            compressedStream = originalStream;
+        }
+
+        // 產生唯一的檔名：統一使用 .jpg 格式
+        var fileName = $"top-submissions/{Guid.NewGuid()}.jpg";
+
+        // 取得 Blob Client 並上傳
+        var blobClient = containerClient.GetBlobClient(fileName);
+        
+        var uploadOptions = new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = "image/jpeg" // 統一為 JPG
+            }
+        };
+
+        await blobClient.UploadAsync(compressedStream, uploadOptions);
+
+        // 如果 compressedStream 是新的 MemoryStream，需要釋放
+        if (compressedStream != originalStream && compressedStream is MemoryStream)
+        {
+            await compressedStream.DisposeAsync();
+        }
+
+        // 回傳完整的 Blob URL
+        return blobClient.Uri.ToString();
     }
 }
 

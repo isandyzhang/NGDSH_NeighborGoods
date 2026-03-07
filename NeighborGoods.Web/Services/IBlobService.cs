@@ -26,5 +26,12 @@ public interface IBlobService
     /// </summary>
     /// <param name="blobUrls">要刪除的 Blob URL 列表</param>
     Task DeleteListingImagesAsync(List<string> blobUrls);
+
+    /// <summary>
+    /// 上傳置頂投稿照片到 Blob Storage。
+    /// </summary>
+    /// <param name="file">上傳的檔案</param>
+    /// <returns>上傳成功後回傳完整的 Blob URL</returns>
+    Task<string> UploadTopSubmissionPhotoAsync(IFormFile file);
 }
 

@@ -1,0 +1,143 @@
+@model NeighborGoods.Web.Models.Entities.ListingTopSubmission
+@using NeighborGoods.Web.Models.Enums
+
+@{
+    ViewData["Title"] = "投稿詳情";
+    Layout = "_AdminLayout";
+}
+
+<div class="mb-3">
+    <a asp-action="TopSubmissions" class="btn btn-secondary">返回列表</a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">投稿資訊</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <strong>投稿者：</strong>
+                <div>@(Model.User?.DisplayName ?? Model.User?.UserName ?? "未知")</div>
+            </div>
+            <div class="col-md-6">
+                <strong>建立時間：</strong>
+                <div>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</div>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <strong>狀態：</strong>
+                <div>
+                    @switch (Model.Status)
+                    {
+                        case TopSubmissionStatus.Pending:
+                            <span class="badge bg-warning">待審核</span>
+                            break;
+                        case TopSubmissionStatus.Approved:
+                            <span class="badge bg-success">已核准</span>
+                            break;
+                        case TopSubmissionStatus.Rejected:
+                            <span class="badge bg-danger">已駁回</span>
+                            break;
+                    }
+                </div>
+            </div>
+            <div class="col-md-6">
+                <strong>是否同意宣傳：</strong>
+                <div>
+                    @if (Model.AllowPromotion)
+                    {
+                        <span class="badge bg-success">是</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">否</span>
+                    }
+                </div>
+            </div>
+        </div>
+        @if (Model.ReviewedAt.HasValue)
+        {
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>審核時間：</strong>
+                    <div>@Model.ReviewedAt.Value.ToString("yyyy-MM-dd HH:mm")</div>
+                </div>
+                <div class="col-md-6">
+                    <strong>審核管理員：</strong>
+                    <div>@(Model.ReviewedByAdmin?.DisplayName ?? Model.ReviewedByAdmin?.UserName ?? "未知")</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">商品資訊</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <strong>商品名稱：</strong>
+            <div>@Model.FeedbackTitle</div>
+        </div>
+        @if (Model.ListingId.HasValue && Model.Listing != null)
+        {
+            <div class="mb-3">
+                <strong>對應商品：</strong>
+                <div>
+                    <a asp-controller="Admin" asp-action="ListingDetails" asp-route-id="@Model.ListingId" target="_blank">
+                        @Model.Listing.Title
+                    </a>
+                </div>
+            </div>
+        }
+        <div class="mb-3">
+            <strong>詳細回饋：</strong>
+            <div class="border p-3 bg-light">@Model.FeedbackDetail</div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">合照照片</h5>
+    </div>
+    <div class="card-body">
+        <img src="@Model.PhotoBlobName" alt="投稿照片" class="img-fluid" style="max-width: 100%; height: auto;" />
+    </div>
+</div>
+
+@if (Model.Status == TopSubmissionStatus.Pending)
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">審核操作</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="ApproveTopSubmission" asp-route-id="@Model.Id" method="post" class="d-inline mb-2">
+                @Html.AntiForgeryToken()
+                <div class="mb-2">
+                    <label for="grantedCredits" class="form-label">給予置頂次數：</label>
+                    <input type="number" name="grantedCredits" id="grantedCredits" value="7" min="1" max="100" class="form-control d-inline-block" style="width: 100px;" />
+                </div>
+                <button type="submit" class="btn btn-success" onclick="return confirm('確定要核准此投稿嗎？使用者將獲得置頂次數。');">核准</button>
+            </form>
+            <form asp-action="RejectTopSubmission" asp-route-id="@Model.Id" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger" onclick="return confirm('確定要駁回此投稿嗎？');">駁回</button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        此投稿已經審核過了。
+        @if (Model.Status == TopSubmissionStatus.Approved)
+        {
+            <div>已給予 <strong>@Model.GrantedCredits</strong> 次置頂機會。</div>
+        }
+    </div>
+}

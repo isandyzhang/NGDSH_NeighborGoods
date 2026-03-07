@@ -71,5 +71,25 @@ public class ListingEditViewModel
 
     [Display(Name = "圖片 5")]
     public IFormFile? Image5 { get; set; }
+
+    /// <summary>
+    /// 目前可用置頂次數
+    /// </summary>
+    public int AvailableTopPinCredits { get; set; }
+
+    /// <summary>
+    /// 是否置頂中
+    /// </summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>
+    /// 置頂開始時間
+    /// </summary>
+    public DateTime? PinnedStartDate { get; set; }
+
+    /// <summary>
+    /// 置頂結束時間
+    /// </summary>
+    public DateTime? PinnedEndDate { get; set; }
 }
 

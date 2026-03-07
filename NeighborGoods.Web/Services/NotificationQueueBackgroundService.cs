@@ -67,6 +67,7 @@ public class NotificationQueueBackgroundService : BackgroundService
             var emailNotificationService = scope.ServiceProvider.GetService<IEmailNotificationService>();
             var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
             var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Models.Entities.ApplicationUser>>();
+            var lineOptions = scope.ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<LineMessagingApiOptions>>();
 
             // 設定查詢超時為 30 秒
             db.Database.SetCommandTimeout(30);
@@ -260,7 +261,8 @@ public class NotificationQueueBackgroundService : BackgroundService
 
                     // 發送通知的 URL
                     var chatUrl = $"/Message/Chat?conversationId={conversationId}";
-                    var fullUrl = $"https://neighborgoods.azurewebsites.net{chatUrl}";
+                    var baseUrl = lineOptions?.Value?.BaseUrl ?? "https://neighborgoodstw.com";
+                    var fullUrl = $"{baseUrl.TrimEnd('/')}{chatUrl}";
                     var message = "你有尚未讀取的新訊息";
                     var linkText = "查看訊息";
 

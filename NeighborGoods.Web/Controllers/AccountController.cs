@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
+using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
 using NeighborGoods.Web.Models.Enums;
@@ -20,6 +21,8 @@ public class AccountController : BaseController
     private readonly ILineMessagingApiService? _lineMessagingApiService;
     private readonly IConfiguration _configuration;
     private readonly IEmailNotificationService? _emailNotificationService;
+    private readonly IBlobService _blobService;
+    private readonly AppDbContext _dbContext;
 
     public AccountController(
         UserManager<ApplicationUser> userManager,
@@ -27,6 +30,8 @@ public class AccountController : BaseController
         IUserService userService,
         IReviewService reviewService,
         IConfiguration configuration,
+        IBlobService blobService,
+        AppDbContext dbContext,
         ILineMessagingApiService? lineMessagingApiService = null,
         IEmailNotificationService? emailNotificationService = null)
         : base(userManager)
@@ -35,6 +40,8 @@ public class AccountController : BaseController
         _userService = userService;
         _reviewService = reviewService;
         _configuration = configuration;
+        _blobService = blobService;
+        _dbContext = dbContext;
         _lineMessagingApiService = lineMessagingApiService;
         _emailNotificationService = emailNotificationService;
     }
@@ -391,7 +398,8 @@ public class AccountController : BaseController
             User = user,
             TotalListings = statistics.TotalListings,
             ActiveListings = statistics.ActiveListings,
-            CompletedListings = statistics.CompletedListings
+            CompletedListings = statistics.CompletedListings,
+            TopPinCredits = user.TopPinCredits
         };
 
         return View(viewModel);
@@ -431,7 +439,8 @@ public class AccountController : BaseController
             User = user,
             TotalListings = statistics.TotalListings,
             ActiveListings = statistics.ActiveListings,
-            CompletedListings = statistics.CompletedListings
+            CompletedListings = statistics.CompletedListings,
+            TopPinCredits = user.TopPinCredits
         };
 
         return View("Profile", viewModel);
@@ -1130,6 +1139,68 @@ public class AccountController : BaseController
 
         TempData["ErrorMessage"] = result.ErrorMessage ?? "綁定失敗，請稍後再試";
         return RedirectToAction(nameof(AuthorizeLineMessagingApi));
+    }
+
+    /// <summary>
+    /// 置頂投稿頁面（GET）
+    /// </summary>
+    [HttpGet]
+    [Authorize]
+    public IActionResult CreateTopSubmission()
+    {
+        var viewModel = new TopSubmissionCreateViewModel();
+        return View(viewModel);
+    }
+
+    /// <summary>
+    /// 置頂投稿提交（POST）
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateTopSubmission(TopSubmissionCreateViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return Challenge();
+        }
+
+        try
+        {
+            // 上傳照片到 Blob Storage
+            var photoUrl = await _blobService.UploadTopSubmissionPhotoAsync(model.Photo);
+
+            // 建立投稿記錄
+            var submission = new ListingTopSubmission
+            {
+                UserId = user.Id,
+                ListingId = model.ListingId,
+                PhotoBlobName = photoUrl,
+                FeedbackTitle = model.FeedbackTitle,
+                FeedbackDetail = model.FeedbackDetail,
+                AllowPromotion = model.AllowPromotion,
+                Status = TopSubmissionStatus.Pending,
+                CreatedAt = TaiwanTime.Now,
+                GrantedCredits = 7 // 預設給 7 次置頂機會
+            };
+
+            _dbContext.ListingTopSubmissions.Add(submission);
+            await _dbContext.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "投稿已送出，等待管理員審核。";
+            return RedirectToAction(nameof(Profile));
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError(string.Empty, $"投稿失敗：{ex.Message}");
+            return View(model);
+        }
     }
 }
 

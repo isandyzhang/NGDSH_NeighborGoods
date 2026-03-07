@@ -20,5 +20,10 @@ public class ProfileViewModel
     /// 已售出/已捐贈的商品數（成交紀錄）
     /// </summary>
     public int CompletedListings { get; set; }
+
+    /// <summary>
+    /// 剩餘可用置頂次數
+    /// </summary>
+    public int TopPinCredits { get; set; }
 }
 

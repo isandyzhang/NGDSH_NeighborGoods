@@ -38,7 +38,7 @@
 
     <!-- 統計數據區塊 -->
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
             <div class="card text-center">
                 <div class="card-body">
                     <h3 class="text-primary mb-0">@Model.TotalListings</h3>
@@ -46,7 +46,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
             <div class="card text-center">
                 <div class="card-body">
                     <h3 class="text-success mb-0">@Model.ActiveListings</h3>
@@ -54,13 +54,37 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
             <div class="card text-center">
                 <div class="card-body">
                     <h3 class="text-info mb-0">@Model.CompletedListings</h3>
                     <small class="text-muted">成交紀錄</small>
                 </div>
             </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning mb-0">@Model.TopPinCredits</h3>
+                    <small class="text-muted">置頂次數</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 置頂投稿區塊 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">置頂功能</h5>
+            <p class="text-muted mb-3">
+                目前可用置頂次數：<strong class="text-warning">@Model.TopPinCredits 次</strong>
+            </p>
+            <p class="text-muted mb-3">
+                投稿一張交易合照（兩人與商品自拍），經管理員審核通過後可獲得 7 次置頂機會。每次置頂可讓商品在首頁置頂 7 天。
+            </p>
+            <a asp-action="CreateTopSubmission" class="btn btn-primary btn-lg w-100" style="min-height: 50px; font-size: 1.1rem;">
+                投稿合照換置頂次數
+            </a>
         </div>
     </div>
 

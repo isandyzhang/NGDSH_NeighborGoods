@@ -84,6 +84,21 @@ public class Listing
     /// 最後更新時間（台灣時間）。
     /// </summary>
     public DateTime UpdatedAt { get; set; } = TaiwanTime.Now;
+
+    /// <summary>
+    /// 是否置頂中
+    /// </summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>
+    /// 置頂開始時間（台灣時間，可為 null）
+    /// </summary>
+    public DateTime? PinnedStartDate { get; set; }
+
+    /// <summary>
+    /// 置頂結束時間（台灣時間，可為 null）
+    /// </summary>
+    public DateTime? PinnedEndDate { get; set; }
 }
 
 
