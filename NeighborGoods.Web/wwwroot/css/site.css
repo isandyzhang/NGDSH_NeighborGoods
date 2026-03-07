@@ -373,6 +373,12 @@ header .navbar .navbar-brand .navbar-brand-subtitle {
   text-decoration: none;
 }
 
+.listing-card-image-wrapper {
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+}
+
 .listing-card-image {
   width: 100%;
   height: 180px;
@@ -391,6 +397,45 @@ header .navbar .navbar-brand .navbar-brand-subtitle {
   align-items: center;
   justify-content: center;
   color: #6c757d;
+}
+
+.listing-pinned-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  background-color: #ff6b6b;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 保留中商品圖片灰色遮罩，讓圖片明顯較黯淡 */
+.listing-reserved-cover {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 8px 8px 0 0;
+}
+
+/* 保留中標籤：與置頂中同風格，置於圖片右上角 */
+.listing-reserved-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background-color: #f0ad4e;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .listing-card-content {
@@ -453,6 +498,19 @@ header .navbar .navbar-brand .navbar-brand-subtitle {
   padding-top: 0.5rem;
   margin-top: 0.5rem;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 商品卡片中的 badge 顏色 */
+.listing-card .badge.bg-success {
+  background-color: #5cb85c !important;
+}
+
+.listing-card .badge.bg-danger {
+  background-color: #f44336 !important;
+}
+
+.listing-card .badge.bg-info {
+  background-color: #42a5f5 !important;
 }
 
 .listing-card-meta {

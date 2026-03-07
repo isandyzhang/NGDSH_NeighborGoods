@@ -180,7 +180,7 @@ else
 <div class="listing-bottom-bar">
     @if (Model.IsOwner)
     {
-        <!-- 賣家看到的按鈕（只有刊登中才可以編輯/修改狀態） -->
+        <!-- 賣家看到的按鈕（刊登中可編輯/修改狀態，保留中僅可修改狀態） -->
         @if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Active)
         {
             <a asp-controller="Listing" asp-action="Edit" asp-route-id="@Model.Id" 
@@ -194,6 +194,19 @@ else
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="statusDropdown">
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Sold)">交易完成</a></li>
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)">保留中</a></li>
+                    <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Inactive)">下架商品</a></li>
+                </ul>
+            </div>
+        }
+        else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)
+        {
+            <div class="listing-status-dropdown">
+                <button class="btn listing-status-btn dropdown-toggle" type="button" id="statusDropdownReserved" data-bs-toggle="dropdown" aria-expanded="false">
+                    修改商品狀態
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="statusDropdownReserved">
+                    <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Active)">上架中</a></li>
+                    <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Sold)">交易完成</a></li>
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Inactive)">下架商品</a></li>
                 </ul>
             </div>
@@ -236,7 +249,17 @@ else
         }
         else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)
         {
-            <!-- 保留中：顯示保留中狀態 -->
+            <!-- 保留中：仍顯示我要聊聊，買家可私訊賣家 -->
+            @if (Model.CanMessage)
+            {
+                <a asp-controller="Message" asp-action="ChatWithUser" 
+                   asp-route-userId="@Model.SellerId" 
+                   asp-route-listingId="@Model.Id"
+                   asp-route-sendInitialMessage="false"
+                   class="btn btn-primary listing-chat-btn">
+                    我要聊聊
+                </a>
+            }
             <button type="button" class="btn btn-secondary listing-status-disabled-btn" disabled>
                 保留中
             </button>

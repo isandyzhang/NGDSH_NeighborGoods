@@ -37,9 +37,9 @@ public class ListingService : IListingService
         int page,
         int pageSize)
     {
-        // 建立查詢基礎
+        // 建立查詢基礎（上架中與保留中皆顯示於商品列表）
         var query = _db.Listings
-            .Where(l => l.Status == ListingStatus.Active);
+            .Where(l => l.Status == ListingStatus.Active || l.Status == ListingStatus.Reserved);
 
         // 如果指定排除用戶，排除該用戶的商品
         if (!string.IsNullOrEmpty(criteria.ExcludeUserId))
@@ -214,6 +214,21 @@ public class ListingService : IListingService
 
             var now = TaiwanTime.Now;
 
+            // 處理置頂邏輯：如果使用者選擇使用置頂，檢查並扣除置頂次數
+            if (model.UseTopPin)
+            {
+                var user = await _db.Users.FindAsync(userId);
+                if (user == null)
+                {
+                    return ServiceResult<Guid>.Fail("找不到使用者");
+                }
+
+                if (user.TopPinCredits <= 0)
+                {
+                    return ServiceResult<Guid>.Fail("您沒有可用的置頂次數");
+                }
+            }
+
             // 使用資料庫交易確保資料一致性
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
@@ -236,6 +251,21 @@ public class ListingService : IListingService
                     CreatedAt = now,
                     UpdatedAt = now
                 };
+
+                // 如果使用者選擇使用置頂，設定置頂相關屬性
+                if (model.UseTopPin)
+                {
+                    var user = await _db.Users.FindAsync(userId);
+                    if (user != null && user.TopPinCredits > 0)
+                    {
+                        // 扣除置頂次數
+                        user.TopPinCredits -= 1;
+                        // 設定置頂
+                        listing.IsPinned = true;
+                        listing.PinnedStartDate = now;
+                        listing.PinnedEndDate = now.AddDays(7);
+                    }
+                }
 
                 _db.Listings.Add(listing);
                 await _db.SaveChangesAsync(); // 先儲存以取得 listing.Id
@@ -302,7 +332,7 @@ public class ListingService : IListingService
                     return ServiceResult<Guid>.Fail("至少需要成功上傳一張圖片，請檢查圖片格式和大小");
                 }
 
-                // 儲存圖片記錄
+                // 儲存所有變更（包含置頂次數的變更）
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -841,18 +871,30 @@ public class ListingService : IListingService
                 return ServiceResult<string?>.Fail("無權限修改此商品");
             }
 
-            // 只有刊登中的商品可以修改狀態
-            if (listing.Status != ListingStatus.Active)
+            // 僅上架中或保留中的商品可修改狀態
+            if (listing.Status != ListingStatus.Active && listing.Status != ListingStatus.Reserved)
             {
-                return ServiceResult<string?>.Fail("只有刊登中的商品才能修改狀態");
+                return ServiceResult<string?>.Fail("只有刊登中或保留中的商品才能修改狀態");
             }
 
-            // 驗證新狀態是否有效
-            if (newStatus != ListingStatus.Sold && 
-                newStatus != ListingStatus.Reserved && 
-                newStatus != ListingStatus.Inactive)
+            // 依目前狀態驗證新狀態是否有效
+            if (listing.Status == ListingStatus.Active)
             {
-                return ServiceResult<string?>.Fail("無效的商品狀態");
+                if (newStatus != ListingStatus.Sold &&
+                    newStatus != ListingStatus.Reserved &&
+                    newStatus != ListingStatus.Inactive)
+                {
+                    return ServiceResult<string?>.Fail("無效的商品狀態");
+                }
+            }
+            else // listing.Status == ListingStatus.Reserved
+            {
+                if (newStatus != ListingStatus.Active &&
+                    newStatus != ListingStatus.Sold &&
+                    newStatus != ListingStatus.Inactive)
+                {
+                    return ServiceResult<string?>.Fail("無效的商品狀態");
+                }
             }
 
             string? warningMessage = null;

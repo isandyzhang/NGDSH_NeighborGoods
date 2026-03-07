@@ -128,6 +128,21 @@
                                         </div>
                                     </div>
                                 }
+                                else if (listing.Status == ListingStatus.Reserved)
+                                {
+                                    <div class="d-flex gap-2" onclick="event.stopPropagation();">
+                                        <div class="dropdown flex-fill">
+                                            <button class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                變更商品狀態
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Active)">上架中</a></li>
+                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Sold)">交易完成</a></li>
+                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Inactive)">下架商品</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                }
                                 else if (listing.Status == ListingStatus.Inactive)
                                 {
                                     <div class="d-flex gap-2" onclick="event.stopPropagation();">

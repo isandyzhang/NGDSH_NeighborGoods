@@ -59,6 +59,17 @@ public class ListingCreateViewModel
 
     [Display(Name = "圖片 5")]
     public IFormFile? Image5 { get; set; }
+
+    /// <summary>
+    /// 是否使用置頂功能
+    /// </summary>
+    [Display(Name = "使用置頂")]
+    public bool UseTopPin { get; set; }
+
+    /// <summary>
+    /// 目前可用置頂次數（僅用於顯示，不從表單提交）
+    /// </summary>
+    public int AvailableTopPinCredits { get; set; }
 }
 
 

@@ -59,7 +59,12 @@ public class ListingController : BaseController
             return RedirectToAction("Profile", "Account");
         }
 
-        return View(new ListingCreateViewModel());
+        var viewModel = new ListingCreateViewModel
+        {
+            AvailableTopPinCredits = user.TopPinCredits
+        };
+
+        return View(viewModel);
     }
 
     [HttpPost]
@@ -100,12 +105,21 @@ public class ListingController : BaseController
 
         if (!result.Success)
         {
+            // 重新載入置頂次數（因為可能已經改變）
+            model.AvailableTopPinCredits = user.TopPinCredits;
             ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "建立商品時發生錯誤");
             return View(model);
         }
 
         // 設定成功訊息
-        TempData["SuccessMessage"] = "商品已新增成功！您可以前往「我的商品」查看。";
+        if (model.UseTopPin)
+        {
+            TempData["SuccessMessage"] = "商品已新增成功並已置頂，將在首頁置頂 7 天！您可以前往「我的商品」查看。";
+        }
+        else
+        {
+            TempData["SuccessMessage"] = "商品已新增成功！您可以前往「我的商品」查看。";
+        }
         
         // 之後會導到「商品詳情」或「我的商品」，暫時先回首頁
         return RedirectToAction("Index", "Home");

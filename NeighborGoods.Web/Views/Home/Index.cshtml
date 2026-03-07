@@ -315,22 +315,29 @@
                 }
 
                 <a asp-controller="Listing" asp-action="Details" asp-route-id="@listing.Id" class="listing-card">
-                    @if (!string.IsNullOrEmpty(listing.FirstImageUrl))
-                    {
-                        <img src="@listing.FirstImageUrl" class="listing-card-image" alt="@listing.Title">
-                    }
-                    else
-                    {
-                        <div class="listing-card-image-placeholder">
-                            <span>無圖片</span>
-                        </div>
-                    }
+                    <div class="listing-card-image-wrapper">
+                        @if (!string.IsNullOrEmpty(listing.FirstImageUrl))
+                        {
+                            <img src="@listing.FirstImageUrl" class="listing-card-image" alt="@listing.Title">
+                        }
+                        else
+                        {
+                            <div class="listing-card-image-placeholder">
+                                <span>無圖片</span>
+                            </div>
+                        }
+                        @if (listing.IsPinned && listing.PinnedEndDate.HasValue && listing.PinnedEndDate.Value >= DateTime.Now)
+                        {
+                            <span class="badge listing-pinned-badge">置頂中</span>
+                        }
+                        @if (listing.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)
+                        {
+                            <div class="listing-reserved-cover" aria-hidden="true"></div>
+                            <span class="badge listing-reserved-badge">保留中</span>
+                        }
+                    </div>
                     <div class="listing-card-content">
                         <div class="listing-card-tags">
-                            @if (listing.IsPinned && listing.PinnedEndDate.HasValue && listing.PinnedEndDate.Value >= DateTime.Now)
-                            {
-                                <span class="badge bg-warning text-dark ms-1 mb-1">置頂中</span>
-                            }
                             <span class="listing-card-tag listing-card-tag-category">@listing.CategoryDisplayName</span>
                             @if (!string.IsNullOrEmpty(listing.ConditionDisplayName))
                             {
@@ -595,18 +602,22 @@
                             };
                             
                             const isPinned = listing.isPinned && listing.pinnedEndDate && new Date(listing.pinnedEndDate) >= new Date();
+                            const isReserved = listing.status === 1; /* ListingStatus.Reserved */
                             const tagsHtml = `<div class="listing-card-tags">
-                                ${isPinned ? '<span class="badge bg-warning text-dark ms-1 mb-1">置頂中</span>' : ''}
                                 <span class="listing-card-tag listing-card-tag-category">${escapeHtml(listing.categoryDisplayName || '')}</span>
                                 ${listing.conditionDisplayName ? `<span class="listing-card-tag listing-card-tag-condition">${escapeHtml(listing.conditionDisplayName)}</span>` : ''}
                                 ${listing.residenceDisplayName ? `<span class="listing-card-tag listing-card-tag-residence">${escapeHtml(listing.residenceDisplayName)}</span>` : ''}
                             </div>`;
                             const cardHtml = `
                                 <a href="@Url.Action("Details", "Listing")/${listing.id}" class="listing-card">
-                                    ${listing.firstImageUrl 
-                                        ? `<img src="${escapeHtml(listing.firstImageUrl)}" class="listing-card-image" alt="${escapeHtml(listing.title)}">`
-                                        : `<div class="listing-card-image-placeholder"><span>無圖片</span></div>`
-                                    }
+                                    <div class="listing-card-image-wrapper">
+                                        ${listing.firstImageUrl 
+                                            ? `<img src="${escapeHtml(listing.firstImageUrl)}" class="listing-card-image" alt="${escapeHtml(listing.title)}">`
+                                            : `<div class="listing-card-image-placeholder"><span>無圖片</span></div>`
+                                        }
+                                        ${isPinned ? '<span class="badge listing-pinned-badge">置頂中</span>' : ''}
+                                        ${isReserved ? '<div class="listing-reserved-cover" aria-hidden="true"></div><span class="badge listing-reserved-badge">保留中</span>' : ''}
+                                    </div>
                                     <div class="listing-card-content">
                                         ${tagsHtml}
                                         <div>
