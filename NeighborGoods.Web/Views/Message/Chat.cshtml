@@ -793,7 +793,12 @@
         /* 響應式設計 */
         @@media (max-width: 576px) {
             .chat-page {
-                height: calc(100vh - 60px);
+                height: calc(100vh - 60px); /* fallback */
+                height: calc(100dvh - 60px);
+            }
+
+            .message-input-container {
+                padding-bottom: max(env(safe-area-inset-bottom), 56px);
             }
 
             .chat-header {
