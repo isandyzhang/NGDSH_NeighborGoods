@@ -68,6 +68,7 @@ public class NotificationQueueBackgroundService : BackgroundService
             var db = scope.ServiceProvider.GetRequiredService<Data.AppDbContext>();
             var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Models.Entities.ApplicationUser>>();
             var lineOptions = scope.ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<LineMessagingApiOptions>>();
+            var emailOptions = scope.ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<EmailNotificationOptions>>();
 
             // 設定查詢超時為 30 秒
             db.Database.SetCommandTimeout(30);
@@ -259,14 +260,16 @@ public class NotificationQueueBackgroundService : BackgroundService
                         continue;
                     }
 
-                    // 發送通知的 URL
+                    // 發送通知的 URL（LINE 與 Email 各自使用自己的 BaseUrl，不共用）
                     var chatUrl = $"/Message/Chat?conversationId={conversationId}";
-                    var baseUrl = lineOptions?.Value?.BaseUrl ?? "https://neighborgoodstw.com";
-                    var fullUrl = $"{baseUrl.TrimEnd('/')}{chatUrl}";
+                    var lineBaseUrl = (lineOptions?.Value?.BaseUrl ?? "https://neighborgoodstw.com").TrimEnd('/');
+                    var emailBaseUrl = (emailOptions?.Value?.BaseUrl ?? "https://neighborgoodstw.com").TrimEnd('/');
+                    var lineFullUrl = $"{lineBaseUrl}{chatUrl}";
+                    var emailFullUrl = $"{emailBaseUrl}{chatUrl}";
                     var message = "你有尚未讀取的新訊息";
                     var linkText = "查看訊息";
 
-                    // 發送 LINE 通知
+                    // 發送 LINE 通知（使用 LineMessagingApi:BaseUrl）
                     if (hasLine && lineMessagingService != null && !string.IsNullOrEmpty(lineUserId))
                     {
                         try
@@ -274,7 +277,7 @@ public class NotificationQueueBackgroundService : BackgroundService
                             await lineMessagingService.SendPushMessageWithLinkAsync(
                                 lineUserId,
                                 message,
-                                fullUrl,
+                                lineFullUrl,
                                 linkText,
                                 NotificationPriority.Medium);
                             user.LineNotificationLastSentAt = now;
@@ -297,7 +300,7 @@ public class NotificationQueueBackgroundService : BackgroundService
                                 await emailNotificationService.SendPushMessageWithLinkAsync(
                                     email,
                                     message,
-                                    fullUrl,
+                                    emailFullUrl,
                                     linkText,
                                     NotificationPriority.Medium);
                                 user.EmailNotificationLastSentAt = now;
