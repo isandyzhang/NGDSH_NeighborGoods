@@ -1,7 +1,186 @@
+@model NeighborGoods.Web.Models.ViewModels.AdminDashboardViewModel
+
 @{
     ViewData["Title"] = "管理員後台";
     Layout = "_AdminLayout";
 }
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">總商品數量</h6>
+                <div class="display-6 fw-bold">@Model.TotalListingsCount</div>
+                <div class="small @(Model.TotalListingsTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.TotalListingsTodayDelta >= 0 ? "+" : "")@Model.TotalListingsTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">刊登中數量</h6>
+                <div class="display-6 fw-bold">@Model.ActiveListingsCount</div>
+                <div class="small @(Model.ActiveListingsTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.ActiveListingsTodayDelta >= 0 ? "+" : "")@Model.ActiveListingsTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">已售出數量</h6>
+                <div class="display-6 fw-bold">@Model.SoldListingsCount</div>
+                <div class="small @(Model.SoldListingsTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.SoldListingsTodayDelta >= 0 ? "+" : "")@Model.SoldListingsTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">已下架數量</h6>
+                <div class="display-6 fw-bold">@Model.InactiveListingsCount</div>
+                <div class="small @(Model.InactiveListingsTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.InactiveListingsTodayDelta >= 0 ? "+" : "")@Model.InactiveListingsTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">用戶總人數</h6>
+                <div class="display-6 fw-bold">@Model.TotalUsersCount</div>
+                <div class="small @(Model.TotalUsersTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.TotalUsersTodayDelta >= 0 ? "+" : "")@Model.TotalUsersTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">LINE 通知開啟數</h6>
+                <div class="display-6 fw-bold">@Model.LineNotificationEnabledUsersCount</div>
+                <div class="small @(Model.LineNotificationEnabledUsersTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.LineNotificationEnabledUsersTodayDelta >= 0 ? "+" : "")@Model.LineNotificationEnabledUsersTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Email 通知開啟數</h6>
+                <div class="display-6 fw-bold">@Model.EmailNotificationEnabledUsersCount</div>
+                <div class="small @(Model.EmailNotificationEnabledUsersTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.EmailNotificationEnabledUsersTodayDelta >= 0 ? "+" : "")@Model.EmailNotificationEnabledUsersTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Email 綁定數</h6>
+                <div class="display-6 fw-bold">@Model.EmailBoundUsersCount</div>
+                <div class="small @(Model.EmailBoundUsersTodayDelta >= 0 ? "text-success" : "text-danger")">
+                    今日淨增減 @(Model.EmailBoundUsersTodayDelta >= 0 ? "+" : "")@Model.EmailBoundUsersTodayDelta
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-bold">置頂投稿（最新）</span>
+                <a asp-action="TopSubmissions" class="btn btn-sm btn-outline-primary">查看全部</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">投稿者</th>
+                                <th>標題</th>
+                                <th>狀態</th>
+                                <th class="pe-3">時間</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.RecentTopSubmissions.Count == 0)
+                            {
+                                <tr><td colspan="4" class="text-center text-muted py-4">目前沒有置頂投稿資料</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in Model.RecentTopSubmissions)
+                                {
+                                    <tr>
+                                        <td class="ps-3">@item.UserDisplayName</td>
+                                        <td><a asp-action="TopSubmissionDetail" asp-route-id="@item.Id">@item.FeedbackTitle</a></td>
+                                        <td>@item.StatusText</td>
+                                        <td class="pe-3">@item.CreatedAt.ToString("MM-dd HH:mm")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-bold">信箱（最新）</span>
+                <a asp-action="Mailbox" class="btn btn-sm btn-outline-primary">查看全部</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">發送者</th>
+                                <th>內容</th>
+                                <th>狀態</th>
+                                <th class="pe-3">時間</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.RecentMailboxMessages.Count == 0)
+                            {
+                                <tr><td colspan="4" class="text-center text-muted py-4">目前沒有信箱資料</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var msg in Model.RecentMailboxMessages)
+                                {
+                                    <tr>
+                                        <td class="ps-3">@msg.SenderDisplayName</td>
+                                        <td>@msg.ContentPreview</td>
+                                        <td>@(msg.IsRead ? "已讀" : "未讀")</td>
+                                        <td class="pe-3">@msg.CreatedAt.ToString("MM-dd HH:mm")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-md-4 mb-3">

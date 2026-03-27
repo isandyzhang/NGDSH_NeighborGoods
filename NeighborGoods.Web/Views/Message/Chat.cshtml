@@ -69,9 +69,11 @@
                         @if (!Model.IsSeller)
                         {
                             <!-- 買家看到的按鈕 -->
-                            @if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Donated)
+                            @if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Sold ||
+                                 Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Donated ||
+                                 Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded)
                             {
-                                <!-- 商品狀態為已售出或已捐贈時，如果尚未評價則顯示給予評價按鈕 -->
+                                <!-- 商品狀態為已售出/已捐贈/已易物時，如果尚未評價則顯示給予評價按鈕 -->
                                 @if (!Model.HasCurrentUserReviewed)
                                 {
                                     <a asp-controller="Message" asp-action="Review" asp-route-listingId="@Model.ListingId.Value" asp-route-conversationId="@Model.ConversationId" class="btn btn-primary listing-action-btn">
@@ -115,9 +117,11 @@
                                     同意交易
                                 </button>
                             }
-                            else if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Donated)
+                            else if (Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Sold ||
+                                     Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.Donated ||
+                                     Model.ListingStatus == NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded)
                             {
-                                <!-- 商品狀態為已售出或已捐贈時，如果尚未評價則顯示給予評價按鈕 -->
+                                <!-- 商品狀態為已售出/已捐贈/已易物時，如果尚未評價則顯示給予評價按鈕 -->
                                 @if (!Model.HasCurrentUserReviewed)
                                 {
                                     <a asp-controller="Message" asp-action="Review" asp-route-listingId="@Model.ListingId.Value" asp-route-conversationId="@Model.ConversationId" class="btn btn-primary listing-action-btn">
@@ -896,6 +900,7 @@
             NeighborGoods.Web.Models.Enums.ListingStatus.Reserved => "保留中",
             NeighborGoods.Web.Models.Enums.ListingStatus.Sold => "已售出",
             NeighborGoods.Web.Models.Enums.ListingStatus.Donated => "已捐贈",
+            NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded => "已易物",
             NeighborGoods.Web.Models.Enums.ListingStatus.Inactive => "已下架",
             _ => status.ToString()
         };

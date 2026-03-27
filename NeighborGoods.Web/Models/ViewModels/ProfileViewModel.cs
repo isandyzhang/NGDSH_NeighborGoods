@@ -17,7 +17,7 @@ public class ProfileViewModel
     public int ActiveListings { get; set; }
     
     /// <summary>
-    /// 已售出/已捐贈的商品數（成交紀錄）
+    /// 已售出/已捐贈/已易物的商品數（成交紀錄）
     /// </summary>
     public int CompletedListings { get; set; }
 

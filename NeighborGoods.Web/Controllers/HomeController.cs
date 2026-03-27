@@ -125,6 +125,17 @@ public class HomeController : BaseController
         return View();
     }
 
+    public async Task<IActionResult> LogoEntry()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser?.Role == UserRole.Admin)
+        {
+            return RedirectToAction("Index", "Admin");
+        }
+
+        return RedirectToAction("Index", "Home");
+    }
+
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()

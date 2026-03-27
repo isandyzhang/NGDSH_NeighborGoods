@@ -724,8 +724,13 @@ public class MessageService : IMessageService
                 return ServiceResult<CompleteTransactionResult>.Fail("商品狀態不允許此操作");
             }
 
-            // 更新商品狀態為已售出
-            listing.Status = Models.Enums.ListingStatus.Sold;
+            // 依商品屬性更新完成狀態：
+            // 免費商品 -> 已捐贈；可易物商品 -> 已贈出/易物；其他 -> 已售出
+            listing.Status = listing.IsFree
+                ? Models.Enums.ListingStatus.Donated
+                : listing.IsTradeable
+                    ? Models.Enums.ListingStatus.GivenOrTraded
+                    : Models.Enums.ListingStatus.Sold;
             listing.UpdatedAt = TaiwanTime.Now;
             // 記錄買家 ID
             listing.BuyerId = buyerId;
@@ -733,12 +738,19 @@ public class MessageService : IMessageService
             // 發送系統訊息通知賣家
             var sellerId = listing.SellerId;
 
+            var completedStatusText = listing.Status switch
+            {
+                Models.Enums.ListingStatus.Donated => "已捐贈",
+                Models.Enums.ListingStatus.GivenOrTraded => "已易物",
+                _ => "已售出"
+            };
+
             var notificationMessage = new Message
             {
                 Id = Guid.NewGuid(),
                 ConversationId = conversation.Id,
                 SenderId = buyerId,
-                Content = "[系統發送] 買家已完成交易，商品狀態已變更為「已售出」。請對買家進行評價。",
+                Content = $"[系統發送] 買家已完成交易，商品狀態已變更為「{completedStatusText}」。請對買家進行評價。",
                 CreatedAt = TaiwanTime.Now
             };
 

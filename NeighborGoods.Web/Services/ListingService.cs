@@ -882,6 +882,8 @@ public class ListingService : IListingService
             {
                 if (newStatus != ListingStatus.Sold &&
                     newStatus != ListingStatus.Reserved &&
+                    newStatus != ListingStatus.Donated &&
+                    newStatus != ListingStatus.GivenOrTraded &&
                     newStatus != ListingStatus.Inactive)
                 {
                     return ServiceResult<string?>.Fail("無效的商品狀態");
@@ -891,16 +893,33 @@ public class ListingService : IListingService
             {
                 if (newStatus != ListingStatus.Active &&
                     newStatus != ListingStatus.Sold &&
+                    newStatus != ListingStatus.Donated &&
+                    newStatus != ListingStatus.GivenOrTraded &&
                     newStatus != ListingStatus.Inactive)
                 {
                     return ServiceResult<string?>.Fail("無效的商品狀態");
                 }
             }
 
+            // 業務規則：
+            // 1) 免費商品可標記為「已捐贈」
+            // 2) 可易物商品可標記為「已贈出/易物」
+            // 3) 非可易物商品不可標記為「已贈出/易物」
+            // 4) 非免費且非愛心商品不可標記為「已捐贈」
+            if (newStatus == ListingStatus.Donated && !(listing.IsFree || listing.IsCharity))
+            {
+                return ServiceResult<string?>.Fail("此商品不是免費或愛心商品，無法標記為已捐贈");
+            }
+
+            if (newStatus == ListingStatus.GivenOrTraded && !listing.IsTradeable)
+            {
+                return ServiceResult<string?>.Fail("此商品未開啟以物易物，無法標記為已易物");
+            }
+
             string? warningMessage = null;
 
             // 如果選擇「交易完成」，檢查是否有相關 Conversation
-            if (newStatus == ListingStatus.Sold)
+            if (newStatus == ListingStatus.Sold || newStatus == ListingStatus.GivenOrTraded || newStatus == ListingStatus.Donated)
             {
                 var hasConversation = await _db.Conversations
                     .AnyAsync(c => c.ListingId == listingId);

@@ -45,9 +45,11 @@ public class ReviewService : IReviewService
             }
 
             // 驗證商品狀態為已售出
-            if (listing.Status != ListingStatus.Sold && listing.Status != ListingStatus.Donated)
+            if (listing.Status != ListingStatus.Sold &&
+                listing.Status != ListingStatus.Donated &&
+                listing.Status != ListingStatus.GivenOrTraded)
             {
-                return ServiceResult.Fail("只有已售出或已捐贈的商品才能評價");
+                return ServiceResult.Fail("只有已售出、已捐贈或已易物的商品才能評價");
             }
 
             // 驗證對話

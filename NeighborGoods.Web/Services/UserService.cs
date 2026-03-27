@@ -39,7 +39,9 @@ public class UserService : IUserService
 
         var completedListings = await _db.Listings
             .CountAsync(l => l.SellerId == userId &&
-                           (l.Status == ListingStatus.Sold || l.Status == ListingStatus.Donated));
+                           (l.Status == ListingStatus.Sold ||
+                            l.Status == ListingStatus.Donated ||
+                            l.Status == ListingStatus.GivenOrTraded));
 
         return new UserStatistics
         {

@@ -6,7 +6,8 @@ public enum ListingStatus
     Reserved = 1, // 保留中
     Sold = 2,     // 已售出
     Donated = 3,  // 已捐贈
-    Inactive = 4  // 已下架
+    Inactive = 4, // 已下架
+    GivenOrTraded = 5 // 已贈出/易物
 }
 
 

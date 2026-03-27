@@ -6,6 +6,50 @@
     Layout = "_AdminLayout";
 }
 
+<form method="get" asp-action="Listings" class="row g-2 mb-3 align-items-end">
+    <div class="col-auto">
+        <label for="status" class="form-label mb-0">狀態篩選</label>
+        <select id="status" name="status" class="form-select">
+            <option value="">全部</option>
+            @foreach (ListingStatus statusOption in Enum.GetValues(typeof(ListingStatus)))
+            {
+                <option value="@statusOption" selected="@(Model.CurrentStatus == statusOption)">
+                    @switch (statusOption)
+                    {
+                        case ListingStatus.Active:
+                            @:上架中
+                            break;
+                        case ListingStatus.Reserved:
+                            @:保留中
+                            break;
+                        case ListingStatus.Sold:
+                            @:已售出
+                            break;
+                        case ListingStatus.Donated:
+                            @:已捐贈
+                            break;
+                        case ListingStatus.GivenOrTraded:
+                            @:已贈出/易物
+                            break;
+                        case ListingStatus.Inactive:
+                            @:已下架
+                            break;
+                        default:
+                            @:未知
+                            break;
+                    }
+                </option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">套用</button>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Listings" class="btn btn-outline-secondary">清除</a>
+    </div>
+</form>
+
 <table class="table table-striped">
     <thead>
         <tr>
@@ -39,6 +83,9 @@
                         case ListingStatus.Donated:
                             <span class="badge bg-primary">已捐贈</span>
                             break;
+                        case ListingStatus.GivenOrTraded:
+                            <span class="badge bg-dark">已贈出/易物</span>
+                            break;
                         case ListingStatus.Inactive:
                             <span class="badge bg-secondary">已下架</span>
                             break;
@@ -68,7 +115,7 @@
             @for (int i = 1; i <= Model.TotalPages; i++)
             {
                 <li class="page-item @(i == Model.Page ? "active" : "")">
-                    <a class="page-link" asp-action="Listings" asp-route-page="@i">@i</a>
+                    <a class="page-link" asp-action="Listings" asp-route-page="@i" asp-route-status="@Model.CurrentStatus">@i</a>
                 </li>
             }
         </ul>

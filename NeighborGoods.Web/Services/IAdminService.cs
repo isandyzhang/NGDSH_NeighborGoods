@@ -1,4 +1,5 @@
 using NeighborGoods.Web.Models.ViewModels;
+using NeighborGoods.Web.Models.Enums;
 
 namespace NeighborGoods.Web.Services;
 
@@ -12,7 +13,12 @@ public interface IAdminService
     /// <summary>
     /// 取得所有商品列表（分頁）
     /// </summary>
-    Task<AdminListingsViewModel> GetAllListingsAsync(int page, int pageSize);
+    Task<AdminListingsViewModel> GetAllListingsAsync(int page, int pageSize, ListingStatus? status = null);
+
+    /// <summary>
+    /// 取得後台 Dashboard 商品統計
+    /// </summary>
+    Task<AdminDashboardViewModel> GetDashboardStatsAsync();
 
     /// <summary>
     /// 取得商品詳情及相關對話

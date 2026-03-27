@@ -96,14 +96,15 @@ public class AdminController : BaseController
         return RedirectToAction("Index", "Home");
     }
 
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
-        return View();
+        var viewModel = await _adminService.GetDashboardStatsAsync();
+        return View(viewModel);
     }
 
-    public async Task<IActionResult> Listings(int page = 1)
+    public async Task<IActionResult> Listings(ListingStatus? status = null, int page = 1)
     {
-        var viewModel = await _adminService.GetAllListingsAsync(page, PaginationConstants.DefaultPageSize);
+        var viewModel = await _adminService.GetAllListingsAsync(page, PaginationConstants.DefaultPageSize, status);
         return View(viewModel);
     }
 

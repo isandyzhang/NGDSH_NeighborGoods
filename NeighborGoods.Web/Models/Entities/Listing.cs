@@ -32,7 +32,7 @@ public class Listing
     public bool IsTradeable { get; set; }
 
     /// <summary>
-    /// 商品狀態（上架中 / 保留中 / 已售出 / 已捐贈 / 已下架）。
+    /// 商品狀態（上架中 / 保留中 / 已售出 / 已捐贈 / 已下架 / 已贈出易物）。
     /// </summary>
     public ListingStatus Status { get; set; } = ListingStatus.Active;
 

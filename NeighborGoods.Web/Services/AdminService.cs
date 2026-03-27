@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Models.Entities;
+using NeighborGoods.Web.Models.Enums;
 using NeighborGoods.Web.Models.ViewModels;
 using NeighborGoods.Web.Utils;
 
@@ -30,13 +31,128 @@ public class AdminService : IAdminService
         return Task.FromResult(!string.IsNullOrEmpty(adminPassword) && adminPassword == password);
     }
 
-    public async Task<AdminListingsViewModel> GetAllListingsAsync(int page, int pageSize)
+    public async Task<AdminDashboardViewModel> GetDashboardStatsAsync()
     {
+        var todayStart = TaiwanTime.Now.Date;
+        var tomorrowStart = todayStart.AddDays(1);
+
+        var totalListingsCount = await _db.Listings.CountAsync();
+        var activeListingsCount = await _db.Listings.CountAsync(l => l.Status == ListingStatus.Active);
+        var soldListingsCount = await _db.Listings.CountAsync(l => l.Status == ListingStatus.Sold);
+        var inactiveListingsCount = await _db.Listings.CountAsync(l => l.Status == ListingStatus.Inactive);
+
+        // 今日淨增減：以可取得欄位進行簡單估算
+        var totalListingsTodayDelta = await _db.Listings.CountAsync(l => l.CreatedAt >= todayStart && l.CreatedAt < tomorrowStart);
+
+        var activeInToday = await _db.Listings.CountAsync(l =>
+            l.Status == ListingStatus.Active &&
+            l.UpdatedAt >= todayStart &&
+            l.UpdatedAt < tomorrowStart);
+        var activeOutToday = await _db.Listings.CountAsync(l =>
+            l.Status != ListingStatus.Active &&
+            l.UpdatedAt >= todayStart &&
+            l.UpdatedAt < tomorrowStart);
+        var activeListingsTodayDelta = activeInToday - activeOutToday;
+
+        var soldListingsTodayDelta = await _db.Listings.CountAsync(l =>
+            l.Status == ListingStatus.Sold &&
+            l.UpdatedAt >= todayStart &&
+            l.UpdatedAt < tomorrowStart);
+
+        var inactiveListingsTodayDelta = await _db.Listings.CountAsync(l =>
+            l.Status == ListingStatus.Inactive &&
+            l.UpdatedAt >= todayStart &&
+            l.UpdatedAt < tomorrowStart);
+
+        var totalUsersCount = await _db.Users.CountAsync();
+        var totalUsersTodayDelta = await _db.Users.CountAsync(u => u.CreatedAt >= todayStart && u.CreatedAt < tomorrowStart);
+
+        var lineNotificationEnabledUsersCount = await _db.Users.CountAsync(u => !string.IsNullOrEmpty(u.LineMessagingApiUserId));
+        var lineNotificationEnabledUsersTodayDelta = await _db.Users.CountAsync(u =>
+            u.LineMessagingApiAuthorizedAt.HasValue &&
+            u.LineMessagingApiAuthorizedAt.Value >= todayStart &&
+            u.LineMessagingApiAuthorizedAt.Value < tomorrowStart);
+
+        var emailNotificationEnabledUsersCount = await _db.Users.CountAsync(u =>
+            u.EmailNotificationEnabled && !string.IsNullOrEmpty(u.Email));
+        var emailNotificationEnabledUsersTodayDelta = await _db.Users.CountAsync(u =>
+            u.EmailNotificationEnabled &&
+            !string.IsNullOrEmpty(u.Email) &&
+            u.CreatedAt >= todayStart &&
+            u.CreatedAt < tomorrowStart);
+
+        var emailBoundUsersCount = await _db.Users.CountAsync(u => !string.IsNullOrEmpty(u.Email));
+        var emailBoundUsersTodayDelta = await _db.Users.CountAsync(u =>
+            u.CreatedAt >= todayStart &&
+            u.CreatedAt < tomorrowStart &&
+            !string.IsNullOrEmpty(u.Email));
+
+        var recentTopSubmissions = await _db.ListingTopSubmissions
+            .Include(s => s.User)
+            .OrderByDescending(s => s.CreatedAt)
+            .Take(8)
+            .Select(s => new AdminDashboardTopSubmissionItemViewModel
+            {
+                Id = s.Id,
+                UserDisplayName = s.User != null ? s.User.DisplayName : "未知用戶",
+                FeedbackTitle = s.FeedbackTitle,
+                StatusText = s.Status == TopSubmissionStatus.Pending ? "待審核"
+                    : s.Status == TopSubmissionStatus.Approved ? "已核准"
+                    : "已駁回",
+                CreatedAt = s.CreatedAt
+            })
+            .ToListAsync();
+
+        var recentMailboxMessages = await _db.AdminMessages
+            .Include(m => m.Sender)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(8)
+            .Select(m => new AdminDashboardMailboxItemViewModel
+            {
+                Id = m.Id,
+                SenderDisplayName = m.Sender != null ? m.Sender.DisplayName : "未知用戶",
+                ContentPreview = m.Content.Length > 40 ? m.Content.Substring(0, 40) + "..." : m.Content,
+                IsRead = m.IsRead,
+                CreatedAt = m.CreatedAt
+            })
+            .ToListAsync();
+
+        return new AdminDashboardViewModel
+        {
+            TotalListingsCount = totalListingsCount,
+            TotalListingsTodayDelta = totalListingsTodayDelta,
+            ActiveListingsCount = activeListingsCount,
+            ActiveListingsTodayDelta = activeListingsTodayDelta,
+            SoldListingsCount = soldListingsCount,
+            SoldListingsTodayDelta = soldListingsTodayDelta,
+            InactiveListingsCount = inactiveListingsCount,
+            InactiveListingsTodayDelta = inactiveListingsTodayDelta,
+            TotalUsersCount = totalUsersCount,
+            TotalUsersTodayDelta = totalUsersTodayDelta,
+            LineNotificationEnabledUsersCount = lineNotificationEnabledUsersCount,
+            LineNotificationEnabledUsersTodayDelta = lineNotificationEnabledUsersTodayDelta,
+            EmailNotificationEnabledUsersCount = emailNotificationEnabledUsersCount,
+            EmailNotificationEnabledUsersTodayDelta = emailNotificationEnabledUsersTodayDelta,
+            EmailBoundUsersCount = emailBoundUsersCount,
+            EmailBoundUsersTodayDelta = emailBoundUsersTodayDelta,
+            RecentTopSubmissions = recentTopSubmissions,
+            RecentMailboxMessages = recentMailboxMessages
+        };
+    }
+
+    public async Task<AdminListingsViewModel> GetAllListingsAsync(int page, int pageSize, ListingStatus? status = null)
+    {
+        var query = _db.Listings.AsQueryable();
+        if (status.HasValue)
+        {
+            query = query.Where(l => l.Status == status.Value);
+        }
+
         // 先計算總數（不包含 Include）
-        var totalCount = await _db.Listings.CountAsync();
+        var totalCount = await query.CountAsync();
 
         // 再執行包含 Include 的查詢
-        var listings = await _db.Listings
+        var listings = await query
             .Include(l => l.Seller)
             .Include(l => l.Buyer)
             .OrderByDescending(l => l.CreatedAt)
@@ -60,7 +176,8 @@ public class AdminService : IAdminService
             Listings = listings,
             Page = page,
             PageSize = pageSize,
-            TotalCount = totalCount
+            TotalCount = totalCount,
+            CurrentStatus = status
         };
     }
 

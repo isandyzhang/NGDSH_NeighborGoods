@@ -35,7 +35,7 @@
                     保留中 (@Model.Listings.Count(l => l.Status == ListingStatus.Reserved))
                 </button>
                 <button type="button" class="btn btn-outline-primary filter-btn" data-status="completed">
-                    成交 (@Model.Listings.Count(l => l.Status == ListingStatus.Sold || l.Status == ListingStatus.Donated))
+                    成交 (@Model.Listings.Count(l => l.Status == ListingStatus.Sold || l.Status == ListingStatus.Donated || l.Status == ListingStatus.GivenOrTraded))
                 </button>
             </div>
         </div>
@@ -50,6 +50,7 @@
                     ListingStatus.Reserved => "warning",
                     ListingStatus.Sold => "info",
                     ListingStatus.Donated => "primary",
+                    ListingStatus.GivenOrTraded => "dark",
                     ListingStatus.Inactive => "secondary",
                     _ => "secondary"
                 };
@@ -60,11 +61,12 @@
                     ListingStatus.Reserved => "保留中",
                     ListingStatus.Sold => "已售出",
                     ListingStatus.Donated => "已捐贈",
+                    ListingStatus.GivenOrTraded => "已易物",
                     ListingStatus.Inactive => "已下架",
                     _ => listing.Status.ToString()
                 };
 
-                var isCompleted = listing.Status == ListingStatus.Sold || listing.Status == ListingStatus.Donated;
+                var isCompleted = listing.Status == ListingStatus.Sold || listing.Status == ListingStatus.Donated || listing.Status == ListingStatus.GivenOrTraded;
 
                 <div class="col-12 col-md-6 col-lg-4 listing-item" 
                      data-status="@((int)listing.Status)" 
@@ -122,7 +124,18 @@
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end">
                                                 <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Reserved)">保留中</a></li>
-                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Sold)">交易完成</a></li>
+                                                @if (listing.IsFree)
+                                                {
+                                                    <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Donated)">已捐贈</a></li>
+                                                }
+                                                else if (listing.IsTradeable)
+                                                {
+                                                    <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.GivenOrTraded)">已易物</a></li>
+                                                }
+                                                else
+                                                {
+                                                    <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Sold)">已售出</a></li>
+                                                }
                                                 <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Inactive)">下架商品</a></li>
                                             </ul>
                                         </div>
@@ -137,7 +150,18 @@
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end">
                                                 <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Active)">上架中</a></li>
-                                                <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Sold)">交易完成</a></li>
+                                                @if (listing.IsFree)
+                                                {
+                                                    <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Donated)">已捐贈</a></li>
+                                                }
+                                                else if (listing.IsTradeable)
+                                                {
+                                                    <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.GivenOrTraded)">已易物</a></li>
+                                                }
+                                                else
+                                                {
+                                                    <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Sold)">已售出</a></li>
+                                                }
                                                 <li><a class="dropdown-item my-status-option" href="#" data-status="@((int)ListingStatus.Inactive)">下架商品</a></li>
                                             </ul>
                                         </div>

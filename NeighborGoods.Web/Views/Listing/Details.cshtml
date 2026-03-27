@@ -192,7 +192,18 @@ else
                     修改商品狀態
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="statusDropdown">
-                    <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Sold)">交易完成</a></li>
+                    @if (Model.IsFree)
+                    {
+                        <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Donated)">已捐贈</a></li>
+                    }
+                    else if (Model.IsTradeable)
+                    {
+                        <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded)">已易物</a></li>
+                    }
+                    else
+                    {
+                        <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Sold)">已售出</a></li>
+                    }
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Reserved)">保留中</a></li>
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Inactive)">下架商品</a></li>
                 </ul>
@@ -206,7 +217,18 @@ else
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="statusDropdownReserved">
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Active)">上架中</a></li>
-                    <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Sold)">交易完成</a></li>
+                    @if (Model.IsFree)
+                    {
+                        <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Donated)">已捐贈</a></li>
+                    }
+                    else if (Model.IsTradeable)
+                    {
+                        <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded)">已易物</a></li>
+                    }
+                    else
+                    {
+                        <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Sold)">已售出</a></li>
+                    }
                     <li><a class="dropdown-item status-option" href="#" data-status="@((int)NeighborGoods.Web.Models.Enums.ListingStatus.Inactive)">下架商品</a></li>
                 </ul>
             </div>
@@ -264,7 +286,7 @@ else
                 保留中
             </button>
         }
-        else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Donated)
+        else if (Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Sold || Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.Donated || Model.Status == NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded)
         {
             <!-- 已售出/已捐贈：顯示已交易成功 -->
             <button type="button" class="btn btn-secondary listing-status-disabled-btn" disabled>
@@ -290,6 +312,7 @@ else
             NeighborGoods.Web.Models.Enums.ListingStatus.Reserved => "保留中",
             NeighborGoods.Web.Models.Enums.ListingStatus.Sold => "已售出",
             NeighborGoods.Web.Models.Enums.ListingStatus.Donated => "已捐贈",
+            NeighborGoods.Web.Models.Enums.ListingStatus.GivenOrTraded => "已易物",
             NeighborGoods.Web.Models.Enums.ListingStatus.Inactive => "已下架",
             _ => status.ToString()
         };
