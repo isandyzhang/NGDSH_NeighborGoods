@@ -1,0 +1,8 @@
+namespace NeighborGoods.Api.Shared.Contracts;
+
+public sealed record PagedResult<T>(
+    int Page,
+    int PageSize,
+    int Total,
+    IReadOnlyList<T> Items
+);

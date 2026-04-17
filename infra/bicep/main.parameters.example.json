@@ -1,0 +1,75 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastasia"
+    },
+    "environmentName": {
+      "value": "prod"
+    },
+    "namePrefix": {
+      "value": "neighborgoods"
+    },
+    "appServicePlanSkuName": {
+      "value": "F1"
+    },
+    "appServicePlanSkuTier": {
+      "value": "Free"
+    },
+    "deploySignalR": {
+      "value": true
+    },
+    "sqlAdminLogin": {
+      "value": "ngadmin"
+    },
+    "sqlAdminPassword": {
+      "value": "PLEASE-SET-AZURE-SQL-ADMIN-PASSWORD"
+    },
+    "lineOidcChannelId": {
+      "value": "PLEASE-SET-LINE-OIDC-CHANNEL-ID"
+    },
+    "lineOidcChannelSecret": {
+      "value": "PLEASE-SET-LINE-OIDC-CHANNEL-SECRET"
+    },
+    "lineMessagingChannelId": {
+      "value": "PLEASE-SET-LINE-MESSAGING-CHANNEL-ID"
+    },
+    "lineMessagingAccessToken": {
+      "value": "PLEASE-SET-LINE-MESSAGING-CHANNEL-ACCESS-TOKEN"
+    },
+    "lineMessagingChannelSecret": {
+      "value": "PLEASE-SET-LINE-MESSAGING-CHANNEL-SECRET"
+    },
+    "lineMessagingBotId": {
+      "value": "@PLEASE-SET-LINE-BOT-ID"
+    },
+    "lineMessagingBaseUrl": {
+      "value": "https://YOUR-WEBAPP.azurewebsites.net"
+    },
+    "emailConnectionString": {
+      "value": "PLEASE-SET-ACS-EMAIL-CONNECTION-STRING"
+    },
+    "emailFromAddress": {
+      "value": "PLEASE-SET-ACS-FROM-EMAIL-ADDRESS"
+    },
+    "emailFromDisplayName": {
+      "value": "NeighborGoods"
+    },
+    "emailLogoUrl": {
+      "value": ""
+    },
+    "emailBaseUrl": {
+      "value": "https://YOUR-WEBAPP.azurewebsites.net"
+    },
+    "lineOidcCallbackPath": {
+      "value": "/signin-line"
+    },
+    "lineOidcScope": {
+      "value": "openid profile"
+    },
+    "aspnetcoreEnvironment": {
+      "value": "Production"
+    }
+  }
+}
