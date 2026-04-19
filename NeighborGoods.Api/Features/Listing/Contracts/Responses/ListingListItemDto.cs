@@ -9,5 +9,13 @@ public sealed record ListingListItemDto(
     string ConditionName,
     int Price,
     int ResidenceCode,
-    string ResidenceName
+    string ResidenceName,
+    string? MainImageUrl,
+    int StatusCode,
+    bool IsFree,
+    bool IsCharity,
+    bool IsTradeable,
+    bool IsPinned,
+    DateTime? PinnedEndDate,
+    int InterestCount
 );

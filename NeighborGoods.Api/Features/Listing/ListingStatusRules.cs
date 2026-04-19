@@ -2,11 +2,12 @@ namespace NeighborGoods.Api.Features.Listing;
 
 public static class ListingStatusRules
 {
-    public static bool IsValid(int statusCode)
-    {
-        return Enum.IsDefined(typeof(ListingStatus), statusCode);
-    }
+    public static bool IsValid(int statusCode) =>
+        Enum.IsDefined(typeof(ListingStatus), statusCode);
 
+    /// <summary>
+    /// 與 Web <c>UpdateListingStatusAsync</c> 一致：僅上架中／保留中可變更，且目標狀態須在允許集合內。
+    /// </summary>
     public static bool CanTransition(ListingStatus from, ListingStatus to)
     {
         if (from == to)
@@ -14,16 +15,23 @@ public static class ListingStatusRules
             return false;
         }
 
-        return (from, to) switch
+        if (from is not (ListingStatus.Active or ListingStatus.Reserved))
         {
-            (ListingStatus.Active, ListingStatus.Reserved) => true,
-            (ListingStatus.Active, ListingStatus.Sold) => true,
-            (ListingStatus.Active, ListingStatus.Archived) => true,
-            (ListingStatus.Reserved, ListingStatus.Active) => true,
-            (ListingStatus.Reserved, ListingStatus.Sold) => true,
-            (ListingStatus.Reserved, ListingStatus.Archived) => true,
-            (ListingStatus.Sold, ListingStatus.Archived) => true,
-            (ListingStatus.Archived, ListingStatus.Active) => true,
+            return false;
+        }
+
+        return from switch
+        {
+            ListingStatus.Active => to is ListingStatus.Reserved
+                or ListingStatus.Sold
+                or ListingStatus.Donated
+                or ListingStatus.GivenOrTraded
+                or ListingStatus.Inactive,
+            ListingStatus.Reserved => to is ListingStatus.Active
+                or ListingStatus.Sold
+                or ListingStatus.Donated
+                or ListingStatus.GivenOrTraded
+                or ListingStatus.Inactive,
             _ => false
         };
     }

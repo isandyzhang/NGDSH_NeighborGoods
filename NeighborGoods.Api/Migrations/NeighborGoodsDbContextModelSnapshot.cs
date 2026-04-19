@@ -107,6 +107,14 @@ namespace NeighborGoods.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Category");
+
+                    b.HasIndex("Condition");
+
+                    b.HasIndex("PickupLocation");
+
+                    b.HasIndex("Residence");
+
                     b.HasIndex(new[] { "BuyerId" }, "IX_Listings_BuyerId");
 
                     b.HasIndex(new[] { "SellerId" }, "IX_Listings_SellerId");
@@ -114,7 +122,123 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("Listings", (string)null);
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AdminMessage", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CodeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeKey")
+                        .IsUnique();
+
+                    b.ToTable("ListingCategories", (string)null);
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingCondition", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CodeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeKey")
+                        .IsUnique();
+
+                    b.ToTable("ListingConditions", (string)null);
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingPickupLocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CodeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeKey")
+                        .IsUnique();
+
+                    b.ToTable("ListingPickupLocations", (string)null);
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingResidence", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CodeKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeKey")
+                        .IsUnique();
+
+                    b.ToTable("ListingResidences", (string)null);
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AdminMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -141,7 +265,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AdminMessages");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetRole", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetRole", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -166,7 +290,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AspNetRoles");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetRoleClaim", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetRoleClaim", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -191,7 +315,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AspNetRoleClaims");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -289,7 +413,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AspNetUsers");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUserClaim", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUserClaim", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -314,7 +438,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AspNetUserClaims");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUserLogin", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUserLogin", b =>
                 {
                     b.Property<string>("LoginProvider")
                         .HasColumnType("nvarchar(450)");
@@ -336,7 +460,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AspNetUserLogins");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUserToken", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUserToken", b =>
                 {
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
@@ -355,7 +479,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("AspNetUserTokens");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Conversation", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -394,7 +518,46 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("Conversations");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.LineBindingPending", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.EmailVerificationChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte>("Purpose")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "Purpose", "NormalizedEmail", "ConsumedAt", "ExpiresAt" }, "IX_EmailVerificationChallenges_Purpose_Email_Consumed_Expires");
+
+                    b.HasIndex(new[] { "UserId", "Purpose", "ConsumedAt" }, "IX_EmailVerificationChallenges_User_Purpose_Consumed");
+
+                    b.ToTable("EmailVerificationChallenges", (string)null);
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.LineBindingPending", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -426,7 +589,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("LineBindingPending", (string)null);
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.ListingImage", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.ListingImage", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -451,7 +614,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("ListingImages");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.ListingTopSubmission", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.ListingTopSubmission", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -514,15 +677,15 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("ListingTopSubmissions");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Message", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Message", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uniqueidentifier");
@@ -543,7 +706,7 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("Messages");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Review", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Review", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -583,13 +746,13 @@ namespace NeighborGoods.Api.Migrations
 
             modelBuilder.Entity("AspNetUserRole", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetRole", null)
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", null)
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -598,11 +761,35 @@ namespace NeighborGoods.Api.Migrations
 
             modelBuilder.Entity("NeighborGoods.Api.Features.Listing.Listing", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Buyer")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Buyer")
                         .WithMany("ListingBuyers")
                         .HasForeignKey("BuyerId");
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Seller")
+                    b.HasOne("NeighborGoods.Api.Features.Listing.ListingCategory", "CategoryInfo")
+                        .WithMany("Listings")
+                        .HasForeignKey("Category")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Features.Listing.ListingCondition", "ConditionInfo")
+                        .WithMany("Listings")
+                        .HasForeignKey("Condition")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Features.Listing.ListingPickupLocation", "PickupLocationInfo")
+                        .WithMany("Listings")
+                        .HasForeignKey("PickupLocation")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Features.Listing.ListingResidence", "ResidenceInfo")
+                        .WithMany("Listings")
+                        .HasForeignKey("Residence")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Seller")
                         .WithMany("ListingSellers")
                         .HasForeignKey("SellerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -610,12 +797,20 @@ namespace NeighborGoods.Api.Migrations
 
                     b.Navigation("Buyer");
 
+                    b.Navigation("CategoryInfo");
+
+                    b.Navigation("ConditionInfo");
+
+                    b.Navigation("PickupLocationInfo");
+
+                    b.Navigation("ResidenceInfo");
+
                     b.Navigation("Seller");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AdminMessage", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AdminMessage", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Sender")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Sender")
                         .WithMany("AdminMessages")
                         .HasForeignKey("SenderId")
                         .IsRequired();
@@ -623,9 +818,9 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Sender");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetRoleClaim", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetRoleClaim", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetRole", "Role")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetRole", "Role")
                         .WithMany("AspNetRoleClaims")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -634,9 +829,9 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUserClaim", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUserClaim", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "User")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "User")
                         .WithMany("AspNetUserClaims")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -645,9 +840,9 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUserLogin", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUserLogin", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "User")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "User")
                         .WithMany("AspNetUserLogins")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -656,9 +851,9 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUserToken", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUserToken", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "User")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "User")
                         .WithMany("AspNetUserTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -667,19 +862,19 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Conversation", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Conversation", b =>
                 {
                     b.HasOne("NeighborGoods.Api.Features.Listing.Listing", "Listing")
                         .WithMany("Conversations")
                         .HasForeignKey("ListingId")
                         .IsRequired();
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Participant1")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Participant1")
                         .WithMany("ConversationParticipant1s")
                         .HasForeignKey("Participant1Id")
                         .IsRequired();
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Participant2")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Participant2")
                         .WithMany("ConversationParticipant2s")
                         .HasForeignKey("Participant2Id")
                         .IsRequired();
@@ -691,9 +886,9 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Participant2");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.LineBindingPending", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.LineBindingPending", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "User")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "User")
                         .WithMany("LineBindingPendings")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -702,7 +897,7 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.ListingImage", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.ListingImage", b =>
                 {
                     b.HasOne("NeighborGoods.Api.Features.Listing.Listing", "Listing")
                         .WithMany("ListingImages")
@@ -713,17 +908,17 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Listing");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.ListingTopSubmission", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.ListingTopSubmission", b =>
                 {
                     b.HasOne("NeighborGoods.Api.Features.Listing.Listing", "Listing")
                         .WithMany("ListingTopSubmissions")
                         .HasForeignKey("ListingId");
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "ReviewedByAdmin")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "ReviewedByAdmin")
                         .WithMany("ListingTopSubmissionReviewedByAdmins")
                         .HasForeignKey("ReviewedByAdminId");
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "User")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "User")
                         .WithMany("ListingTopSubmissionUsers")
                         .HasForeignKey("UserId")
                         .IsRequired();
@@ -735,15 +930,15 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Message", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Message", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.Conversation", "Conversation")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Conversation", "Conversation")
                         .WithMany("Messages")
                         .HasForeignKey("ConversationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Sender")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Sender")
                         .WithMany("Messages")
                         .HasForeignKey("SenderId")
                         .IsRequired();
@@ -753,9 +948,9 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Sender");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Review", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Review", b =>
                 {
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Buyer")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Buyer")
                         .WithMany("ReviewBuyers")
                         .HasForeignKey("BuyerId")
                         .IsRequired();
@@ -766,7 +961,7 @@ namespace NeighborGoods.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", "Seller")
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Seller")
                         .WithMany("ReviewSellers")
                         .HasForeignKey("SellerId")
                         .IsRequired();
@@ -789,12 +984,32 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Reviews");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetRole", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingCategory", b =>
+                {
+                    b.Navigation("Listings");
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingCondition", b =>
+                {
+                    b.Navigation("Listings");
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingPickupLocation", b =>
+                {
+                    b.Navigation("Listings");
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingResidence", b =>
+                {
+                    b.Navigation("Listings");
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetRole", b =>
                 {
                     b.Navigation("AspNetRoleClaims");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.AspNetUser", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", b =>
                 {
                     b.Navigation("AdminMessages");
 
@@ -825,7 +1040,7 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("ReviewSellers");
                 });
 
-            modelBuilder.Entity("NeighborGoods.Api.ScaffoldTemp.Entities.Conversation", b =>
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Conversation", b =>
                 {
                     b.Navigation("Messages");
                 });

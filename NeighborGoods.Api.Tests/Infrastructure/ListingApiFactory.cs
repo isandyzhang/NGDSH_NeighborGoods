@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NeighborGoods.Api.Features.Auth.Services;
 using NeighborGoods.Api.Features.Listing;
+using NeighborGoods.Api.Infrastructure.Storage;
+using NeighborGoods.Api.Shared.Notifications;
 using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
 using NeighborGoods.Api.Shared.Persistence;
 
@@ -18,8 +20,10 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
     private readonly string _connectionString = connectionString;
     private const string ConfirmedUserId = "test-user-confirmed";
     private const string UnconfirmedUserId = "test-user-unconfirmed";
+    private const string OtherConfirmedUserId = "test-user-other";
     private const string ConfirmedUserName = "tester";
     private const string UnconfirmedUserName = "novalid";
+    internal const string OtherConfirmedUserName = "other";
     private const string UserPassword = "Passw0rd!";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -31,7 +35,10 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 new KeyValuePair<string, string?>("ConnectionStrings:DefaultConnection", _connectionString),
                 new KeyValuePair<string, string?>("Line:ChannelId", "line-test-channel"),
                 new KeyValuePair<string, string?>("Line:ChannelSecret", "line-test-channel-secret"),
-                new KeyValuePair<string, string?>("Line:CallbackUrl", "https://localhost/api/v1/auth/line/callback")
+                new KeyValuePair<string, string?>("Line:CallbackUrl", "https://localhost/api/v1/auth/line/callback"),
+                new KeyValuePair<string, string?>("LineMessagingApi:ChannelAccessToken", "line-msg-test-token"),
+                new KeyValuePair<string, string?>("LineMessagingApi:ChannelSecret", "line-msg-test-secret"),
+                new KeyValuePair<string, string?>("LineMessagingApi:BotId", "@bot_test")
             ]);
         });
 
@@ -39,6 +46,12 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
         {
             services.RemoveAll<ILineOAuthClient>();
             services.AddSingleton<ILineOAuthClient, FakeLineOAuthClient>();
+            services.RemoveAll<IBlobStorage>();
+            services.AddSingleton<IBlobStorage, FakeBlobStorage>();
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender, FakeEmailSender>();
+            services.RemoveAll<ILineMessageSender>();
+            services.AddSingleton<ILineMessageSender, FakeLineMessageSender>();
 
             var connectionBuilder = new SqlConnectionStringBuilder(_connectionString);
             var dbName = connectionBuilder.InitialCatalog;
@@ -51,7 +64,10 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+            FakeEmailSender.Reset();
+            FakeLineMessageSender.Reset();
             dbContext.Database.Migrate();
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [EmailVerificationChallenges]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Messages]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Reviews]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Conversations]");
@@ -80,6 +96,12 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 "novalid@example.com",
                 emailConfirmed: false));
 
+            dbContext.AspNetUsers.Add(BuildUser(
+                OtherConfirmedUserId,
+                OtherConfirmedUserName,
+                "other@example.com",
+                emailConfirmed: true));
+
             dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
             {
                 Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
@@ -99,6 +121,104 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 Status = 0,
                 CreatedAt = DateTime.UtcNow.AddDays(-2),
                 UpdatedAt = DateTime.UtcNow.AddDays(-2)
+            });
+            dbContext.ListingImages.Add(new ListingImage
+            {
+                Id = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                ListingId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                ImageUrl = "https://legacy-images.test/listings/11111111-1111-1111-1111-111111111111/0-old.jpg",
+                SortOrder = 0,
+                CreatedAt = DateTime.UtcNow.AddDays(-2)
+            });
+            dbContext.ListingImages.Add(new ListingImage
+            {
+                Id = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                ListingId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                ImageUrl = "listings/11111111-1111-1111-1111-111111111111/1-new-path.jpg",
+                SortOrder = 1,
+                CreatedAt = DateTime.UtcNow.AddDays(-1)
+            });
+
+            // 累加篩選測試用（標題含 filter-test- 前綴；皆為上架中）
+            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            {
+                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                Title = "filter-test-charity-only",
+                Description = "",
+                Price = 100,
+                IsFree = false,
+                IsCharity = true,
+                SellerId = ConfirmedUserId,
+                Category = 1,
+                PickupLocation = 3,
+                Condition = 1,
+                BuyerId = null,
+                Residence = 2,
+                IsTradeable = false,
+                IsPinned = false,
+                Status = 0,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            });
+            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            {
+                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                Title = "filter-test-free-only",
+                Description = "",
+                Price = 0,
+                IsFree = true,
+                IsCharity = false,
+                SellerId = ConfirmedUserId,
+                Category = 1,
+                PickupLocation = 3,
+                Condition = 1,
+                BuyerId = null,
+                Residence = 2,
+                IsTradeable = false,
+                IsPinned = false,
+                Status = 0,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            });
+            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            {
+                Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                Title = "filter-test-both-flags",
+                Description = "",
+                Price = 0,
+                IsFree = true,
+                IsCharity = true,
+                SellerId = ConfirmedUserId,
+                Category = 1,
+                PickupLocation = 3,
+                Condition = 1,
+                BuyerId = null,
+                Residence = 2,
+                IsTradeable = false,
+                IsPinned = false,
+                Status = 0,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            });
+            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            {
+                Id = Guid.Parse("55555555-5555-5555-5555-555555555555"),
+                Title = "filter-test-tradeable-only",
+                Description = "",
+                Price = 200,
+                IsFree = false,
+                IsCharity = false,
+                SellerId = ConfirmedUserId,
+                Category = 1,
+                PickupLocation = 3,
+                Condition = 1,
+                BuyerId = null,
+                Residence = 2,
+                IsTradeable = true,
+                IsPinned = false,
+                Status = 0,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
             });
             dbContext.SaveChanges();
         });
@@ -124,8 +244,8 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             LockoutEnabled = false,
             AccessFailedCount = 0,
             LineNotificationPreference = 0,
-            EmailNotificationEnabled = false,
-            TopPinCredits = 0
+            EmailNotificationEnabled = emailConfirmed,
+            TopPinCredits = emailConfirmed ? 5 : 0
         };
 
         var hasher = new PasswordHasher<AspNetUser>();
@@ -147,5 +267,20 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
 
             return Task.FromResult<LineOAuthProfile?>(null);
         }
+    }
+
+    private sealed class FakeBlobStorage : IBlobStorage
+    {
+        public string BuildPublicUrl(string blobName) =>
+            $"https://blob.local.test/listing/{blobName.TrimStart('/')}";
+
+        public Task DeleteAsync(string blobName, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<string> UploadCompressedJpegAsync(
+            string blobName,
+            Stream content,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(blobName);
     }
 }

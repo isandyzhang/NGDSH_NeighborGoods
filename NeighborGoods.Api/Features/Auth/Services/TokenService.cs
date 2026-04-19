@@ -147,6 +147,7 @@ public sealed class TokenService(
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(ClaimTypes.NameIdentifier, user.Id),
             new(TokenTypeClaim, tokenType)
         };
 

@@ -43,6 +43,27 @@ param sqlAdminLogin string = ''
 @description('Azure SQL admin password (used only when provisionSqlResources = true)')
 param sqlAdminPassword string = ''
 
+@description('Azure SQL database SKU name (Serverless default: GP_S_Gen5_1)')
+param sqlDatabaseSkuName string = 'GP_S_Gen5_1'
+
+@description('Azure SQL database SKU tier')
+param sqlDatabaseSkuTier string = 'GeneralPurpose'
+
+@description('Azure SQL database hardware family')
+param sqlDatabaseSkuFamily string = 'Gen5'
+
+@description('Azure SQL database vCore capacity')
+param sqlDatabaseSkuCapacity int = 1
+
+@description('Azure SQL database max size in bytes (32 GB default)')
+param sqlDatabaseMaxSizeBytes int = 34359738368
+
+@description('Azure SQL database serverless minimum vCores, e.g. 0.5')
+param sqlDatabaseMinCapacity string = '0.5'
+
+@description('Azure SQL serverless auto-pause delay in minutes')
+param sqlDatabaseAutoPauseDelay int = 60
+
 @secure()
 @description('Existing SQL connection string (used when provisionSqlResources = false)')
 param existingSqlConnectionString string = ''
@@ -61,6 +82,22 @@ param lineOidcChannelId string
 @secure()
 @description('LINE OIDC ChannelSecret')
 param lineOidcChannelSecret string
+
+@description('JWT issuer')
+param jwtIssuer string = 'NeighborGoods.Api'
+
+@description('JWT audience')
+param jwtAudience string = 'NeighborGoods.Api.Client'
+
+@secure()
+@description('JWT signing key (minimum 32 chars)')
+param jwtSigningKey string
+
+@description('JWT access token minutes')
+param jwtAccessTokenMinutes int = 30
+
+@description('JWT refresh token days')
+param jwtRefreshTokenDays int = 14
 
 @description('LINE Messaging API ChannelId (optional)')
 param lineMessagingChannelId string = ''
@@ -95,14 +132,20 @@ param emailLogoUrl string = ''
 @description('Email base URL (optional)')
 param emailBaseUrl string = ''
 
-@description('LINE OIDC callback path')
-param lineOidcCallbackPath string = '/signin-line'
+@description('LINE OIDC callback full URL')
+param lineOidcCallbackUrl string
 
 @description('LINE OIDC scope')
 param lineOidcScope string = 'openid profile'
 
 @description('App environment')
 param aspnetcoreEnvironment string = 'Production'
+
+@description('Allowed CORS origin #0')
+param corsAllowedOrigin0 string = 'http://localhost:5173'
+
+@description('Allowed CORS origin #1')
+param corsAllowedOrigin1 string = ''
 
 var suffix = toLower(uniqueString(resourceGroup().id, namePrefix, environmentName))
 var storageAccountName = toLower(take(replace('${namePrefix}${environmentName}${suffix}', '-', ''), 24))
@@ -193,13 +236,16 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = if (
   parent: sqlServer
   location: location
   sku: {
-    name: 'Basic'
-    tier: 'Basic'
-    capacity: 5
+    name: sqlDatabaseSkuName
+    tier: sqlDatabaseSkuTier
+    family: sqlDatabaseSkuFamily
+    capacity: sqlDatabaseSkuCapacity
   }
   properties: {
     collation: 'SQL_Latin1_General_CP1_CI_AS'
-    maxSizeBytes: 2147483648
+    maxSizeBytes: sqlDatabaseMaxSizeBytes
+    minCapacity: json(sqlDatabaseMinCapacity)
+    autoPauseDelay: sqlDatabaseAutoPauseDelay
   }
 }
 
@@ -212,6 +258,7 @@ resource sqlFirewallAllowAzure 'Microsoft.Sql/servers/firewallRules@2023-08-01-p
   }
 }
 
+// Azure SignalR（Free_F1）：與 App Service 版相同；API 需 `AddAzureSignalR()` 才會走雲端中繼。
 resource signalR 'Microsoft.SignalRService/signalR@2024-03-01-preview' = if (deploySignalR) {
   name: signalRName
   location: location
@@ -237,7 +284,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: containerPort
         transport: 'auto'
       }
-      secrets: [
+      secrets: concat([
         {
           name: 'sql-connection'
           value: sqlConnectionSecretValue
@@ -255,6 +302,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           value: lineOidcChannelSecret
         }
         {
+          name: 'jwt-signing-key'
+          value: jwtSigningKey
+        }
+        {
           name: 'line-msg-token'
           value: lineMessagingAccessToken
         }
@@ -266,7 +317,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'email-connection'
           value: emailConnectionString
         }
-      ]
+      ], deploySignalR ? [
+        {
+          name: 'signalr-connection'
+          value: signalR.listKeys().primaryConnectionString
+        }
+      ] : [])
     }
     template: {
       containers: [
@@ -277,7 +333,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(containerCpu)
             memory: containerMemory
           }
-          env: [
+          env: concat([
             {
               name: 'ASPNETCORE_ENVIRONMENT'
               value: aspnetcoreEnvironment
@@ -299,20 +355,48 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: blobContainerEnvValue
             }
             {
-              name: 'Authentication__Line__ChannelId'
+              name: 'Line__ChannelId'
               secretRef: 'line-oidc-channel-id'
             }
             {
-              name: 'Authentication__Line__ChannelSecret'
+              name: 'Line__ChannelSecret'
               secretRef: 'line-oidc-channel-secret'
             }
             {
-              name: 'Authentication__Line__CallbackPath'
-              value: lineOidcCallbackPath
+              name: 'Line__CallbackUrl'
+              value: lineOidcCallbackUrl
             }
             {
-              name: 'Authentication__Line__Scope'
+              name: 'Line__Scope'
               value: lineOidcScope
+            }
+            {
+              name: 'Jwt__Issuer'
+              value: jwtIssuer
+            }
+            {
+              name: 'Jwt__Audience'
+              value: jwtAudience
+            }
+            {
+              name: 'Jwt__SigningKey'
+              secretRef: 'jwt-signing-key'
+            }
+            {
+              name: 'Jwt__AccessTokenMinutes'
+              value: string(jwtAccessTokenMinutes)
+            }
+            {
+              name: 'Jwt__RefreshTokenDays'
+              value: string(jwtRefreshTokenDays)
+            }
+            {
+              name: 'Cors__AllowedOrigins__0'
+              value: corsAllowedOrigin0
+            }
+            {
+              name: 'Cors__AllowedOrigins__1'
+              value: corsAllowedOrigin1
             }
             {
               name: 'LineMessagingApi__ChannelId'
@@ -354,7 +438,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'EmailNotification__BaseUrl'
               value: emailBaseUrl
             }
-          ]
+          ], deploySignalR ? [
+            {
+              name: 'Azure__SignalR__ConnectionString'
+              secretRef: 'signalr-connection'
+            }
+          ] : [])
         }
       ]
       scale: {
@@ -371,3 +460,7 @@ output storageAccountName string = provisionStorageResources ? storageAccount.na
 output sqlServerName string = provisionSqlResources ? sqlServer.name : 'external-sql'
 output sqlDatabaseName string = provisionSqlResources ? sqlDatabase.name : 'external-db'
 output signalRName string = deploySignalR ? signalR.name : 'not-deployed'
+output signalRHostName string = deploySignalR ? signalR.properties.hostName : ''
+
+@secure()
+output signalRPrimaryConnectionString string = deploySignalR ? signalR.listKeys().primaryConnectionString : ''

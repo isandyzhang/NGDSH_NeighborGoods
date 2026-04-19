@@ -25,6 +25,27 @@ param sqlAdminLogin string
 @description('Azure SQL admin password')
 param sqlAdminPassword string
 
+@description('Azure SQL database SKU name (Serverless default: GP_S_Gen5_1)')
+param sqlDatabaseSkuName string = 'GP_S_Gen5_1'
+
+@description('Azure SQL database SKU tier')
+param sqlDatabaseSkuTier string = 'GeneralPurpose'
+
+@description('Azure SQL database hardware family')
+param sqlDatabaseSkuFamily string = 'Gen5'
+
+@description('Azure SQL database vCore capacity')
+param sqlDatabaseSkuCapacity int = 1
+
+@description('Azure SQL database max size in bytes (32 GB default)')
+param sqlDatabaseMaxSizeBytes int = 34359738368
+
+@description('Azure SQL database serverless minimum vCores, e.g. 0.5')
+param sqlDatabaseMinCapacity string = '0.5'
+
+@description('Azure SQL serverless auto-pause delay in minutes')
+param sqlDatabaseAutoPauseDelay int = 60
+
 @secure()
 @description('LINE OIDC ChannelId')
 param lineOidcChannelId string
@@ -32,6 +53,22 @@ param lineOidcChannelId string
 @secure()
 @description('LINE OIDC ChannelSecret')
 param lineOidcChannelSecret string
+
+@description('JWT issuer')
+param jwtIssuer string = 'NeighborGoods.Api'
+
+@description('JWT audience')
+param jwtAudience string = 'NeighborGoods.Api.Client'
+
+@secure()
+@description('JWT signing key (minimum 32 chars)')
+param jwtSigningKey string = ''
+
+@description('JWT access token minutes')
+param jwtAccessTokenMinutes int = 30
+
+@description('JWT refresh token days')
+param jwtRefreshTokenDays int = 14
 
 @description('LINE Messaging API ChannelId (optional)')
 param lineMessagingChannelId string = ''
@@ -66,14 +103,20 @@ param emailLogoUrl string = ''
 @description('Email base URL (optional)')
 param emailBaseUrl string = ''
 
-@description('LINE OIDC callback path')
-param lineOidcCallbackPath string = '/signin-line'
+@description('LINE OIDC callback full URL')
+param lineOidcCallbackUrl string = ''
 
 @description('LINE OIDC scope')
 param lineOidcScope string = 'openid profile'
 
 @description('App environment')
 param aspnetcoreEnvironment string = 'Production'
+
+@description('Allowed CORS origin #0')
+param corsAllowedOrigin0 string = 'http://localhost:5173'
+
+@description('Allowed CORS origin #1')
+param corsAllowedOrigin1 string = ''
 
 var suffix = toLower(uniqueString(resourceGroup().id, namePrefix, environmentName))
 var webAppName = '${namePrefix}-${environmentName}-web-${take(suffix, 6)}'
@@ -128,13 +171,16 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   parent: sqlServer
   location: location
   sku: {
-    name: 'Basic'
-    tier: 'Basic'
-    capacity: 5
+    name: sqlDatabaseSkuName
+    tier: sqlDatabaseSkuTier
+    family: sqlDatabaseSkuFamily
+    capacity: sqlDatabaseSkuCapacity
   }
   properties: {
     collation: 'SQL_Latin1_General_CP1_CI_AS'
-    maxSizeBytes: 2147483648
+    maxSizeBytes: sqlDatabaseMaxSizeBytes
+    minCapacity: json(sqlDatabaseMinCapacity)
+    autoPauseDelay: sqlDatabaseAutoPauseDelay
   }
 }
 
@@ -160,6 +206,21 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
+// Azure SignalR（Free_F1）：多執行個體時 Hub 狀態外掛；應用程式需 `Microsoft.Azure.SignalR` 並 `AddAzureSignalR()` 才會使用此連線字串。
+resource signalR 'Microsoft.SignalRService/signalR@2024-03-01-preview' = if (deploySignalR) {
+  name: signalRName
+  location: location
+  sku: {
+    name: 'Free_F1'
+    tier: 'Free'
+    capacity: 1
+  }
+  kind: 'SignalR'
+  properties: {
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
   location: location
@@ -171,7 +232,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       alwaysOn: false
       ftpsState: 'Disabled'
-      appSettings: [
+      appSettings: concat([
         {
           name: 'ASPNETCORE_ENVIRONMENT'
           value: aspnetcoreEnvironment
@@ -189,20 +250,48 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: blobContainer.name
         }
         {
-          name: 'Authentication__Line__ChannelId'
+          name: 'Line__ChannelId'
           value: lineOidcChannelId
         }
         {
-          name: 'Authentication__Line__ChannelSecret'
+          name: 'Line__ChannelSecret'
           value: lineOidcChannelSecret
         }
         {
-          name: 'Authentication__Line__CallbackPath'
-          value: lineOidcCallbackPath
+          name: 'Line__CallbackUrl'
+          value: lineOidcCallbackUrl
         }
         {
-          name: 'Authentication__Line__Scope'
+          name: 'Line__Scope'
           value: lineOidcScope
+        }
+        {
+          name: 'Jwt__Issuer'
+          value: jwtIssuer
+        }
+        {
+          name: 'Jwt__Audience'
+          value: jwtAudience
+        }
+        {
+          name: 'Jwt__SigningKey'
+          value: jwtSigningKey
+        }
+        {
+          name: 'Jwt__AccessTokenMinutes'
+          value: string(jwtAccessTokenMinutes)
+        }
+        {
+          name: 'Jwt__RefreshTokenDays'
+          value: string(jwtRefreshTokenDays)
+        }
+        {
+          name: 'Cors__AllowedOrigins__0'
+          value: corsAllowedOrigin0
+        }
+        {
+          name: 'Cors__AllowedOrigins__1'
+          value: corsAllowedOrigin1
         }
         {
           name: 'LineMessagingApi__ChannelId'
@@ -244,22 +333,13 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'EmailNotification__BaseUrl'
           value: emailBaseUrl
         }
-      ]
+      ], deploySignalR ? [
+        {
+          name: 'Azure__SignalR__ConnectionString'
+          value: signalR.listKeys().primaryConnectionString
+        }
+      ] : [])
     }
-  }
-}
-
-resource signalR 'Microsoft.SignalRService/signalR@2024-03-01-preview' = if (deploySignalR) {
-  name: signalRName
-  location: location
-  sku: {
-    name: 'Free_F1'
-    tier: 'Free'
-    capacity: 1
-  }
-  kind: 'SignalR'
-  properties: {
-    publicNetworkAccess: 'Enabled'
   }
 }
 
@@ -270,3 +350,7 @@ output storageAccountName string = storageAccount.name
 output sqlServerName string = sqlServer.name
 output sqlDatabaseName string = sqlDatabase.name
 output signalRName string = deploySignalR ? signalR.name : 'not-deployed'
+output signalRHostName string = deploySignalR ? signalR.properties.hostName : ''
+
+@secure()
+output signalRPrimaryConnectionString string = deploySignalR ? signalR.listKeys().primaryConnectionString : ''

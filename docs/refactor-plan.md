@@ -14,7 +14,7 @@
 - 核心流程無退化：登入、刊登、查詢、訊息、圖片上傳可用。
 - `NeighborGoods.Api` 與資料庫連線可穩定運作（不誤用 in-memory fallback）。
 - `NeighborGoods.Api` 可同時支援帳密登入與 LINE OAuth，統一簽發 JWT（Access/Refresh）。
-- Listing 寫入端點強制授權，且上架前必須通過 `EmailConfirmed`。
+- Listing 寫入端點強制授權；`PUT` / `DELETE` / 狀態 `PATCH` 僅限該筆商品之賣家本人（否則 `403`、`LISTING_ACCESS_DENIED`）；`POST` 上架另須通過 `EmailConfirmed`。
 - 每次上線有一致檢查流程（build、設定鍵、smoke test、回滾）。
 
 ## 3. 現況摘要（2026-04，已更新）
@@ -30,9 +30,16 @@
   - `GET /api/v1/auth/line/login`、`GET /api/v1/auth/line/callback`（LINE OAuth）
 - Listing 寫入流程已移除 `SystemSellerProvider`，改為 `CurrentUser` claims 取得 `SellerId`。
 - 上架已強制檢查 `EmailConfirmed=true`，未通過回 `403`。
-- 整合測試已擴充為 auth + listing 共 14 個案例，全綠。
+- Listing 更新、刪除與狀態變更已比對 `SellerId` 與目前 JWT 使用者，非賣家回 `403`（`LISTING_ACCESS_DENIED`）。
+- 商品種類（`Category`）已改為資料表 `ListingCategories`（含 seed、`Listings.Category` FK）；`POST`/`PUT` 會驗證為作用中分類；查詢顯示名稱讀 DB。
+- 品況、社宅、面交地點已改為 `ListingConditions` / `ListingResidences` / `ListingPickupLocations`（含 seed、對應 `Listings` FK）；`POST`/`PUT` 需帶 `pickupLocationCode` 並驗證；查詢顯示名稱讀 DB；已移除 `ListingLookupCatalog`。
+- 已提供 `GET /api/v1/lookups/categories|conditions|residences|pickup-locations`（不需登入）。
+- 已提供對話／訊息 API（`Features/Messaging`）：REST 開聊、列表、訊息分頁、發訊、已讀；SignalR `/hubs/messages` 推播 `ReceiveMessage`；`Messages.Content` 欄位長度已擴至 1000（migration `ExpandMessagesContentMaxLength`）。
+- 已提供帳號 API（`Features/Account`）：註冊寄碼／註冊、刊登前 Email 驗證寄碼／驗證、`GET/PATCH /api/v1/account/me`、LINE 官方帳號綁定（start/status/confirm/unbind）；驗證碼改由 DB `EmailVerificationChallenges` 管理（migration `AddEmailVerificationChallenges`）。
+- 整合測試已擴充為 auth + listing + messaging + account 共 67 個案例，全綠。
 - API 結構已重排為 Pure Feature：
   - `Features/Listing`（endpoint/service/repository/contracts 共置）
+  - `Features/Lookups`（categories / conditions / residences / pickup-locations）
   - `Features/Auth`（endpoints/services/contracts/configuration）
   - `Features/System`（health/ping）
   - `Shared`（API 契約、共用型別、DbContext、CurrentUser security）
@@ -45,7 +52,7 @@
   - `Services/ListingCommandService.cs`
   - `Services/ListingStatusService.cs`
   - `ListingStatus.cs` / `ListingStatusRules.cs`
-  - `Listing.cs` / `ListingSummary.cs` / `ListingLookupCatalog.cs`
+  - `Listing.cs` / `ListingCategory.cs` / `ListingCondition.cs` / `ListingResidence.cs` / `ListingPickupLocation.cs` / `ListingSummary.cs`
   - `Contracts/Requests/*`
   - `Contracts/Responses/*`
 - `Features/Auth`
@@ -58,14 +65,32 @@
   - `Contracts/Responses/*`
   - `Configuration/JwtOptions.cs`
   - `Configuration/LineOAuthOptions.cs`
+- `Features/Lookups`
+  - `LookupEndpoints.cs`
 - `Features/System`
   - `SystemEndpoints.cs`
+- `Features/Messaging`
+  - `MessagingEndpoints.cs`、`MessageHub.cs`、`Services/MessagingQueryService.cs`、`Services/MessagingCommandService.cs`、`Contracts/*`
+- `Features/Account`
+  - `AccountEndpoints.cs`、`Services/AccountRegistrationService.cs`、`Services/AccountEmailVerificationService.cs`、`Services/AccountProfileService.cs`、`Services/AccountLineBindingService.cs`、`Contracts/*`
+- `Features/Integrations/Line`
+  - `LineWebhookEndpoints.cs`、`Services/LineWebhookService.cs`
 - `Shared`
   - `ApiContracts/*`
   - `Contracts/*`
+  - `Notifications/*`
   - `Persistence/NeighborGoodsDbContext.cs`
   - `Security/ICurrentUserContext.cs`
   - `Security/HttpCurrentUserContext.cs`
+
+## 3.2 API / Web 邊界守則（重構期間）
+
+- 定位原則：`NeighborGoods.Web` 僅作為商業流程與舊行為的參考來源，不列入正式依賴鏈。
+- 依賴原則：`NeighborGoods.Api` 與 `NeighborGoods.Web` 之間禁止專案參考（`ProjectReference`）與程式碼相依（namespace/type 互引）。
+- 實作原則：API 僅依據自身 domain、contract、資料模型實作商業邏輯；不得複製或綁定 MVC ViewModel / UI 專用 enum / controller 邏輯。
+- 驗證原則：凡從 Web 參考而來的流程，需先轉成 API use-case 與測試案例（整合測試優先），再進入 API 實作。
+- 契約原則：API 對外行為以 `/api/v1` 契約為唯一準則；Web 既有行為若與 API 契約衝突，以 API 契約為準並記錄差異。
+- 退場原則：Web 移除前，需確認核心流程（登入、刊登、查詢、訊息、圖片）可由 API 驗證通過，且無任何 API 程式碼依賴 Web 內容。
 
 ## 4. 單一執行路線圖
 
@@ -116,16 +141,17 @@
 
 - 已導入 JWT Bearer 驗證與授權中介層（`AddAuthentication().AddJwtBearer(...)` + `UseAuthentication/UseAuthorization`）。
 - 已提供 API Auth 路由：`login/refresh/revoke/line-login/line-callback`。
-- Listing 寫入端點（`POST/PUT/DELETE/PATCH`）皆要求授權。
+- Listing 寫入端點（`POST/PUT/DELETE/PATCH`）皆要求授權；`PUT`/`DELETE`/狀態 `PATCH` 僅賣家本人。
 - 上架流程由 `CurrentUser` 取得 `SellerId`，不再使用系統預設賣家。
 - 上架前檢查 `EmailConfirmed`，未驗證回 `403`（`EMAIL_NOT_CONFIRMED`）。
-- 測試覆蓋 auth（帳密、refresh/revoke、LINE callback）與授權情境（401/403/成功）共 14 案例。
+- 測試覆蓋 auth（帳密、refresh/revoke、LINE callback）與授權情境（401/403/成功、非賣家寫入、無效分類／面交、lookups）、messaging（對話建立、發訊、已讀、權限）與 account（寄碼、註冊、刊登前 Email 驗證、me）等案例。
 
 ### Migration 操作規範（開發 / 正式 / 測試）
 
 - 開發新增 schema 變更：
   - `dotnet ef migrations add <MigrationName> --project NeighborGoods.Api --startup-project NeighborGoods.Api`
   - `dotnet ef database update --project NeighborGoods.Api --startup-project NeighborGoods.Api`
+  - macOS／Linux：請先設定 `ConnectionStrings__DefaultConnection`（指向本機 Docker SQL、Azure SQL 等），再執行上述指令。
 - 正式環境套用：
   - 由手動或 CI 執行 `dotnet ef database update`（不在 API 啟動時自動套用）。
   - 套用前後需保留 migration 名稱與執行紀錄，納入部署檢查。
@@ -137,6 +163,7 @@
 ### Phase 2 - 主檔去硬編碼（3-5 天）
 
 - 將 `Category/Condition/Residence/PickupLocation` 轉為資料表維護。
+- **進度**：`Category` / `Condition` / `Residence` / `PickupLocation` 皆已改為資料表、seed、FK、lookup API 與寫入驗證；`ListingLookupCatalog` 已移除。Web MVC 仍暫以 enum 對應數值，後續可改讀 API 或同庫。
 - 查詢與表單改由 Lookup table 提供，不再依賴 enum 硬編碼。
 - 採雙軌遷移：先讀取切換，再寫入切換，最後移除舊欄位。
 
@@ -151,6 +178,7 @@
 - 建立 React 前端骨架並完成最小流程：Login、Listing List、Listing Detail。
 - 前端 API 呼叫走統一 client，型別化 DTO，錯誤統一轉換。
 - 逐步由 MVC 切換，保留短期備援。
+- 重構期間 `NeighborGoods.Web` 僅供參考，不作為 API 依賴；完成切換後可直接下線移除。
 
 ### Phase 5 - 安全與上線收斂（3-5 天，部分已完成）
 
@@ -172,12 +200,36 @@
   - `POST /api/v1/listings`
   - `PUT /api/v1/listings/{id}`
   - `DELETE /api/v1/listings/{id}`
+- Lookups 契約（目前已實作）：
+  - `GET /api/v1/lookups/categories`
+  - `GET /api/v1/lookups/conditions`
+  - `GET /api/v1/lookups/residences`
+  - `GET /api/v1/lookups/pickup-locations`
 - Auth 契約（目前已實作）：
   - `POST /api/v1/auth/login`
   - `POST /api/v1/auth/refresh`
   - `POST /api/v1/auth/revoke`
   - `GET /api/v1/auth/line/login`
   - `GET /api/v1/auth/line/callback`
+- Account 契約（目前已實作）：
+  - `POST /api/v1/account/register/send-code`
+  - `POST /api/v1/account/register`
+  - `POST /api/v1/account/email/send-code`
+  - `POST /api/v1/account/email/verify`
+  - `GET /api/v1/account/me`
+  - `PATCH /api/v1/account/me`
+  - `POST /api/v1/account/line/bind/start`
+  - `GET /api/v1/account/line/bind/status?pendingBindingId=`
+  - `POST /api/v1/account/line/bind/confirm`
+  - `POST /api/v1/account/line/bind/unbind`
+  - `POST /api/v1/integrations/line/webhook`（Webhook 驗簽與 follow/unfollow 事件）
+- 對話／訊息（REST + SignalR；不實作站內購買／同意／完成交易流程；建立對話須包含該商品賣家）：
+  - `POST /api/v1/conversations`（body：`listingId`, `otherUserId`；僅建立或取得對話，不發訊）
+  - `GET /api/v1/conversations`
+  - `GET /api/v1/conversations/{id}/messages?page=&pageSize=`
+  - `POST /api/v1/conversations/{id}/messages`（body：`content`）
+  - `POST /api/v1/conversations/{id}/read`
+  - SignalR Hub：`/hubs/messages`（連線時 query 帶 `access_token`；發訊成功後伺服器對雙方推播 `ReceiveMessage`）
 - 主要狀態碼：
   - `200` 成功查詢/更新/刪除
   - `201` 建立成功
@@ -241,8 +293,8 @@
 
 1. 將 JWT/LINE secrets 從開發設定搬到環境變數/KeyVault（清理硬編碼風險）。
 2. 規劃 Refresh Token 強化（裝置識別、撤銷追蹤、異常行為告警）。
-3. 推進 Lookup table migration（先從 Category 開始）。
-4. 補 `GET /api/v1/lookups/*`（conditions/residences/pickup locations）。
+3. Lookup table：`Category` / `Condition` / `Residence` / `PickupLocation` 與對應 API 已完成。
+4. `GET /api/v1/lookups/conditions`、`residences`、`pickup-locations` 已完成。
 5. 加入部署後 health check 與告警門檻。
 
 ## 9. 文件管理規則（從現在開始）

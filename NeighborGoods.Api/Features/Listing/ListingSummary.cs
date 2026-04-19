@@ -6,5 +6,12 @@ public sealed record ListingSummary(
     int Category,
     int Condition,
     int Price,
-    int Residence
+    int Residence,
+    int Status,
+    bool IsFree,
+    bool IsCharity,
+    bool IsTradeable,
+    bool IsPinned,
+    DateTime? PinnedEndDate,
+    int InterestCount
 );

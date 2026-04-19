@@ -12,10 +12,14 @@ public sealed class Listing
     public bool IsCharity { get; set; }
     public string SellerId { get; set; } = string.Empty;
     public int Category { get; set; }
+    public ListingCategory? CategoryInfo { get; set; }
     public int PickupLocation { get; set; } = 3;
+    public ListingPickupLocation? PickupLocationInfo { get; set; }
     public int Condition { get; set; }
+    public ListingCondition? ConditionInfo { get; set; }
     public string? BuyerId { get; set; }
     public int Residence { get; set; }
+    public ListingResidence? ResidenceInfo { get; set; }
     public bool IsTradeable { get; set; }
     public bool IsPinned { get; set; }
     public DateTime? PinnedEndDate { get; set; }

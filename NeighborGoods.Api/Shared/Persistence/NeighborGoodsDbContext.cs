@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
 using ListingEntity = NeighborGoods.Api.Features.Listing.Listing;
 
@@ -14,7 +15,12 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
     public DbSet<AspNetUserLogin> AspNetUserLogins => Set<AspNetUserLogin>();
     public DbSet<AspNetUserToken> AspNetUserTokens => Set<AspNetUserToken>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<EmailVerificationChallenge> EmailVerificationChallenges => Set<EmailVerificationChallenge>();
     public DbSet<LineBindingPending> LineBindingPendings => Set<LineBindingPending>();
+    public DbSet<ListingCategory> ListingCategories => Set<ListingCategory>();
+    public DbSet<ListingCondition> ListingConditions => Set<ListingCondition>();
+    public DbSet<ListingResidence> ListingResidences => Set<ListingResidence>();
+    public DbSet<ListingPickupLocation> ListingPickupLocations => Set<ListingPickupLocation>();
     public DbSet<ListingEntity> Listings => Set<ListingEntity>();
     public DbSet<ListingImage> ListingImages => Set<ListingImage>();
     public DbSet<ListingTopSubmission> ListingTopSubmissions => Set<ListingTopSubmission>();
@@ -126,6 +132,17 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
+        modelBuilder.Entity<EmailVerificationChallenge>(entity =>
+        {
+            entity.ToTable("EmailVerificationChallenges");
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.NormalizedEmail).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.CodeHash).HasMaxLength(128).IsRequired();
+
+            entity.HasIndex(e => new { e.Purpose, e.NormalizedEmail, e.ConsumedAt, e.ExpiresAt }, "IX_EmailVerificationChallenges_Purpose_Email_Consumed_Expires");
+            entity.HasIndex(e => new { e.UserId, e.Purpose, e.ConsumedAt }, "IX_EmailVerificationChallenges_User_Purpose_Consumed");
+        });
+
         modelBuilder.Entity<LineBindingPending>(entity =>
         {
             entity.ToTable("LineBindingPending");
@@ -142,6 +159,46 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.HasOne(d => d.User).WithMany(p => p.LineBindingPendings).HasForeignKey(d => d.UserId);
         });
 
+        modelBuilder.Entity<ListingCategory>(entity =>
+        {
+            entity.ToTable("ListingCategories");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CodeKey).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(128).IsRequired();
+            entity.HasIndex(e => e.CodeKey).IsUnique();
+        });
+
+        modelBuilder.Entity<ListingCondition>(entity =>
+        {
+            entity.ToTable("ListingConditions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CodeKey).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(128).IsRequired();
+            entity.HasIndex(e => e.CodeKey).IsUnique();
+        });
+
+        modelBuilder.Entity<ListingResidence>(entity =>
+        {
+            entity.ToTable("ListingResidences");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CodeKey).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(128).IsRequired();
+            entity.HasIndex(e => e.CodeKey).IsUnique();
+        });
+
+        modelBuilder.Entity<ListingPickupLocation>(entity =>
+        {
+            entity.ToTable("ListingPickupLocations");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CodeKey).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(128).IsRequired();
+            entity.HasIndex(e => e.CodeKey).IsUnique();
+        });
+
         modelBuilder.Entity<ListingEntity>(entity =>
         {
             entity.ToTable("Listings");
@@ -155,6 +212,26 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.PickupLocation).HasDefaultValue(3);
             entity.Property(e => e.Price).HasColumnType("decimal(18, 0)");
             entity.Property(e => e.Title).HasMaxLength(200);
+
+            entity.HasOne(d => d.CategoryInfo)
+                .WithMany(c => c.Listings)
+                .HasForeignKey(d => d.Category)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.ConditionInfo)
+                .WithMany(c => c.Listings)
+                .HasForeignKey(d => d.Condition)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.ResidenceInfo)
+                .WithMany(c => c.Listings)
+                .HasForeignKey(d => d.Residence)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.PickupLocationInfo)
+                .WithMany(c => c.Listings)
+                .HasForeignKey(d => d.PickupLocation)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(d => d.Buyer).WithMany(p => p.ListingBuyers).HasForeignKey(d => d.BuyerId);
 
@@ -202,7 +279,7 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.HasIndex(e => e.SenderId, "IX_Messages_SenderId");
 
             entity.Property(e => e.Id).ValueGeneratedNever();
-            entity.Property(e => e.Content).HasMaxLength(50);
+            entity.Property(e => e.Content).HasMaxLength(1000);
 
             entity.HasOne(d => d.Conversation).WithMany(p => p.Messages).HasForeignKey(d => d.ConversationId);
 

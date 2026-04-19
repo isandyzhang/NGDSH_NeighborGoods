@@ -29,7 +29,8 @@ public static class AuthEndpoints
             var response = ToTokenResponse(tokens);
             return Results.Ok(ApiResponseFactory.Success(response, httpContext));
         })
-        .WithName("LoginV1");
+        .WithName("LoginV1")
+        .RequireRateLimiting("AuthWrite");
 
         app.MapPost("/api/v1/auth/refresh", async (
             HttpContext httpContext,
@@ -46,7 +47,8 @@ public static class AuthEndpoints
             var response = ToTokenResponse(tokens);
             return Results.Ok(ApiResponseFactory.Success(response, httpContext));
         })
-        .WithName("RefreshTokenV1");
+        .WithName("RefreshTokenV1")
+        .RequireRateLimiting("AuthWrite");
 
         app.MapPost("/api/v1/auth/revoke", async (
             HttpContext httpContext,
@@ -62,7 +64,8 @@ public static class AuthEndpoints
 
             return Results.Ok(ApiResponseFactory.Success(new { revoked = true }, httpContext));
         })
-        .WithName("RevokeTokenV1");
+        .WithName("RevokeTokenV1")
+        .RequireRateLimiting("AuthWrite");
 
         app.MapGet("/api/v1/auth/line/login", (
             ILineOAuthStateStore stateStore,

@@ -1,17 +1,31 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NeighborGoods.Api.Features.Listing.Contracts;
+using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Contracts;
 using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Listing.Services;
 
-public sealed class ListingQueryService(NeighborGoodsDbContext dbContext)
+public sealed class ListingQueryService(
+    NeighborGoodsDbContext dbContext,
+    IMemoryCache memoryCache,
+    IBlobStorage blobStorage,
+    ICurrentUserContext currentUserContext)
 {
+    private static readonly TimeSpan LookupCacheDuration = TimeSpan.FromMinutes(5);
+    private const string CategoryLookupCacheKey = "listing-lookups:categories";
+    private const string ConditionLookupCacheKey = "listing-lookups:conditions";
+    private const string ResidenceLookupCacheKey = "listing-lookups:residences";
+    private const string PickupLocationLookupCacheKey = "listing-lookups:pickup-locations";
+
     public async Task<ListingDetailDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var categories = ListingLookupCatalog.Categories.ToDictionary(x => x.Code, x => x.DisplayName);
-        var conditions = ListingLookupCatalog.Conditions.ToDictionary(x => x.Code, x => x.DisplayName);
-        var residences = ListingLookupCatalog.Residences.ToDictionary(x => x.Code, x => x.DisplayName);
+        var categoryNames = await GetCategoryMapAsync(cancellationToken);
+        var conditionNames = await GetConditionMapAsync(cancellationToken);
+        var residenceNames = await GetResidenceMapAsync(cancellationToken);
+        var pickupNames = await GetPickupLocationMapAsync(cancellationToken);
 
         var listing = await dbContext.Listings
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -20,18 +34,40 @@ public sealed class ListingQueryService(NeighborGoodsDbContext dbContext)
             return null;
         }
 
+        var storedImageUrls = await dbContext.ListingImages.AsNoTracking()
+            .Where(x => x.ListingId == id)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .Select(x => x.ImageUrl)
+            .ToListAsync(cancellationToken);
+        var resolvedImageUrls = storedImageUrls
+            .Select(ResolveImageUrl)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .ToList();
+        var mainImageUrl = resolvedImageUrls.FirstOrDefault();
+
         return new ListingDetailDto(
             listing.Id,
             listing.Title,
             listing.Description,
             listing.Category,
-            categories.GetValueOrDefault(listing.Category, "其他"),
+            categoryNames.GetValueOrDefault(listing.Category, "其他"),
             listing.Condition,
-            conditions.GetValueOrDefault(listing.Condition, "良好"),
+            conditionNames.GetValueOrDefault(listing.Condition, "良好"),
             Convert.ToInt32(listing.Price),
             listing.Residence,
-            residences.GetValueOrDefault(listing.Residence, "未指定"),
+            residenceNames.GetValueOrDefault(listing.Residence, "未指定"),
+            listing.PickupLocation,
+            pickupNames.GetValueOrDefault(listing.PickupLocation, "私訊"),
+            mainImageUrl,
+            resolvedImageUrls,
             listing.Status,
+            listing.IsFree,
+            listing.IsCharity,
+            listing.IsTradeable,
+            listing.IsPinned,
+            listing.PinnedStartDate,
+            listing.PinnedEndDate,
             listing.CreatedAt,
             listing.UpdatedAt);
     }
@@ -42,9 +78,9 @@ public sealed class ListingQueryService(NeighborGoodsDbContext dbContext)
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var skip = (page - 1) * pageSize;
 
-        var categories = ListingLookupCatalog.Categories.ToDictionary(x => x.Code, x => x.DisplayName);
-        var conditions = ListingLookupCatalog.Conditions.ToDictionary(x => x.Code, x => x.DisplayName);
-        var residences = ListingLookupCatalog.Residences.ToDictionary(x => x.Code, x => x.DisplayName);
+        var categoryNames = await GetCategoryMapAsync(cancellationToken);
+        var conditionNames = await GetConditionMapAsync(cancellationToken);
+        var residenceNames = await GetResidenceMapAsync(cancellationToken);
 
         var active = (int)ListingStatus.Active;
         var reserved = (int)ListingStatus.Reserved;
@@ -52,17 +88,69 @@ public sealed class ListingQueryService(NeighborGoodsDbContext dbContext)
         var queryable = dbContext.Listings
             .Where(x => x.Status == active || x.Status == reserved);
 
+        if (!string.IsNullOrWhiteSpace(request.ExcludeUserId))
+        {
+            queryable = queryable.Where(x => x.SellerId != request.ExcludeUserId);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Query))
         {
             var keyword = request.Query.Trim();
-            queryable = queryable.Where(x =>
-                EF.Functions.Like(x.Title, $"%{keyword}%") ||
-                (x.Description != null && EF.Functions.Like(x.Description, $"%{keyword}%")));
+            if (keyword.Length >= ListingConstants.MinSearchTermLength)
+            {
+                queryable = queryable.Where(x =>
+                    EF.Functions.Like(x.Title, $"%{keyword}%") ||
+                    (x.Description != null && EF.Functions.Like(x.Description, $"%{keyword}%")));
+            }
         }
+
+        if (request.CategoryCode is { } cat)
+        {
+            queryable = queryable.Where(x => x.Category == cat);
+        }
+
+        if (request.ConditionCode is { } cond)
+        {
+            queryable = queryable.Where(x => x.Condition == cond);
+        }
+
+        if (request.ResidenceCode is { } res)
+        {
+            queryable = queryable.Where(x => x.Residence == res);
+        }
+
+        if (request.MinPrice is { } minP)
+        {
+            queryable = queryable.Where(x => x.Price >= minP);
+        }
+
+        if (request.MaxPrice is { } maxP)
+        {
+            queryable = queryable.Where(x => x.Price <= maxP);
+        }
+
+        if (request.IsCharity == true)
+        {
+            queryable = queryable.Where(x => x.IsCharity);
+        }
+
+        if (request.IsFree == true)
+        {
+            queryable = queryable.Where(x => x.IsFree);
+        }
+
+        if (request.IsTradeable == true)
+        {
+            queryable = queryable.Where(x => x.IsTradeable);
+        }
+
+        var todayUtc = DateTime.UtcNow.Date;
+        queryable = queryable
+            .OrderByDescending(x => x.IsPinned && x.PinnedEndDate.HasValue && x.PinnedEndDate.Value.Date >= todayUtc)
+            .ThenByDescending(x => x.CreatedAt);
 
         var total = await queryable.CountAsync(cancellationToken);
         var listings = await queryable
-            .OrderByDescending(x => x.CreatedAt)
             .Skip(skip)
             .Take(pageSize)
             .Select(x => new ListingSummary(
@@ -71,23 +159,202 @@ public sealed class ListingQueryService(NeighborGoodsDbContext dbContext)
                 x.Category,
                 x.Condition,
                 Convert.ToInt32(x.Price),
-                x.Residence))
+                x.Residence,
+                x.Status,
+                x.IsFree,
+                x.IsCharity,
+                x.IsTradeable,
+                x.IsPinned,
+                x.PinnedEndDate,
+                dbContext.Conversations.Count(c => c.ListingId == x.Id)))
             .ToListAsync(cancellationToken);
+
+        var coverImageMap = await GetCoverImageMapAsync(
+            listings.Select(x => x.Id).ToList(),
+            cancellationToken);
 
         var items = listings
             .Select(x => new ListingListItemDto(
                 x.Id,
                 x.Title,
                 x.Category,
-                categories.GetValueOrDefault(x.Category, "其他"),
+                categoryNames.GetValueOrDefault(x.Category, "其他"),
                 x.Condition,
-                conditions.GetValueOrDefault(x.Condition, "良好"),
+                conditionNames.GetValueOrDefault(x.Condition, "良好"),
                 x.Price,
                 x.Residence,
-                residences.GetValueOrDefault(x.Residence, "未指定")
-            ))
+                residenceNames.GetValueOrDefault(x.Residence, "未指定"),
+                coverImageMap.GetValueOrDefault(x.Id),
+                x.Status,
+                x.IsFree,
+                x.IsCharity,
+                x.IsTradeable,
+                x.IsPinned,
+                x.PinnedEndDate,
+                x.InterestCount))
             .ToList();
 
         return new PagedResult<ListingListItemDto>(page, pageSize, total, items);
+    }
+
+    public async Task<PagedResult<MyListingListItemDto>> QueryMineAsync(ListingQueryRequest request, CancellationToken cancellationToken = default)
+    {
+        var sellerId = currentUserContext.GetRequiredUserId();
+        var page = Math.Max(request.Page, 1);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        var skip = (page - 1) * pageSize;
+
+        var categoryNames = await GetCategoryMapAsync(cancellationToken);
+
+        var queryable = dbContext.Listings
+            .Where(x => x.SellerId == sellerId)
+            .OrderByDescending(x => x.CreatedAt);
+
+        var total = await queryable.CountAsync(cancellationToken);
+        var rows = await queryable
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(x => new
+            {
+                x.Id,
+                x.Title,
+                x.Category,
+                x.Price,
+                x.IsFree,
+                x.IsCharity,
+                x.IsTradeable,
+                x.Status,
+                x.CreatedAt,
+                x.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        var ids = rows.Select(r => r.Id).ToList();
+        var coverImageMap = await GetCoverImageMapAsync(ids, cancellationToken);
+
+        var items = rows
+            .Select(x => new MyListingListItemDto(
+                x.Id,
+                x.Title,
+                x.Category,
+                categoryNames.GetValueOrDefault(x.Category, "其他"),
+                Convert.ToInt32(x.Price),
+                x.IsFree,
+                x.IsCharity,
+                x.IsTradeable,
+                x.Status,
+                coverImageMap.GetValueOrDefault(x.Id),
+                x.CreatedAt,
+                x.UpdatedAt))
+            .ToList();
+
+        return new PagedResult<MyListingListItemDto>(page, pageSize, total, items);
+    }
+
+    private async Task<Dictionary<int, string>> GetCategoryMapAsync(CancellationToken cancellationToken)
+    {
+        if (memoryCache.TryGetValue<Dictionary<int, string>>(CategoryLookupCacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var map = await dbContext.ListingCategories.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder)
+            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
+
+        memoryCache.Set(CategoryLookupCacheKey, map, LookupCacheDuration);
+        return map;
+    }
+
+    private async Task<Dictionary<int, string>> GetConditionMapAsync(CancellationToken cancellationToken)
+    {
+        if (memoryCache.TryGetValue<Dictionary<int, string>>(ConditionLookupCacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var map = await dbContext.ListingConditions.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder)
+            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
+
+        memoryCache.Set(ConditionLookupCacheKey, map, LookupCacheDuration);
+        return map;
+    }
+
+    private async Task<Dictionary<int, string>> GetResidenceMapAsync(CancellationToken cancellationToken)
+    {
+        if (memoryCache.TryGetValue<Dictionary<int, string>>(ResidenceLookupCacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var map = await dbContext.ListingResidences.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder)
+            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
+
+        memoryCache.Set(ResidenceLookupCacheKey, map, LookupCacheDuration);
+        return map;
+    }
+
+    private async Task<Dictionary<int, string>> GetPickupLocationMapAsync(CancellationToken cancellationToken)
+    {
+        if (memoryCache.TryGetValue<Dictionary<int, string>>(PickupLocationLookupCacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var map = await dbContext.ListingPickupLocations.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder)
+            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
+
+        memoryCache.Set(PickupLocationLookupCacheKey, map, LookupCacheDuration);
+        return map;
+    }
+
+    private async Task<Dictionary<Guid, string?>> GetCoverImageMapAsync(
+        IReadOnlyCollection<Guid> listingIds,
+        CancellationToken cancellationToken)
+    {
+        if (listingIds.Count == 0)
+        {
+            return [];
+        }
+
+        var images = await dbContext.ListingImages.AsNoTracking()
+            .Where(x => listingIds.Contains(x.ListingId))
+            .OrderBy(x => x.ListingId)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .Select(x => new
+            {
+                x.ListingId,
+                x.ImageUrl
+            })
+            .ToListAsync(cancellationToken);
+
+        return images
+            .GroupBy(x => x.ListingId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var raw = g.FirstOrDefault()?.ImageUrl;
+                    return string.IsNullOrWhiteSpace(raw) ? null : ResolveImageUrl(raw);
+                });
+    }
+
+    private string ResolveImageUrl(string storedPathOrUrl)
+    {
+        if (storedPathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            storedPathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return storedPathOrUrl;
+        }
+
+        return blobStorage.BuildPublicUrl(storedPathOrUrl);
     }
 }
