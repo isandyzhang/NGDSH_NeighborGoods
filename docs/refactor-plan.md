@@ -180,6 +180,39 @@
 - 逐步由 MVC 切換，保留短期備援。
 - 重構期間 `NeighborGoods.Web` 僅供參考，不作為 API 依賴；完成切換後可直接下線移除。
 
+#### Phase 4A - React Frontend 首波交付（2026-04 啟動）
+
+- 新增獨立專案：`NeighborGoods.Frontend`（Vite + React + TypeScript + Tailwind）。
+- 核心目錄策略：
+  - `src/app`：路由、版型殼層
+  - `src/features/auth`：登入、token 管理、路由守衛
+  - `src/features/listings`：商品列表首頁（搜尋/分頁）
+  - `src/features/messaging`：對話列表、聊天室、SignalR 即時訊息
+  - `src/shared`：API client、共用型別、UI 元件、環境設定
+- API client 統一策略：
+  - 請求攜帶 Bearer token
+  - 遇到 `401` 先嘗試 `POST /api/v1/auth/refresh`
+  - refresh 失敗則清空登入狀態並導回登入頁
+- 路由優先順序：
+  1. Login（`/login`）
+  2. Listing Home（`/listings`）
+  3. Messages（`/messages`、`/messages/{conversationId}`，需授權）
+- 視覺規範已建立：`docs/frontend-style-guide.md`（色票、字級、元件、頁面模板）。
+
+#### Phase 4A 驗收標準
+
+- `NeighborGoods.Frontend` 可成功 `npm run build`。
+- 登入成功後可持續登入（重整頁面不掉登入）。
+- 商品首頁可完成載入、搜尋、分頁，並具備 loading/empty/error 三態。
+- 訊息頁可列出對話、查詢歷史訊息、送出訊息、呼叫已讀 API，並可透過 SignalR 收到 `ReceiveMessage` 推播。
+- 所有新頁面遵循 `docs/frontend-style-guide.md` token 與元件規範。
+
+#### Phase 4A 風險與控管
+
+- DTO 欄位命名差異：前端需保留 adapter/typed API 邊界，避免 UI 直接耦合後端實體。
+- 訊息分頁與即時推播可能重複：以訊息 ID 去重後再排序。
+- API 本機位址差異：統一由 `.env` (`VITE_API_BASE_URL`, `VITE_SIGNALR_BASE_URL`) 管理。
+
 ### Phase 5 - 安全與上線收斂（3-5 天，部分已完成）
 
 - JWT + Refresh Token（目前採 JSON body 回傳）已導入。

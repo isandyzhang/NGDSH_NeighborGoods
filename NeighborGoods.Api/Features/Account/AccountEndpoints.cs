@@ -2,6 +2,7 @@ using NeighborGoods.Api.Features.Account.Contracts.Requests;
 using NeighborGoods.Api.Features.Account.Contracts.Responses;
 using NeighborGoods.Api.Features.Account.Services;
 using NeighborGoods.Api.Shared.ApiContracts;
+using NeighborGoods.Api.Shared.Notifications;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Account;
@@ -215,6 +216,57 @@ public static class AccountEndpoints
         .WithName("AccountLineBindUnbindV1")
         .RequireAuthorization()
         .RequireRateLimiting("AccountWrite");
+
+        app.MapGet("/api/v1/account/line/preferences", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            AccountLinePreferenceService preferenceService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await preferenceService.GetAsync(userId, ct);
+            if (data is null)
+            {
+                return AccountError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("AccountLinePreferencesGetV1")
+        .RequireAuthorization();
+
+        app.MapPatch("/api/v1/account/line/preferences", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            UpdateLinePreferencesRequest request,
+            AccountLinePreferenceService preferenceService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await preferenceService.UpdateAsync(userId, request, ct);
+            if (data is null)
+            {
+                return AccountError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("AccountLinePreferencesUpdateV1")
+        .RequireAuthorization()
+        .RequireRateLimiting("AccountWrite");
+
+        app.MapGet("/api/v1/account/line/quota", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            LineMessagingQuotaService quotaService,
+            CancellationToken ct = default) =>
+        {
+            _ = currentUser.GetRequiredUserId();
+            var data = await quotaService.GetCurrentQuotaAsync(ct);
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("AccountLineQuotaV1")
+        .RequireAuthorization();
 
         return app;
     }

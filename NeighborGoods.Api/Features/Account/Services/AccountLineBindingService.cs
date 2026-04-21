@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NeighborGoods.Api.Features.Account.Contracts.Responses;
+using NeighborGoods.Api.Features.Integrations.Line.Services;
 using NeighborGoods.Api.Shared.Notifications;
 using NeighborGoods.Api.Shared.Persistence;
 using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
@@ -10,6 +11,7 @@ namespace NeighborGoods.Api.Features.Account.Services;
 public sealed class AccountLineBindingService(
     NeighborGoodsDbContext dbContext,
     ILineMessageSender lineMessageSender,
+    LineFlexMessageBuilder flexMessageBuilder,
     IOptions<LineMessagingOptions> lineMessagingOptions)
 {
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
@@ -125,8 +127,9 @@ public sealed class AccountLineBindingService(
         dbContext.LineBindingPendings.Remove(pending);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await lineMessageSender.SendTextAsync(
+        await SendFlexNoticeAsync(
             user.LineMessagingApiUserId,
+            "LINE 綁定成功",
             "歡迎使用 LINE 通知功能！您現在可以透過 LINE 接收訊息通知。",
             cancellationToken);
 
@@ -157,8 +160,9 @@ public sealed class AccountLineBindingService(
             .FirstOrDefaultAsync(x => x.LineMessagingApiUserId == lineUserId, cancellationToken);
         if (existingUser is not null)
         {
-            await lineMessageSender.SendTextAsync(
+            await SendFlexNoticeAsync(
                 lineUserId,
+                "歡迎回來",
                 "歡迎回來！您已經綁定 LINE 通知功能。",
                 cancellationToken);
             return;
@@ -174,8 +178,9 @@ public sealed class AccountLineBindingService(
             var pending = pendingBindings[0];
             pending.LineUserId = lineUserId;
             await dbContext.SaveChangesAsync(cancellationToken);
-            await lineMessageSender.SendTextAsync(
+            await SendFlexNoticeAsync(
                 lineUserId,
+                "LINE 綁定進行中",
                 "歡迎加入！請返回網站點擊「確認綁定」按鈕完成綁定。",
                 cancellationToken);
             return;
@@ -183,15 +188,17 @@ public sealed class AccountLineBindingService(
 
         if (pendingBindings.Count > 1)
         {
-            await lineMessageSender.SendTextAsync(
+            await SendFlexNoticeAsync(
                 lineUserId,
+                "LINE 綁定提醒",
                 "歡迎加入！請返回網站完成 LINE 通知綁定。",
                 cancellationToken);
             return;
         }
 
-        await lineMessageSender.SendTextAsync(
+        await SendFlexNoticeAsync(
             lineUserId,
+            "LINE 綁定提醒",
             "歡迎加入！請前往網站個人資料頁面完成 LINE 通知綁定。",
             cancellationToken);
     }
@@ -208,5 +215,15 @@ public sealed class AccountLineBindingService(
         user.LineMessagingApiUserId = null;
         user.LineMessagingApiAuthorizedAt = null;
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task SendFlexNoticeAsync(
+        string lineUserId,
+        string title,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var card = flexMessageBuilder.BuildNoticeCard(title, message);
+        await lineMessageSender.PushFlexAsync(lineUserId, card.AltText, card.Contents, cancellationToken);
     }
 }

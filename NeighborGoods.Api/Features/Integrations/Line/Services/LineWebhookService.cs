@@ -9,6 +9,9 @@ namespace NeighborGoods.Api.Features.Integrations.Line.Services;
 
 public sealed class LineWebhookService(
     AccountLineBindingService lineBindingService,
+    LineMenuQueryService lineMenuQueryService,
+    LineFlexMessageBuilder flexMessageBuilder,
+    ILineMessageSender lineMessageSender,
     IOptions<LineMessagingOptions> lineMessagingOptions)
 {
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
@@ -33,14 +36,139 @@ public sealed class LineWebhookService(
             if (string.Equals(evt.Type, "follow", StringComparison.OrdinalIgnoreCase))
             {
                 await lineBindingService.HandleFollowAsync(evt.UserId, cancellationToken);
+                continue;
             }
-            else if (string.Equals(evt.Type, "unfollow", StringComparison.OrdinalIgnoreCase))
+
+            if (string.Equals(evt.Type, "unfollow", StringComparison.OrdinalIgnoreCase))
             {
                 await lineBindingService.HandleUnfollowAsync(evt.UserId, cancellationToken);
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(evt.ReplyToken))
+            {
+                await HandleInteractiveEventAsync(evt, cancellationToken);
             }
         }
 
         return (true, null, null);
+    }
+
+    private async Task HandleInteractiveEventAsync(LineWebhookEventItem evt, CancellationToken cancellationToken)
+    {
+        var action = ResolveAction(evt);
+        if (string.IsNullOrWhiteSpace(action))
+        {
+            var helpCard = flexMessageBuilder.BuildNoticeCard(
+                "NeighborGoods 小幫手",
+                "可輸入：首頁、我的商品、我的訊息，或使用下方圖文選單。");
+            await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, helpCard.AltText, helpCard.Contents, cancellationToken);
+            return;
+        }
+
+        if (action == "home")
+        {
+            var homeCard = flexMessageBuilder.BuildHomeCard();
+            await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, homeCard.AltText, homeCard.Contents, cancellationToken);
+            return;
+        }
+
+        var user = await lineMenuQueryService.GetBoundUserAsync(evt.UserId!, cancellationToken);
+        if (user is null)
+        {
+            var bindHint = flexMessageBuilder.BuildBindHintCard();
+            await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, bindHint.AltText, bindHint.Contents, cancellationToken);
+            return;
+        }
+
+        if (action == "myListings")
+        {
+            var summary = await lineMenuQueryService.GetMyListingsSummaryAsync(user.Id, cancellationToken);
+            var card = flexMessageBuilder.BuildMyListingsCard(summary);
+            await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, card.AltText, card.Contents, cancellationToken);
+            return;
+        }
+
+        if (action == "myMessages")
+        {
+            var summary = await lineMenuQueryService.GetMyMessagesSummaryAsync(user.Id, cancellationToken);
+            var card = flexMessageBuilder.BuildMyMessagesCard(summary);
+            await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, card.AltText, card.Contents, cancellationToken);
+            return;
+        }
+
+        var fallback = flexMessageBuilder.BuildNoticeCard(
+            "功能尚未支援",
+            "目前可用功能：首頁、我的商品、我的訊息。");
+        await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, fallback.AltText, fallback.Contents, cancellationToken);
+    }
+
+    private static string? ResolveAction(LineWebhookEventItem evt)
+    {
+        if (!string.IsNullOrWhiteSpace(evt.PostbackData))
+        {
+            var postbackAction = ParseActionFromPostback(evt.PostbackData!);
+            if (!string.IsNullOrWhiteSpace(postbackAction))
+            {
+                return postbackAction;
+            }
+        }
+
+        if (!string.Equals(evt.Type, "message", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var text = evt.MessageText?.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return text switch
+        {
+            "首頁" => "home",
+            "我的商品" => "myListings",
+            "我的訊息" => "myMessages",
+            "menu:home" => "home",
+            "menu:myListings" => "myListings",
+            "menu:myMessages" => "myMessages",
+            _ => null
+        };
+    }
+
+    private static string? ParseActionFromPostback(string data)
+    {
+        if (string.IsNullOrWhiteSpace(data))
+        {
+            return null;
+        }
+
+        if (data.StartsWith("menu:", StringComparison.OrdinalIgnoreCase))
+        {
+            return data["menu:".Length..];
+        }
+
+        var segments = data.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var segment in segments)
+        {
+            var idx = segment.IndexOf('=');
+            if (idx <= 0 || idx >= segment.Length - 1)
+            {
+                continue;
+            }
+
+            var key = Uri.UnescapeDataString(segment[..idx]);
+            if (!string.Equals(key, "action", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = Uri.UnescapeDataString(segment[(idx + 1)..]);
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+
+        return null;
     }
 
     private bool ValidateSignature(string body, string? signature)
@@ -70,18 +198,48 @@ public sealed class LineWebhookService(
             var type = eventElement.TryGetProperty("type", out var typeElement)
                 ? typeElement.GetString() ?? string.Empty
                 : string.Empty;
+
             string? userId = null;
+            string? replyToken = eventElement.TryGetProperty("replyToken", out var replyTokenElement)
+                ? replyTokenElement.GetString()
+                : null;
+            string? postbackData = null;
+            string? messageType = null;
+            string? messageText = null;
+
             if (eventElement.TryGetProperty("source", out var sourceElement) &&
                 sourceElement.TryGetProperty("userId", out var userIdElement))
             {
                 userId = userIdElement.GetString();
             }
 
-            result.Add(new LineWebhookEventItem(type, userId));
+            if (eventElement.TryGetProperty("postback", out var postbackElement)
+                && postbackElement.TryGetProperty("data", out var dataElement))
+            {
+                postbackData = dataElement.GetString();
+            }
+
+            if (eventElement.TryGetProperty("message", out var messageElement))
+            {
+                messageType = messageElement.TryGetProperty("type", out var mtElement)
+                    ? mtElement.GetString()
+                    : null;
+                messageText = messageElement.TryGetProperty("text", out var textElement)
+                    ? textElement.GetString()
+                    : null;
+            }
+
+            result.Add(new LineWebhookEventItem(type, userId, replyToken, postbackData, messageType, messageText));
         }
 
         return result;
     }
 
-    private sealed record LineWebhookEventItem(string Type, string? UserId);
+    private sealed record LineWebhookEventItem(
+        string Type,
+        string? UserId,
+        string? ReplyToken,
+        string? PostbackData,
+        string? MessageType,
+        string? MessageText);
 }

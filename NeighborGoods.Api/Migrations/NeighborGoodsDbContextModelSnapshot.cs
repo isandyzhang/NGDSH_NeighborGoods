@@ -180,6 +180,36 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("ListingConditions", (string)null);
                 });
 
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingFavorite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("CategorySnapshot")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "ListingId" }, "IX_ListingFavorites_ListingId");
+
+                    b.HasIndex(new[] { "UserId", "CategorySnapshot", "CreatedAt" }, "IX_ListingFavorites_UserId_CategorySnapshot_CreatedAt");
+
+                    b.HasIndex(new[] { "UserId", "ListingId" }, "IX_ListingFavorites_UserId_ListingId")
+                        .IsUnique();
+
+                    b.ToTable("ListingFavorites", (string)null);
+                });
+
             modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingPickupLocation", b =>
                 {
                     b.Property<int>("Id")
@@ -706,6 +736,61 @@ namespace NeighborGoods.Api.Migrations
                     b.ToTable("Messages");
                 });
 
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.PurchaseRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BuyerId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpireAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResponseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SellerId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("SellerReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "BuyerId" }, "IX_PurchaseRequests_BuyerId");
+
+                    b.HasIndex(new[] { "ConversationId" }, "IX_PurchaseRequests_ConversationId");
+
+                    b.HasIndex(new[] { "ListingId", "CreatedAt" }, "IX_PurchaseRequests_ListingId_CreatedAt");
+
+                    b.HasIndex(new[] { "ListingId", "Status" }, "IX_PurchaseRequests_ListingId_Status")
+                        .IsUnique()
+                        .HasFilter("([Status]=(0))");
+
+                    b.HasIndex(new[] { "SellerId", "Status" }, "IX_PurchaseRequests_SellerId_Status");
+
+                    b.ToTable("PurchaseRequests");
+                });
+
             modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Review", b =>
                 {
                     b.Property<Guid>("Id")
@@ -806,6 +891,25 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("ResidenceInfo");
 
                     b.Navigation("Seller");
+                });
+
+            modelBuilder.Entity("NeighborGoods.Api.Features.Listing.ListingFavorite", b =>
+                {
+                    b.HasOne("NeighborGoods.Api.Features.Listing.Listing", "Listing")
+                        .WithMany("Favorites")
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Listing");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AdminMessage", b =>
@@ -948,6 +1052,39 @@ namespace NeighborGoods.Api.Migrations
                     b.Navigation("Sender");
                 });
 
+            modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.PurchaseRequest", b =>
+                {
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Buyer")
+                        .WithMany("PurchaseRequestBuyers")
+                        .HasForeignKey("BuyerId")
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Conversation", "Conversation")
+                        .WithMany("PurchaseRequests")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Features.Listing.Listing", "Listing")
+                        .WithMany("PurchaseRequests")
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Seller")
+                        .WithMany("PurchaseRequestSellers")
+                        .HasForeignKey("SellerId")
+                        .IsRequired();
+
+                    b.Navigation("Buyer");
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("Listing");
+
+                    b.Navigation("Seller");
+                });
+
             modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Review", b =>
                 {
                     b.HasOne("NeighborGoods.Api.Shared.Persistence.LegacyEntities.AspNetUser", "Buyer")
@@ -977,9 +1114,13 @@ namespace NeighborGoods.Api.Migrations
                 {
                     b.Navigation("Conversations");
 
+                    b.Navigation("Favorites");
+
                     b.Navigation("ListingImages");
 
                     b.Navigation("ListingTopSubmissions");
+
+                    b.Navigation("PurchaseRequests");
 
                     b.Navigation("Reviews");
                 });
@@ -1035,6 +1176,10 @@ namespace NeighborGoods.Api.Migrations
 
                     b.Navigation("Messages");
 
+                    b.Navigation("PurchaseRequestBuyers");
+
+                    b.Navigation("PurchaseRequestSellers");
+
                     b.Navigation("ReviewBuyers");
 
                     b.Navigation("ReviewSellers");
@@ -1043,6 +1188,8 @@ namespace NeighborGoods.Api.Migrations
             modelBuilder.Entity("NeighborGoods.Api.Shared.Persistence.LegacyEntities.Conversation", b =>
                 {
                     b.Navigation("Messages");
+
+                    b.Navigation("PurchaseRequests");
                 });
 #pragma warning restore 612, 618
         }

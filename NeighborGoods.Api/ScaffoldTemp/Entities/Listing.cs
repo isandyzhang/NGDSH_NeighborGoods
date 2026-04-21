@@ -53,5 +53,7 @@ public partial class Listing
 
     public virtual ICollection<Review> Reviews { get; set; } = new List<Review>();
 
+    public virtual ICollection<PurchaseRequest> PurchaseRequests { get; set; } = new List<PurchaseRequest>();
+
     public virtual AspNetUser Seller { get; set; } = null!;
 }

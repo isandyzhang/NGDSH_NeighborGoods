@@ -22,9 +22,11 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
     public DbSet<ListingResidence> ListingResidences => Set<ListingResidence>();
     public DbSet<ListingPickupLocation> ListingPickupLocations => Set<ListingPickupLocation>();
     public DbSet<ListingEntity> Listings => Set<ListingEntity>();
+    public DbSet<ListingFavorite> ListingFavorites => Set<ListingFavorite>();
     public DbSet<ListingImage> ListingImages => Set<ListingImage>();
     public DbSet<ListingTopSubmission> ListingTopSubmissions => Set<ListingTopSubmission>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
     public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -238,6 +240,25 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.HasOne(d => d.Seller).WithMany(p => p.ListingSellers).HasForeignKey(d => d.SellerId);
         });
 
+        modelBuilder.Entity<ListingFavorite>(entity =>
+        {
+            entity.ToTable("ListingFavorites");
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.HasIndex(e => e.ListingId, "IX_ListingFavorites_ListingId");
+            entity.HasIndex(e => new { e.UserId, e.CategorySnapshot, e.CreatedAt }, "IX_ListingFavorites_UserId_CategorySnapshot_CreatedAt");
+            entity.HasIndex(e => new { e.UserId, e.ListingId }, "IX_ListingFavorites_UserId_ListingId").IsUnique();
+
+            entity.HasOne(d => d.Listing)
+                .WithMany(p => p.Favorites)
+                .HasForeignKey(d => d.ListingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ListingImage>(entity =>
         {
             entity.HasIndex(e => e.ListingId, "IX_ListingImages_ListingId");
@@ -285,6 +306,43 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
 
             entity.HasOne(d => d.Sender).WithMany(p => p.Messages)
                 .HasForeignKey(d => d.SenderId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<PurchaseRequest>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.ResponseReason).HasMaxLength(500);
+
+            entity.HasIndex(
+                    e => new { e.ListingId, e.Status },
+                    "IX_PurchaseRequests_ListingId_Status")
+                .HasFilter("([Status]=(0))")
+                .IsUnique();
+
+            entity.HasIndex(e => new { e.ListingId, e.CreatedAt }, "IX_PurchaseRequests_ListingId_CreatedAt");
+            entity.HasIndex(e => new { e.SellerId, e.Status }, "IX_PurchaseRequests_SellerId_Status");
+            entity.HasIndex(e => e.ConversationId, "IX_PurchaseRequests_ConversationId");
+            entity.HasIndex(e => e.BuyerId, "IX_PurchaseRequests_BuyerId");
+
+            entity.HasOne(d => d.Listing)
+                .WithMany(p => p.PurchaseRequests)
+                .HasForeignKey(d => d.ListingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(d => d.Conversation)
+                .WithMany(p => p.PurchaseRequests)
+                .HasForeignKey(d => d.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(d => d.Buyer)
+                .WithMany(p => p.PurchaseRequestBuyers)
+                .HasForeignKey(d => d.BuyerId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            entity.HasOne(d => d.Seller)
+                .WithMany(p => p.PurchaseRequestSellers)
+                .HasForeignKey(d => d.SellerId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
 

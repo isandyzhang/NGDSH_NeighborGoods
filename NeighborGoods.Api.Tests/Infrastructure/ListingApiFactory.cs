@@ -21,9 +21,11 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
     private const string ConfirmedUserId = "test-user-confirmed";
     private const string UnconfirmedUserId = "test-user-unconfirmed";
     private const string OtherConfirmedUserId = "test-user-other";
+    private const string AdminUserId = "test-user-admin";
     private const string ConfirmedUserName = "tester";
     private const string UnconfirmedUserName = "novalid";
     internal const string OtherConfirmedUserName = "other";
+    internal const string AdminUserName = "admin";
     private const string UserPassword = "Passw0rd!";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -68,9 +70,11 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             FakeLineMessageSender.Reset();
             dbContext.Database.Migrate();
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [EmailVerificationChallenges]");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [PurchaseRequests]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Messages]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Reviews]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Conversations]");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingFavorites]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingImages]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingTopSubmissions]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AdminMessages]");
@@ -101,6 +105,13 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 OtherConfirmedUserName,
                 "other@example.com",
                 emailConfirmed: true));
+
+            dbContext.AspNetUsers.Add(BuildUser(
+                AdminUserId,
+                AdminUserName,
+                "admin@example.com",
+                emailConfirmed: true,
+                role: 3));
 
             dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
             {
@@ -224,13 +235,13 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
         });
     }
 
-    private static AspNetUser BuildUser(string id, string userName, string email, bool emailConfirmed)
+    private static AspNetUser BuildUser(string id, string userName, string email, bool emailConfirmed, int role = 0)
     {
         var user = new AspNetUser
         {
             Id = id,
             DisplayName = userName,
-            Role = 0,
+            Role = role,
             CreatedAt = DateTime.UtcNow.AddYears(-1),
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),

@@ -979,6 +979,150 @@ public sealed class ListingEndpointsTests
     }
 
     [Fact]
+    public async Task PostFavorite_AddsFavoriteAndIsIdempotent()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+
+        var first = await client.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(firstBody.GetProperty("success").GetBoolean());
+        Assert.True(firstBody.GetProperty("data").GetProperty("isFavorited").GetBoolean());
+        Assert.Equal(1, firstBody.GetProperty("data").GetProperty("favoriteCount").GetInt32());
+
+        var second = await client.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var secondBody = await second.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(secondBody.GetProperty("data").GetProperty("isFavorited").GetBoolean());
+        Assert.Equal(1, secondBody.GetProperty("data").GetProperty("favoriteCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task DeleteFavorite_IsIdempotent()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+
+        var firstDelete = await client.DeleteAsync($"/api/v1/listings/{SeededTesterListingId}/favorite");
+        Assert.Equal(HttpStatusCode.OK, firstDelete.StatusCode);
+        var firstDeleteBody = await firstDelete.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(firstDeleteBody.GetProperty("data").GetProperty("isFavorited").GetBoolean());
+        Assert.Equal(0, firstDeleteBody.GetProperty("data").GetProperty("favoriteCount").GetInt32());
+
+        await client.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+        var secondDelete = await client.DeleteAsync($"/api/v1/listings/{SeededTesterListingId}/favorite");
+        Assert.Equal(HttpStatusCode.OK, secondDelete.StatusCode);
+        var secondDeleteBody = await secondDelete.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(secondDeleteBody.GetProperty("data").GetProperty("isFavorited").GetBoolean());
+        Assert.Equal(0, secondDeleteBody.GetProperty("data").GetProperty("favoriteCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task GetFavoriteStatus_WhenAnonymous_ReturnsCountAndFalse()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var authedClient = factory.CreateClient();
+        await AuthenticateAsAsync(authedClient, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+        await authedClient.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+
+        using var anonymousClient = factory.CreateClient();
+        var response = await anonymousClient.GetAsync($"/api/v1/listings/{SeededTesterListingId}/favorite-status");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("success").GetBoolean());
+        Assert.Equal(1, body.GetProperty("data").GetProperty("favoriteCount").GetInt32());
+        Assert.False(body.GetProperty("data").GetProperty("isFavorited").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GetMyFavorites_ReturnsFavoritedListing()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+        await client.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+
+        var response = await client.GetAsync("/api/v1/listings/favorites?page=1&pageSize=20");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("success").GetBoolean());
+
+        var items = body.GetProperty("data").GetProperty("items");
+        Assert.Single(items.EnumerateArray());
+        Assert.Equal("二手書櫃", items[0].GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task GetInterestProfile_ReturnsTopCategories()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+        await client.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+
+        var extraListingId = Guid.NewGuid();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+            db.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            {
+                Id = extraListingId,
+                Title = "偏好分類測試",
+                Description = "for profile",
+                Price = 900,
+                IsFree = false,
+                IsCharity = false,
+                SellerId = ConfirmedUserId,
+                Category = 1,
+                PickupLocation = 3,
+                Condition = 1,
+                Residence = 2,
+                IsTradeable = false,
+                IsPinned = false,
+                Status = 0,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await client.PostAsync($"/api/v1/listings/{extraListingId}/favorite", content: null);
+        var profileResponse = await client.GetAsync("/api/v1/users/me/interest-profile?days=90&topN=5");
+
+        Assert.Equal(HttpStatusCode.OK, profileResponse.StatusCode);
+        var body = await profileResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var categories = body.GetProperty("data").GetProperty("topCategories");
+        Assert.Equal(2, categories.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task GetPushTargets_OnlyAdminCanAccess()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var otherClient = factory.CreateClient();
+        await AuthenticateAsAsync(otherClient, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+        await otherClient.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+
+        using var nonAdminClient = factory.CreateClient();
+        await AuthenticateAsAsync(nonAdminClient, ConfirmedUserName, UserPassword);
+        var forbiddenResponse = await nonAdminClient.GetAsync(
+            $"/api/v1/internal/push-targets?categoryCode=0&listingId={SeededTesterListingId}&limit=20");
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
+
+        using var adminClient = factory.CreateClient();
+        await AuthenticateAsAsync(adminClient, ListingApiFactory.AdminUserName, UserPassword);
+        var okResponse = await adminClient.GetAsync(
+            $"/api/v1/internal/push-targets?categoryCode=0&listingId={SeededTesterListingId}&limit=20");
+        Assert.Equal(HttpStatusCode.OK, okResponse.StatusCode);
+        var body = await okResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var targets = body.GetProperty("data").GetProperty("targets");
+        Assert.True(targets.GetArrayLength() >= 1);
+    }
+
+    [Fact]
     public async Task PatchReactivate_FromInactive_ReturnsOk()
     {
         using var factory = new ListingApiFactory(_fixture.ConnectionString);

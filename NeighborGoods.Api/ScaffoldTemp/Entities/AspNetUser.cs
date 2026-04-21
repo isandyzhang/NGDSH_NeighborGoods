@@ -81,6 +81,10 @@ public partial class AspNetUser
 
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 
+    public virtual ICollection<PurchaseRequest> PurchaseRequestBuyers { get; set; } = new List<PurchaseRequest>();
+
+    public virtual ICollection<PurchaseRequest> PurchaseRequestSellers { get; set; } = new List<PurchaseRequest>();
+
     public virtual ICollection<Review> ReviewBuyers { get; set; } = new List<Review>();
 
     public virtual ICollection<Review> ReviewSellers { get; set; } = new List<Review>();

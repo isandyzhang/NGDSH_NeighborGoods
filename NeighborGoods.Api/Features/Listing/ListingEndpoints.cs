@@ -1,7 +1,10 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Features.Listing.Services;
 using NeighborGoods.Api.Shared.ApiContracts;
+using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Listing;
 
@@ -106,6 +109,135 @@ public static class ListingEndpoints
         })
         .WithName("GetMyListingsV1")
         .WithSummary("我的商品（賣家本人所有狀態）")
+        .RequireAuthorization();
+
+        app.MapPost("/api/v1/listings/{id:guid}/favorite", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            ListingFavoriteService service,
+            Guid id,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await service.FavoriteAsync(userId, id, ct);
+            if (data is null)
+            {
+                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("FavoriteListingV1")
+        .RequireAuthorization();
+
+        app.MapDelete("/api/v1/listings/{id:guid}/favorite", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            ListingFavoriteService service,
+            Guid id,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await service.UnfavoriteAsync(userId, id, ct);
+            if (data is null)
+            {
+                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("UnfavoriteListingV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/listings/{id:guid}/favorite-status", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            ListingFavoriteService service,
+            Guid id,
+            CancellationToken ct = default) =>
+        {
+            var (data, errorCode, errorMessage) = await service.GetFavoriteStatusAsync(currentUser.UserId, id, ct);
+            if (data is null)
+            {
+                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("GetListingFavoriteStatusV1");
+
+        app.MapGet("/api/v1/listings/favorites", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            ListingFavoriteService service,
+            int page = 1,
+            int pageSize = 20,
+            int? categoryCode = null,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var result = await service.GetMyFavoritesAsync(userId, page, pageSize, categoryCode, ct);
+            var payload = new
+            {
+                items = result.Items,
+                pagination = new
+                {
+                    page = result.Page,
+                    pageSize = result.PageSize,
+                    totalCount = result.Total,
+                    totalPages = (int)Math.Ceiling(result.Total / (double)result.PageSize)
+                }
+            };
+            return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+        })
+        .WithName("GetMyFavoriteListingsV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/users/me/interest-profile", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            ListingFavoriteService service,
+            int days = 90,
+            int topN = 5,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var data = await service.GetInterestProfileAsync(userId, days, topN, ct);
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("GetMyInterestProfileV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/internal/push-targets", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            NeighborGoodsDbContext dbContext,
+            ListingFavoriteService service,
+            int categoryCode,
+            Guid? listingId = null,
+            int limit = 500,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var isAdmin = await dbContext.AspNetUsers
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == userId && x.Role == 3, ct);
+            if (!isAdmin)
+            {
+                return Results.Json(
+                    ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var (data, errorCode, errorMessage) = await service.GetPushTargetsAsync(categoryCode, listingId, limit, ct);
+            if (data is null)
+            {
+                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("GetFavoritePushTargetsV1")
         .RequireAuthorization();
 
         app.MapPost("/api/v1/listings", async (
@@ -486,6 +618,23 @@ public static class ListingEndpoints
         Results.Json(
             ApiResponseFactory.Error(ex.Code, ex.Message, httpContext),
             statusCode: ex.StatusCode);
+
+    private static IResult ToFavoriteErrorResult(HttpContext httpContext, string code, string message)
+    {
+        var statusCode = code switch
+        {
+            "LISTING_NOT_FOUND" => StatusCodes.Status404NotFound,
+            "CATEGORY_NOT_FOUND" => StatusCodes.Status404NotFound,
+            "LISTING_NOT_AVAILABLE" => StatusCodes.Status409Conflict,
+            "LISTING_FAVORITE_OWN_LISTING_NOT_ALLOWED" => StatusCodes.Status409Conflict,
+            "FORBIDDEN" => StatusCodes.Status403Forbidden,
+            _ => StatusCodes.Status400BadRequest
+        };
+
+        return Results.Json(
+            ApiResponseFactory.Error(code, message, httpContext),
+            statusCode: statusCode);
+    }
 
     private static IResult ToStatusActionResult(ListingStatusChangeOutcome outcome, Guid id, HttpContext httpContext)
     {

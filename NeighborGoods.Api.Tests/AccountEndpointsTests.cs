@@ -260,6 +260,91 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task LineWebhook_PostbackMyMessages_RepliesFlexMessage()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        const string lineUserId = "line-user-webhook-001";
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+            var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
+            user.LineMessagingApiUserId = lineUserId;
+            user.LineMessagingApiAuthorizedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        var webhookBody = $$"""
+            {
+              "events": [
+                {
+                  "type": "postback",
+                  "replyToken": "reply-token-1",
+                  "source": { "userId": "{{lineUserId}}" },
+                  "postback": { "data": "action=myMessages" }
+                }
+              ]
+            }
+            """;
+        var webhookRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/integrations/line/webhook")
+        {
+            Content = new StringContent(webhookBody, Encoding.UTF8, "application/json")
+        };
+        webhookRequest.Headers.Add("X-Line-Signature", ComputeSignature(webhookBody, "line-msg-test-secret"));
+
+        var response = await client.SendAsync(webhookRequest);
+        response.EnsureSuccessStatusCode();
+
+        Assert.Single(FakeLineMessageSender.ReplyFlexMessages);
+        Assert.Contains("我的訊息", FakeLineMessageSender.ReplyFlexMessages[0].AltText);
+    }
+
+    [Fact]
+    public async Task LinePreferences_PatchThenGet_ReturnsUpdatedFlags()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var patchResponse = await client.PatchAsJsonAsync(
+            "/api/v1/account/line/preferences",
+            new
+            {
+                marketingPushEnabled = true,
+                preferenceNewListings = true,
+                preferencePriceDrop = false,
+                preferenceMessageDigest = true
+            });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var getResponse = await client.GetAsync("/api/v1/account/line/preferences");
+        getResponse.EnsureSuccessStatusCode();
+        var body = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var data = body.GetProperty("data");
+        Assert.True(data.GetProperty("marketingPushEnabled").GetBoolean());
+        Assert.True(data.GetProperty("preferenceNewListings").GetBoolean());
+        Assert.False(data.GetProperty("preferencePriceDrop").GetBoolean());
+        Assert.True(data.GetProperty("preferenceMessageDigest").GetBoolean());
+    }
+
+    [Fact]
+    public async Task LineQuota_Get_ReturnsQuotaPayload()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var response = await client.GetAsync("/api/v1/account/line/quota");
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var data = body.GetProperty("data");
+        Assert.True(data.TryGetProperty("usedCount", out _));
+        Assert.True(data.TryGetProperty("note", out _));
+    }
+
     private static async Task AuthenticateAsAsync(HttpClient client, string userNameOrEmail, string password)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new

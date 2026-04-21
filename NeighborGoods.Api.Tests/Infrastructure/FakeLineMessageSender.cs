@@ -4,14 +4,32 @@ namespace NeighborGoods.Api.Tests;
 
 internal sealed class FakeLineMessageSender : ILineMessageSender
 {
-    public static List<(string UserId, string Message)> SentTextMessages { get; } = [];
+    public static List<(string ReplyToken, string AltText)> ReplyFlexMessages { get; } = [];
+    public static List<(string UserId, string AltText)> PushFlexMessages { get; } = [];
 
-    public static List<(string UserId, string Message, string LinkUrl, string LinkText)> SentLinkMessages { get; } = [];
+    public Task ReplyFlexAsync(
+        string replyToken,
+        string altText,
+        object flexContents,
+        CancellationToken cancellationToken = default)
+    {
+        ReplyFlexMessages.Add((replyToken, altText));
+        return Task.CompletedTask;
+    }
+
+    public Task PushFlexAsync(
+        string lineUserId,
+        string altText,
+        object flexContents,
+        CancellationToken cancellationToken = default)
+    {
+        PushFlexMessages.Add((lineUserId, altText));
+        return Task.CompletedTask;
+    }
 
     public Task SendTextAsync(string lineUserId, string message, CancellationToken cancellationToken = default)
     {
-        SentTextMessages.Add((lineUserId, message));
-        return Task.CompletedTask;
+        return PushFlexAsync(lineUserId, message, new { legacy = true, message }, cancellationToken);
     }
 
     public Task SendLinkAsync(
@@ -21,13 +39,16 @@ internal sealed class FakeLineMessageSender : ILineMessageSender
         string linkText,
         CancellationToken cancellationToken = default)
     {
-        SentLinkMessages.Add((lineUserId, message, linkUrl, linkText));
-        return Task.CompletedTask;
+        return PushFlexAsync(
+            lineUserId,
+            message,
+            new { legacy = true, message, linkUrl, linkText },
+            cancellationToken);
     }
 
     public static void Reset()
     {
-        SentTextMessages.Clear();
-        SentLinkMessages.Clear();
+        ReplyFlexMessages.Clear();
+        PushFlexMessages.Clear();
     }
 }

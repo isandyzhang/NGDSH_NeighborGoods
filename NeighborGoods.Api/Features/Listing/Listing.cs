@@ -30,8 +30,10 @@ public sealed class Listing
 
     public AspNetUser? Buyer { get; set; }
     public ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
+    public ICollection<ListingFavorite> Favorites { get; set; } = new List<ListingFavorite>();
     public ICollection<ListingImage> ListingImages { get; set; } = new List<ListingImage>();
     public ICollection<ListingTopSubmission> ListingTopSubmissions { get; set; } = new List<ListingTopSubmission>();
+    public ICollection<PurchaseRequest> PurchaseRequests { get; set; } = new List<PurchaseRequest>();
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public AspNetUser Seller { get; set; } = null!;
 }
