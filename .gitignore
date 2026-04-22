@@ -163,3 +163,5 @@ appsettings*.json
 **/infra/bicep/*.local.json
 **/infra/bicep/**/*.local.json
 
+# Local scratch (e.g. one-off git author rewrite)
+.tmp-rewrite-author.ps1
