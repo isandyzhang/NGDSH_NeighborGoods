@@ -104,17 +104,32 @@ public sealed class ListingQueryService(
             }
         }
 
-        if (request.CategoryCode is { } cat)
+        var categoryCodes = request.CategoryCodes?.Where(x => x > 0).Distinct().ToArray();
+        if (categoryCodes is { Length: > 0 })
+        {
+            queryable = queryable.Where(x => categoryCodes.Contains(x.Category));
+        }
+        else if (request.CategoryCode is { } cat)
         {
             queryable = queryable.Where(x => x.Category == cat);
         }
 
-        if (request.ConditionCode is { } cond)
+        var conditionCodes = request.ConditionCodes?.Where(x => x > 0).Distinct().ToArray();
+        if (conditionCodes is { Length: > 0 })
+        {
+            queryable = queryable.Where(x => conditionCodes.Contains(x.Condition));
+        }
+        else if (request.ConditionCode is { } cond)
         {
             queryable = queryable.Where(x => x.Condition == cond);
         }
 
-        if (request.ResidenceCode is { } res)
+        var residenceCodes = request.ResidenceCodes?.Where(x => x > 0).Distinct().ToArray();
+        if (residenceCodes is { Length: > 0 })
+        {
+            queryable = queryable.Where(x => residenceCodes.Contains(x.Residence));
+        }
+        else if (request.ResidenceCode is { } res)
         {
             queryable = queryable.Where(x => x.Residence == res);
         }

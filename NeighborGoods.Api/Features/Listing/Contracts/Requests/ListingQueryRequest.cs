@@ -18,6 +18,9 @@ public sealed class ListingQueryRequest
     public int? CategoryCode { get; init; }
     public int? ConditionCode { get; init; }
     public int? ResidenceCode { get; init; }
+    public IReadOnlyCollection<int>? CategoryCodes { get; init; }
+    public IReadOnlyCollection<int>? ConditionCodes { get; init; }
+    public IReadOnlyCollection<int>? ResidenceCodes { get; init; }
     public int? MinPrice { get; init; }
     public int? MaxPrice { get; init; }
 

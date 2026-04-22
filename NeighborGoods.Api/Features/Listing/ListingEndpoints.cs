@@ -45,6 +45,9 @@ public static class ListingEndpoints
             int? categoryCode = null,
             int? conditionCode = null,
             int? residenceCode = null,
+            string? categoryCodes = null,
+            string? conditionCodes = null,
+            string? residenceCodes = null,
             int? minPrice = null,
             int? maxPrice = null,
             string? excludeUserId = null,
@@ -61,6 +64,9 @@ public static class ListingEndpoints
                 CategoryCode = categoryCode,
                 ConditionCode = conditionCode,
                 ResidenceCode = residenceCode,
+                CategoryCodes = ParseCodes(categoryCodes),
+                ConditionCodes = ParseCodes(conditionCodes),
+                ResidenceCodes = ParseCodes(residenceCodes),
                 MinPrice = minPrice,
                 MaxPrice = maxPrice,
                 ExcludeUserId = excludeUserId
@@ -83,7 +89,7 @@ public static class ListingEndpoints
         .WithName("GetListingsV1")
         .WithSummary("商品列表（可累加篩選）")
         .WithDescription(
-            "可選 query：isFree、isCharity、isTradeable、categoryCode、conditionCode、residenceCode、minPrice、maxPrice、excludeUserId。關鍵字 q 長度須 >= 2 才套用 LIKE。僅當 isFree/isCharity/isTradeable 為 true 時套用；多個同時帶入為 AND。列表排序：置頂中優先，再依建立時間。");
+            "可選 query：isFree、isCharity、isTradeable、categoryCode/categoryCodes、conditionCode/conditionCodes、residenceCode/residenceCodes、minPrice、maxPrice、excludeUserId。codes 支援逗號分隔多選。關鍵字 q 長度須 >= 2 才套用 LIKE。僅當 isFree/isCharity/isTradeable 為 true 時套用；多個同時帶入為 AND。列表排序：置頂中優先，再依建立時間。");
 
         app.MapGet("/api/v1/listings/mine", async (
             HttpContext httpContext,
@@ -612,6 +618,24 @@ public static class ListingEndpoints
         .RequireAuthorization();
 
         return app;
+    }
+
+    private static IReadOnlyCollection<int>? ParseCodes(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var values = raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => int.TryParse(x, out var number) ? number : (int?)null)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToArray();
+
+        return values.Length == 0 ? null : values;
     }
 
     private static IResult ToListingAccessResult(ListingAccessException ex, HttpContext httpContext) =>

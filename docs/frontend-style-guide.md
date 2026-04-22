@@ -97,7 +97,8 @@
 ### ListingHome
 
 - 頂部 Hero 標題
-- 搜尋卡片（關鍵字 + 搜尋按鈕）
+- Hero 副標文案固定為「社宅專屬二手交易平台」
+- 篩選卡片改為按鈕式條件（展開型 + 直接切換型）
 - 商品卡片網格（`md:2欄 / xl:3欄`）
 - 頁尾分頁（上一頁 / 頁碼 / 下一頁）
 
@@ -126,3 +127,79 @@
 - 新頁面優先使用現有 `shared/ui` 元件，避免重複造輪子。
 - 任何新增色彩需先補到 token，再決定是否擴展 utility。
 - 若需新增大型元件（如 FilterBar、MessageComposer），先定義可重用 API，再實作樣式。
+
+## 8. Hero 與動效規格（第二階段）
+
+### Hero 文案
+
+- 網站名稱保持：`NeighborGoods`
+- Listing 首頁副標統一：`社宅專屬二手交易平台`
+
+### 進場動畫（中等節奏）
+
+- 動畫組合：`fade-in + rise-up`
+- 位移：`translateY(20px -> 0)`
+- 透明度：`0 -> 1`
+- duration：`450ms`
+- easing：`cubic-bezier(0.22, 1, 0.36, 1)`
+- 延遲：
+  - 品牌名稱：`0ms`
+  - 主標：`80ms`
+  - 副標：`140ms`
+  - 篩選區：`220ms`
+
+## 9. 篩選按鈕交互規格（第二階段）
+
+### 查詢觸發原則
+
+- 所有條件均為按鈕狀態驅動。
+- 任一條件按下或取消後，都立即重新打 query。
+- 「清除條件」重置全部 active 狀態後，立即重查。
+
+### 條件按鈕類型
+
+- 展開型（可多選）：`分類`、`品況`、`社宅`
+  - 點擊主按鈕後展開選項群（chips）
+  - 支援多選；任一選項變更即重查
+- 直接切換型（單鍵開關）：`是否免費`、`愛心捐贈`、`以物易物`
+  - On / Off 即時重查
+
+### Query 介面建議
+
+- 展開型條件：陣列或逗號串（例如 `categoryCodes=1,3,7`）
+- 切換型條件：布林（例如 `isFree=true`）
+- 清除條件：移除條件參數，回預設列表
+
+## 10. 第二階段色彩 Token（柔和語意色）
+
+### 快速條件按鈕
+
+- `pill-free-default`: `#E7F4EA`
+- `pill-free-active`: `#2F7D4E`
+- `pill-charity-default`: `#FBECEA`
+- `pill-charity-active`: `#B45B4D`
+- `pill-trade-default`: `#ECEAF9`
+- `pill-trade-active`: `#5E5AB5`
+
+### 視覺原則
+
+- 展開型主按鈕使用深色主題（`brand` 系）
+- 選項 chip 使用淺底；active 切深底高對比
+- 所有篩選按鈕保持 `shadow-soft`，hover 可加強陰影
+
+## 11. 動效與互動細節
+
+- 按鈕 hover：`150ms`（shadow + opacity）
+- 按鈕 active：`90ms`（`scale(0.98)`）
+- 展開區塊：`200ms`（height + opacity）
+- 手機展開：bottom sheet `250ms`
+- 重查時可用短 skeleton（`150~250ms`）減少畫面閃爍
+
+## 12. 篩選區 RWD 規格（第二階段）
+
+- Desktop：展開型 + 直接切換型同列或一列半顯示
+- Tablet：上下兩列（展開型在上、切換型在下）
+- Mobile：
+  - 第一排：分類 / 品況 / 社宅
+  - 第二排：免費 / 愛心 / 以物易物 / 清除條件
+  - 展開內容採 bottom sheet，避免壓縮商品列表

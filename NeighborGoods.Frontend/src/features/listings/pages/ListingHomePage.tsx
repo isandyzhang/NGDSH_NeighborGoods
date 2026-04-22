@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link } from 'react-router-dom'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { listingApi, type ListingItem } from '@/features/listings/api/listingApi'
@@ -6,9 +6,11 @@ import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
-import { Input } from '@/shared/ui/Input'
 
 const PAGE_SIZE = 12
+const MIN_SKELETON_MS = 180
+
+type ExpandableFilterKey = 'category' | 'condition' | 'residence'
 
 const formatPrice = (item: ListingItem) => {
   if (item.isFree) {
@@ -25,16 +27,14 @@ export const ListingHomePage = () => {
   const [residences, setResidences] = useState<LookupItem[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [searchInput, setSearchInput] = useState('')
-  const [query, setQuery] = useState('')
-  const [categoryCode, setCategoryCode] = useState('')
-  const [conditionCode, setConditionCode] = useState('')
-  const [residenceCode, setResidenceCode] = useState('')
-  const [minPrice, setMinPrice] = useState('')
-  const [maxPrice, setMaxPrice] = useState('')
+  const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<number[]>([])
+  const [selectedConditionCodes, setSelectedConditionCodes] = useState<number[]>([])
+  const [selectedResidenceCodes, setSelectedResidenceCodes] = useState<number[]>([])
   const [isFree, setIsFree] = useState(false)
   const [isCharity, setIsCharity] = useState(false)
   const [isTradeable, setIsTradeable] = useState(false)
+  const [expandedFilter, setExpandedFilter] = useState<ExpandableFilterKey | null>(null)
+  const [mobileSheetFilter, setMobileSheetFilter] = useState<ExpandableFilterKey | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +64,7 @@ export const ListingHomePage = () => {
 
   useEffect(() => {
     let disposed = false
+    const startedAt = Date.now()
     setLoading(true)
     setError(null)
 
@@ -71,12 +72,9 @@ export const ListingHomePage = () => {
       .list({
         page,
         pageSize: PAGE_SIZE,
-        q: query || undefined,
-        categoryCode: categoryCode ? Number(categoryCode) : undefined,
-        conditionCode: conditionCode ? Number(conditionCode) : undefined,
-        residenceCode: residenceCode ? Number(residenceCode) : undefined,
-        minPrice: minPrice ? Number(minPrice) : undefined,
-        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        categoryCodes: selectedCategoryCodes,
+        conditionCodes: selectedConditionCodes,
+        residenceCodes: selectedResidenceCodes,
         isFree: isFree || undefined,
         isCharity: isCharity || undefined,
         isTradeable: isTradeable || undefined,
@@ -98,166 +96,257 @@ export const ListingHomePage = () => {
         setError(message)
       })
       .finally(() => {
-        if (!disposed) {
-          setLoading(false)
-        }
+        const elapsed = Date.now() - startedAt
+        const wait = Math.max(0, MIN_SKELETON_MS - elapsed)
+        window.setTimeout(() => {
+          if (!disposed) {
+            setLoading(false)
+          }
+        }, wait)
       })
 
     return () => {
       disposed = true
     }
-  }, [page, query, categoryCode, conditionCode, residenceCode, minPrice, maxPrice, isFree, isCharity, isTradeable])
+  }, [
+    page,
+    selectedCategoryCodes,
+    selectedConditionCodes,
+    selectedResidenceCodes,
+    isFree,
+    isCharity,
+    isTradeable,
+  ])
 
   const summaryText = useMemo(() => {
     if (loading) {
       return '載入中...'
     }
-    if (query) {
-      return `搜尋關鍵字：${query}`
-    }
-    return '探索社區最新刊登'
-  }, [loading, query])
+    return '依社宅與條件快速篩選可交易商品'
+  }, [loading])
 
-  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const toggleMultiCode = (
+    value: number,
+    setValues: Dispatch<SetStateAction<number[]>>,
+  ) => {
     setPage(1)
-    setQuery(searchInput.trim())
+    setValues((current) =>
+      current.includes(value) ? current.filter((x) => x !== value) : [...current, value],
+    )
   }
+
+  const activeFilterCount =
+    selectedCategoryCodes.length +
+    selectedConditionCodes.length +
+    selectedResidenceCodes.length +
+    Number(isFree) +
+    Number(isCharity) +
+    Number(isTradeable)
+
+  const clearAllFilters = () => {
+    setPage(1)
+    setSelectedCategoryCodes([])
+    setSelectedConditionCodes([])
+    setSelectedResidenceCodes([])
+    setIsFree(false)
+    setIsCharity(false)
+    setIsTradeable(false)
+    setExpandedFilter(null)
+    setMobileSheetFilter(null)
+  }
+
+  const renderMultiOptions = (
+    title: string,
+    options: LookupItem[],
+    selected: number[],
+    onToggle: (code: number) => void,
+  ) => (
+    <section className="space-y-3">
+      <h3 className="text-sm font-medium text-text-main">{title}</h3>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const active = selected.includes(option.id)
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onToggle(option.id)}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                active
+                  ? 'border-brand bg-brand text-brand-foreground shadow-soft'
+                  : 'border-border bg-surface text-text-main hover:bg-surface-2'
+              }`}
+            >
+              {option.displayName}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">
       <section className="mb-6 space-y-3">
-        <h1 className="text-3xl font-semibold leading-tight text-text-main sm:text-4xl md:text-5xl">
-          鄰里好物交換與贈與
+        <p className="animate-fade-rise text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
+        <h1
+          className="animate-fade-rise text-3xl font-semibold leading-tight text-text-main sm:text-4xl md:text-5xl"
+          style={{ animationDelay: '80ms' }}
+        >
+          社宅專屬二手交易平台
         </h1>
-        <p className="text-text-subtle">{summaryText}</p>
+        <p className="animate-fade-rise text-text-subtle" style={{ animationDelay: '140ms' }}>
+          {summaryText}
+        </p>
       </section>
 
-      <Card className="mb-6">
-        <form className="space-y-3" onSubmit={handleSearch}>
-          <Input
-            label="搜尋標題或描述"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="例如：嬰兒床、書桌、單車"
+      <Card className="animate-fade-rise mb-6 space-y-3" style={{ animationDelay: '220ms' }}>
+        <div className="hidden gap-2 md:flex md:flex-wrap">
+          <Button
+            type="button"
+            className="shadow-soft"
+            onClick={() => setExpandedFilter((current) => (current === 'category' ? null : 'category'))}
+          >
+            分類 {selectedCategoryCodes.length ? `(${selectedCategoryCodes.length})` : ''}
+          </Button>
+          <Button
+            type="button"
+            className="shadow-soft"
+            onClick={() => setExpandedFilter((current) => (current === 'condition' ? null : 'condition'))}
+          >
+            品況 {selectedConditionCodes.length ? `(${selectedConditionCodes.length})` : ''}
+          </Button>
+          <Button
+            type="button"
+            className="shadow-soft"
+            onClick={() => setExpandedFilter((current) => (current === 'residence' ? null : 'residence'))}
+          >
+            社宅 {selectedResidenceCodes.length ? `(${selectedResidenceCodes.length})` : ''}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 md:hidden">
+          <Button type="button" className="shadow-soft text-xs" onClick={() => setMobileSheetFilter('category')}>
+            分類
+          </Button>
+          <Button type="button" className="shadow-soft text-xs" onClick={() => setMobileSheetFilter('condition')}>
+            品況
+          </Button>
+          <Button type="button" className="shadow-soft text-xs" onClick={() => setMobileSheetFilter('residence')}>
+            社宅
+          </Button>
+        </div>
+
+        {expandedFilter === 'category' ? (
+          <div className="animate-expand-fade hidden md:block">
+            {renderMultiOptions('分類', categories, selectedCategoryCodes, (code) =>
+              toggleMultiCode(code, setSelectedCategoryCodes),
+            )}
+          </div>
+        ) : null}
+        {expandedFilter === 'condition' ? (
+          <div className="animate-expand-fade hidden md:block">
+            {renderMultiOptions('品況', conditions, selectedConditionCodes, (code) =>
+              toggleMultiCode(code, setSelectedConditionCodes),
+            )}
+          </div>
+        ) : null}
+        {expandedFilter === 'residence' ? (
+          <div className="animate-expand-fade hidden md:block">
+            {renderMultiOptions('社宅', residences, selectedResidenceCodes, (code) =>
+              toggleMultiCode(code, setSelectedResidenceCodes),
+            )}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPage(1)
+              setIsFree((current) => !current)
+            }}
+            className={`rounded-full border px-4 py-2 text-sm shadow-soft transition active:scale-[0.98] ${
+              isFree
+                ? 'border-[#2F7D4E] bg-[#2F7D4E] text-white'
+                : 'border-[#BFDCC9] bg-[#E7F4EA] text-[#205A3A]'
+            }`}
+          >
+            免費
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPage(1)
+              setIsCharity((current) => !current)
+            }}
+            className={`rounded-full border px-4 py-2 text-sm shadow-soft transition active:scale-[0.98] ${
+              isCharity
+                ? 'border-[#B45B4D] bg-[#B45B4D] text-white'
+                : 'border-[#EAC8C2] bg-[#FBECEA] text-[#7F3D34]'
+            }`}
+          >
+            愛心捐贈
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPage(1)
+              setIsTradeable((current) => !current)
+            }}
+            className={`rounded-full border px-4 py-2 text-sm shadow-soft transition active:scale-[0.98] ${
+              isTradeable
+                ? 'border-[#5E5AB5] bg-[#5E5AB5] text-white'
+                : 'border-[#CFCBEA] bg-[#ECEAF9] text-[#484587]'
+            }`}
+          >
+            以物易物
+          </button>
+          <Button type="button" variant="secondary" onClick={clearAllFilters}>
+            清除條件 {activeFilterCount ? `(${activeFilterCount})` : ''}
+          </Button>
+        </div>
+      </Card>
+
+      {mobileSheetFilter ? (
+        <div className="fixed inset-0 z-20 flex items-end bg-black/35 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="關閉條件選單"
+            onClick={() => setMobileSheetFilter(null)}
           />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="text-sm text-text-subtle">
-              分類
-              <select
-                className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main"
-                value={categoryCode}
-                onChange={(event) => setCategoryCode(event.target.value)}
-              >
-                <option value="">全部分類</option>
-                {categories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm text-text-subtle">
-              品況
-              <select
-                className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main"
-                value={conditionCode}
-                onChange={(event) => setConditionCode(event.target.value)}
-              >
-                <option value="">全部品況</option>
-                {conditions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm text-text-subtle sm:col-span-2 lg:col-span-1">
-              社宅
-              <select
-                className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main"
-                value={residenceCode}
-                onChange={(event) => setResidenceCode(event.target.value)}
-              >
-                <option value="">全部社宅</option>
-                {residences.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm text-text-subtle">
-              最低價格
-              <input
-                type="number"
-                min={0}
-                className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main"
-                value={minPrice}
-                onChange={(event) => setMinPrice(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-            <label className="text-sm text-text-subtle">
-              最高價格
-              <input
-                type="number"
-                min={0}
-                className="mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main"
-                value={maxPrice}
-                onChange={(event) => setMaxPrice(event.target.value)}
-                placeholder="不限"
-              />
-            </label>
-            <div className="flex items-end">
-              <Button type="submit" fullWidth>
-                搜尋
+          <Card className="animate-sheet-up relative z-10 max-h-[70vh] w-full overflow-auto rounded-b-none">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-text-main">
+                {mobileSheetFilter === 'category'
+                  ? '選擇分類'
+                  : mobileSheetFilter === 'condition'
+                    ? '選擇品況'
+                    : '選擇社宅'}
+              </h3>
+              <Button type="button" variant="secondary" onClick={() => setMobileSheetFilter(null)}>
+                完成
               </Button>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-text-subtle">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={isFree} onChange={(event) => setIsFree(event.target.checked)} />
-              免費
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isCharity}
-                onChange={(event) => setIsCharity(event.target.checked)}
-              />
-              愛心捐贈
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isTradeable}
-                onChange={(event) => setIsTradeable(event.target.checked)}
-              />
-              以物易物
-            </label>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setSearchInput('')
-                setQuery('')
-                setCategoryCode('')
-                setConditionCode('')
-                setResidenceCode('')
-                setMinPrice('')
-                setMaxPrice('')
-                setIsFree(false)
-                setIsCharity(false)
-                setIsTradeable(false)
-                setPage(1)
-              }}
-            >
-              清除條件
-            </Button>
-          </div>
-        </form>
-      </Card>
+            {mobileSheetFilter === 'category'
+              ? renderMultiOptions('分類', categories, selectedCategoryCodes, (code) =>
+                  toggleMultiCode(code, setSelectedCategoryCodes),
+                )
+              : null}
+            {mobileSheetFilter === 'condition'
+              ? renderMultiOptions('品況', conditions, selectedConditionCodes, (code) =>
+                  toggleMultiCode(code, setSelectedConditionCodes),
+                )
+              : null}
+            {mobileSheetFilter === 'residence'
+              ? renderMultiOptions('社宅', residences, selectedResidenceCodes, (code) =>
+                  toggleMultiCode(code, setSelectedResidenceCodes),
+                )
+              : null}
+          </Card>
+        </div>
+      ) : null}
 
       {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
 
@@ -270,7 +359,7 @@ export const ListingHomePage = () => {
       ) : null}
 
       {!loading && !items.length ? (
-        <EmptyState title="目前沒有符合條件的商品" description="請調整搜尋條件，或稍後再試一次。" />
+        <EmptyState title="目前沒有符合條件的商品" description="請調整篩選條件，或稍後再試一次。" />
       ) : null}
 
       {!loading && items.length ? (

@@ -15,7 +15,7 @@ export const Button = ({
   ...props
 }: ButtonProps) => {
   const baseClasses =
-    'rounded-xl px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60'
+    'rounded-xl px-4 py-2 text-sm font-medium transition duration-150 hover:shadow-soft active:scale-[0.98] active:duration-90 disabled:cursor-not-allowed disabled:opacity-60'
 
   const variantClasses =
     variant === 'primary'

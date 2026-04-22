@@ -64,6 +64,9 @@ type QueryParams = {
   categoryCode?: number
   conditionCode?: number
   residenceCode?: number
+  categoryCodes?: number[]
+  conditionCodes?: number[]
+  residenceCodes?: number[]
   isFree?: boolean
   isCharity?: boolean
   isTradeable?: boolean
@@ -73,7 +76,16 @@ type QueryParams = {
 
 export const listingApi = {
   async list(params: QueryParams): Promise<ListPayload> {
-    const response = await http.get<ApiResponse<ListPayload>>('/api/v1/listings', { params })
+    const normalizedParams = {
+      ...params,
+      categoryCodes: params.categoryCodes?.length ? params.categoryCodes.join(',') : undefined,
+      conditionCodes: params.conditionCodes?.length ? params.conditionCodes.join(',') : undefined,
+      residenceCodes: params.residenceCodes?.length ? params.residenceCodes.join(',') : undefined,
+    }
+
+    const response = await http.get<ApiResponse<ListPayload>>('/api/v1/listings', {
+      params: normalizedParams,
+    })
     return unwrapApiResponse(response.data)
   },
 
