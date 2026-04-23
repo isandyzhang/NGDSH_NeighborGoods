@@ -377,6 +377,11 @@ namespace NeighborGoods.Api.Migrations
                     b.Property<DateTime?>("EmailNotificationLastSentAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsQuickResponder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTime?>("LineMessagingApiAuthorizedAt")
                         .HasColumnType("datetime2");
 
@@ -415,6 +420,12 @@ namespace NeighborGoods.Api.Migrations
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
+
+                    b.Property<DateTime?>("QuickResponderEvaluatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("QuickResponderP75Minutes")
+                        .HasColumnType("int");
 
                     b.Property<int>("Role")
                         .HasColumnType("int");

@@ -199,6 +199,36 @@ public static class ListingEndpoints
         .WithName("GetMyFavoriteListingsV1")
         .RequireAuthorization();
 
+        app.MapGet("/api/v1/sellers/{sellerId}/listings", async (
+            HttpContext httpContext,
+            ListingQueryService service,
+            string sellerId,
+            int page = 1,
+            int pageSize = 20,
+            CancellationToken ct = default) =>
+        {
+            var result = await service.QueryBySellerAsync(sellerId, page, pageSize, ct);
+            if (result is null)
+            {
+                return Results.NotFound(ApiResponseFactory.Error("SELLER_NOT_FOUND", "找不到賣家", httpContext));
+            }
+
+            var payload = new
+            {
+                seller = result.Seller,
+                items = result.Items,
+                pagination = new
+                {
+                    page = result.Page,
+                    pageSize = result.PageSize,
+                    totalCount = result.Total,
+                    totalPages = (int)Math.Ceiling(result.Total / (double)result.PageSize)
+                }
+            };
+            return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+        })
+        .WithName("GetSellerListingsV1");
+
         app.MapGet("/api/v1/users/me/interest-profile", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,
@@ -249,8 +279,10 @@ public static class ListingEndpoints
         app.MapPost("/api/v1/listings", async (
             HttpContext httpContext,
             ListingCommandService service,
+            ILoggerFactory loggerFactory,
             CancellationToken ct = default) =>
         {
+            var logger = loggerFactory.CreateLogger("CreateListingV1");
             if (!httpContext.Request.HasFormContentType)
             {
                 return Results.Json(
@@ -318,6 +350,13 @@ public static class ListingEndpoints
             catch (ListingAccessException ex)
             {
                 return ToListingAccessResult(ex, httpContext);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "建立商品發生未預期例外。");
+                return Results.Json(
+                    ApiResponseFactory.Error("INTERNAL_ERROR", "建立商品失敗，請稍後再試。", httpContext),
+                    statusCode: StatusCodes.Status500InternalServerError);
             }
         })
         .WithName("CreateListingV1")

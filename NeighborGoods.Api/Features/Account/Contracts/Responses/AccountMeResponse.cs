@@ -7,6 +7,7 @@ public sealed record AccountMeResponse(
     string? Email,
     bool EmailConfirmed,
     string? LineUserId,
+    bool LineNotifyBound,
     DateTime CreatedAt,
     AccountStatisticsResponse Statistics
 );

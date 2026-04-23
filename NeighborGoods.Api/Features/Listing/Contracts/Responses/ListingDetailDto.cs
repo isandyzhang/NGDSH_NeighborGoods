@@ -22,6 +22,8 @@ public sealed record ListingDetailDto(
     bool IsPinned,
     DateTime? PinnedStartDate,
     DateTime? PinnedEndDate,
+    DateTime? PendingPurchaseRequestExpireAt,
+    int? PendingPurchaseRequestRemainingSeconds,
     DateTime CreatedAt,
     DateTime? UpdatedAt
 );

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace NeighborGoods.Api.Shared.Persistence.LegacyEntities;
@@ -56,6 +56,12 @@ public partial class AspNetUser
     public DateTime? EmailNotificationLastSentAt { get; set; }
 
     public int TopPinCredits { get; set; }
+
+    public bool IsQuickResponder { get; set; }
+
+    public DateTime? QuickResponderEvaluatedAt { get; set; }
+
+    public int? QuickResponderP75Minutes { get; set; }
 
     public virtual ICollection<AdminMessage> AdminMessages { get; set; } = new List<AdminMessage>();
 

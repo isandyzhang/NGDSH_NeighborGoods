@@ -30,6 +30,18 @@ export const http = axios.create({
   timeout: 15000,
 })
 
+const normalizeNetworkErrorMessage = (error: AxiosError<ApiErrorResponse>) => {
+  if (error.code === 'ECONNABORTED') {
+    return '連線逾時（15 秒），請稍後再試一次'
+  }
+
+  if (error.message?.toLowerCase().includes('network error')) {
+    return '網路連線失敗，請確認後端服務是否啟動'
+  }
+
+  return error.message || '發生未預期錯誤'
+}
+
 http.interceptors.request.use((config) => {
   const token = getTokenHandler()
   if (token) {
@@ -65,6 +77,6 @@ http.interceptors.response.use(
       )
     }
 
-    throw new ApiClientError(error.message || '發生未預期錯誤', 'NETWORK_ERROR', status)
+    throw new ApiClientError(normalizeNetworkErrorMessage(error), 'NETWORK_ERROR', status)
   },
 )

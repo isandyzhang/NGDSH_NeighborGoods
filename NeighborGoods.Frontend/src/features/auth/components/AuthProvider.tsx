@@ -18,6 +18,7 @@ type AuthContextValue = {
   login: (payload: LoginPayload) => Promise<void>
   logout: () => Promise<void>
   refreshTokens: () => Promise<AuthTokens | null>
+  acceptTokens: (tokens: AuthTokens) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -85,8 +86,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       login,
       logout,
       refreshTokens,
+      acceptTokens: saveTokens,
     }),
-    [login, logout, refreshTokens, tokens],
+    [login, logout, refreshTokens, saveTokens, tokens],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

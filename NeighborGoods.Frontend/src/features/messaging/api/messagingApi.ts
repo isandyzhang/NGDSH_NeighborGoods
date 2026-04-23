@@ -28,6 +28,20 @@ export type MessagesPage = {
   totalPages: number
 }
 
+export type ConversationPurchaseRequest = {
+  id: string
+  listingId: string
+  conversationId: string
+  buyerId: string
+  sellerId: string
+  status: number
+  createdAt: string
+  expireAt: string
+  respondedAt: string | null
+  responseReason: string | null
+  remainingSeconds: number
+}
+
 type ConversationsPayload = { items: ConversationItem[] }
 
 export const messagingApi = {
@@ -64,5 +78,34 @@ export const messagingApi = {
 
   async markRead(conversationId: string): Promise<void> {
     await http.post(`/api/v1/conversations/${conversationId}/read`)
+  },
+
+  async getCurrentPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.get<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/current`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async acceptPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/accept`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async rejectPurchaseRequest(conversationId: string, reason?: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/reject`,
+      { reason: reason?.trim() || null },
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async cancelPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/cancel`,
+    )
+    return unwrapApiResponse(response.data)
   },
 }

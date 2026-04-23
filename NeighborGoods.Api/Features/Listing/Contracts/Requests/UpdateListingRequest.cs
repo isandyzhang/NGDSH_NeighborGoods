@@ -16,4 +16,7 @@ public sealed class UpdateListingRequest
 
     /// <summary>要刪除的圖片識別：可為 DB 內 raw ImageUrl，或公開 GET 詳情回傳之完整 URL。</summary>
     public IReadOnlyList<string>? ImageUrlsToDelete { get; init; }
+
+    /// <summary>圖片排序：可為 DB 內 raw ImageUrl，或公開 GET 詳情回傳之完整 URL。</summary>
+    public IReadOnlyList<string>? ImageUrlsInOrder { get; init; }
 }

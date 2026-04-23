@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
-import { accountApi } from '@/features/account/api/accountApi'
-import { NavLink } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/components/AuthProvider'
-import { Button } from './Button'
-
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-lg px-3 py-2 text-sm transition ${isActive ? 'bg-surface text-text-main' : 'text-text-subtle hover:text-text-main'}`
+import { accountApi } from '@/features/account/api/accountApi'
+import { Button, getButtonClassName } from '@/shared/ui/Button'
 
 export const TopNav = () => {
-  const { isAuthenticated, logout } = useAuth()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const { isAuthenticated, tokens, logout } = useAuth()
+  const hideLoginAction = pathname === '/login'
   const [displayName, setDisplayName] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const menuContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -18,77 +20,157 @@ export const TopNav = () => {
       return
     }
 
+    let disposed = false
+
     void accountApi
       .me()
-      .then((me) => {
-        setDisplayName(me.displayName)
+      .then((profile) => {
+        if (!disposed) {
+          setDisplayName(profile.displayName || '用戶')
+        }
       })
       .catch(() => {
-        setDisplayName(null)
+        if (!disposed) {
+          setDisplayName('用戶')
+        }
       })
-  }, [isAuthenticated])
+
+    return () => {
+      disposed = true
+    }
+  }, [isAuthenticated, tokens?.userId])
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return
+    }
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!menuContainerRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [menuOpen])
+
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
+  const handleLogout = async () => {
+    if (loggingOut) {
+      return
+    }
+
+    setLoggingOut(true)
+    try {
+      await logout()
+      setMenuOpen(false)
+      navigate('/listings')
+    } finally {
+      setLoggingOut(false)
+    }
+  }
+
+  const menuItems = [
+    { to: '/messages', label: '我的訊息' },
+    { to: '/account', label: '我的帳號' },
+    { to: '/favorites', label: '我的收藏' },
+    { to: '/my-listings', label: '我的商品' },
+    { to: '/listings/create', label: '刊登商品' },
+    { to: '/contact-admin', label: '聯絡管理員' },
+    { to: '/terms', label: '使用條款' },
+    { to: '/privacy', label: '隱私條款' },
+  ] as const
 
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
-        <div className="text-lg font-semibold text-text-main">NeighborGoods</div>
-        <button
-          type="button"
-          className="rounded-lg border border-border px-3 py-2 text-sm text-text-main md:hidden"
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          選單
-        </button>
-        <nav className="hidden items-center gap-2 md:flex">
-          {isAuthenticated && displayName ? (
-            <span className="mr-2 text-sm text-text-subtle">您好，{displayName}</span>
-          ) : null}
-          <NavLink to="/listings" className={navClass}>
-            商品列表
-          </NavLink>
-          {isAuthenticated ? (
+      <div ref={menuContainerRef} className="mx-auto w-full max-w-6xl px-4">
+        <div className="flex h-20 items-center justify-between">
+          <Link
+            to="/listings"
+            className="text-[1.75rem] font-semibold tracking-tight text-text-subtle"
+          >
+            NeighborGoods
+          </Link>
+          {hideLoginAction ? null : isAuthenticated ? (
             <>
-              <NavLink to="/messages" className={navClass}>
-                訊息
-              </NavLink>
-              <Button variant="secondary" onClick={() => void logout()}>
-                登出
-              </Button>
-            </>
-          ) : (
-            <NavLink to="/login" className={navClass}>
-              登入
-            </NavLink>
-          )}
-        </nav>
-      </div>
-      <div className={`border-t border-border px-4 py-3 md:hidden ${menuOpen ? 'block' : 'hidden'}`}>
-        <div className="flex flex-col gap-2">
-          <NavLink to="/listings" className={navClass} onClick={() => setMenuOpen(false)}>
-            商品列表
-          </NavLink>
-          {isAuthenticated ? (
-            <>
-              <NavLink to="/messages" className={navClass} onClick={() => setMenuOpen(false)}>
-                訊息
-              </NavLink>
-              {displayName ? <p className="px-3 text-sm text-text-subtle">您好，{displayName}</p> : null}
               <Button
+                type="button"
                 variant="secondary"
-                onClick={() => {
-                  setMenuOpen(false)
-                  void logout()
-                }}
+                onClick={() => setMenuOpen((current) => !current)}
+                className="h-12 min-w-[10.5rem] px-4 text-4xl font-semibold"
+                aria-expanded={menuOpen}
+                aria-controls="topnav-user-menu"
               >
-                登出
+                {`Hi, ${displayName ?? '用戶'}`}
               </Button>
             </>
           ) : (
-            <NavLink to="/login" className={navClass} onClick={() => setMenuOpen(false)}>
-              登入
-            </NavLink>
+            <div className="flex items-center">
+              <Link
+                to="/login"
+                className={getButtonClassName({
+                  variant: 'secondary',
+                  className: 'inline-flex items-center justify-center rounded-2xl px-6 py-3 text-xl font-semibold',
+                })}
+              >
+                登入
+              </Link>
+            </div>
           )}
         </div>
+
+        {hideLoginAction || !isAuthenticated ? null : (
+          <div
+            id="topnav-user-menu"
+            className={`overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-out ${
+              menuOpen ? 'max-h-[48vh] border-t border-border pb-1 opacity-100' : 'max-h-0 pb-0 opacity-0'
+            }`}
+          >
+            <div className="grid max-h-[48vh] grid-cols-2 content-start gap-2 overflow-y-auto py-2 md:grid-cols-4">
+              {menuItems.map((item, index) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMenuOpen(false)}
+                  className={getButtonClassName({
+                    variant: 'secondary',
+                    className: `topnav-menu-item inline-flex items-center justify-center px-3 py-3 text-xl font-semibold ${
+                      menuOpen ? 'is-open' : ''
+                    }`,
+                  })}
+                  style={menuOpen ? { animationDelay: `${index * 55}ms` } : undefined}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void handleLogout()}
+                className={`topnav-menu-item col-span-2 border border-[#E9B4B4] bg-[#FDE2E2] px-3 py-3 text-xl font-semibold text-[#B23A3A] hover:bg-[#F8D1D1] md:col-span-4 ${
+                  menuOpen ? 'is-open' : ''
+                }`}
+                style={menuOpen ? { animationDelay: `${menuItems.length * 55}ms` } : undefined}
+              >
+                {loggingOut ? '登出中...' : '登出'}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   )

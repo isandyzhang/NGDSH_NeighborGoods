@@ -71,9 +71,24 @@ public sealed class ListingCommandService(
             await dbContext.SaveChangesAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
-            await tx.RollbackAsync(cancellationToken);
+            logger.LogError(
+                ex,
+                "建立商品失敗（交易將回滾）：Seller={SellerId}, ListingId={ListingId}, ImageCount={ImageCount}",
+                listing.SellerId,
+                listing.Id,
+                imageFiles.Count);
+
+            try
+            {
+                await tx.RollbackAsync(cancellationToken);
+            }
+            catch (Exception rollbackEx)
+            {
+                logger.LogError(rollbackEx, "建立商品回滾交易失敗：ListingId={ListingId}", listing.Id);
+            }
+
             await TryDeleteBlobsAsync(uploadedBlobNames, cancellationToken);
             throw;
         }
@@ -159,11 +174,14 @@ public sealed class ListingCommandService(
                 }
             }
 
-            var remaining = entity.ListingImages.OrderBy(img => img.SortOrder).ToList();
-            for (var i = 0; i < remaining.Count; i++)
-            {
-                remaining[i].SortOrder = i;
-            }
+        }
+
+        var orderedImages = BuildOrderedImages(
+            entity.ListingImages.ToList(),
+            request.ImageUrlsInOrder);
+        for (var i = 0; i < orderedImages.Count; i++)
+        {
+            orderedImages[i].SortOrder = i;
         }
 
         dbContext.Listings.Update(entity);
@@ -487,5 +505,63 @@ public sealed class ListingCommandService(
         {
             throw new ArgumentException("Price cannot be negative.", nameof(price));
         }
+    }
+
+    private List<ListingImage> BuildOrderedImages(
+        List<ListingImage> currentImages,
+        IReadOnlyList<string>? orderTokens)
+    {
+        if (currentImages.Count == 0)
+        {
+            return currentImages;
+        }
+
+        if (orderTokens is not { Count: > 0 })
+        {
+            return currentImages
+                .OrderBy(img => img.SortOrder)
+                .ThenBy(img => img.CreatedAt)
+                .ToList();
+        }
+
+        var normalizedTokens = orderTokens
+            .Where(token => !string.IsNullOrWhiteSpace(token))
+            .Select(token => token.Trim())
+            .ToList();
+        if (normalizedTokens.Count == 0)
+        {
+            return currentImages
+                .OrderBy(img => img.SortOrder)
+                .ThenBy(img => img.CreatedAt)
+                .ToList();
+        }
+
+        var remaining = currentImages.ToList();
+        var ordered = new List<ListingImage>(currentImages.Count);
+        foreach (var token in normalizedTokens)
+        {
+            var match = remaining.FirstOrDefault(img =>
+                ListingBlobPath.StoredImageMatchesDeleteToken(
+                    img.ImageUrl,
+                    token,
+                    raw => ResolveImageUrlForMatch(raw)));
+            if (match is null)
+            {
+                continue;
+            }
+
+            ordered.Add(match);
+            remaining.Remove(match);
+        }
+
+        if (remaining.Count > 0)
+        {
+            ordered.AddRange(
+                remaining
+                    .OrderBy(img => img.SortOrder)
+                    .ThenBy(img => img.CreatedAt));
+        }
+
+        return ordered;
     }
 }

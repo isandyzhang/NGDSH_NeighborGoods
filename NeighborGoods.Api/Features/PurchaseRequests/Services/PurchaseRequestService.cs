@@ -231,6 +231,99 @@ public sealed class PurchaseRequestService(
         return (ToResponse(request, DateTime.UtcNow), null, null);
     }
 
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> GetCurrentByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var (conversation, conversationErrorCode, conversationErrorMessage) = await EnsureConversationParticipantAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (conversation is null)
+        {
+            return (null, conversationErrorCode, conversationErrorMessage);
+        }
+
+        var request = await dbContext.PurchaseRequests
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
+        if (request is null)
+        {
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
+        }
+
+        var now = DateTime.UtcNow;
+        if ((PurchaseRequestStatus)request.Status == PurchaseRequestStatus.Pending
+            && request.ExpireAt <= now)
+        {
+            request.Status = (int)PurchaseRequestStatus.Expired;
+            request.RespondedAt = now;
+            request.ResponseReason = "逾時未回覆";
+            await AddSystemMessageAsync(
+                request.ConversationId,
+                request.SellerId,
+                ExpireRequestSystemMessage,
+                now,
+                cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return (ToResponse(request, DateTime.UtcNow), null, null);
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> AcceptByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var (requestId, errorCode, errorMessage) = await GetPendingRequestIdByConversationAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (requestId is null)
+        {
+            return (null, errorCode, errorMessage);
+        }
+
+        return await AcceptAsync(currentUserId, requestId.Value, cancellationToken);
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> RejectByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        var (requestId, errorCode, errorMessage) = await GetPendingRequestIdByConversationAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (requestId is null)
+        {
+            return (null, errorCode, errorMessage);
+        }
+
+        return await RejectAsync(currentUserId, requestId.Value, reason, cancellationToken);
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> CancelByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var (requestId, errorCode, errorMessage) = await GetPendingRequestIdByConversationAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (requestId is null)
+        {
+            return (null, errorCode, errorMessage);
+        }
+
+        return await CancelAsync(currentUserId, requestId.Value, cancellationToken);
+    }
+
     public async Task<int> ExpirePendingAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
@@ -427,6 +520,73 @@ public sealed class PurchaseRequestService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<(Guid? RequestId, string? ErrorCode, string? ErrorMessage)> GetPendingRequestIdByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var (conversation, conversationErrorCode, conversationErrorMessage) = await EnsureConversationParticipantAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (conversation is null)
+        {
+            return (null, conversationErrorCode, conversationErrorMessage);
+        }
+
+        var now = DateTime.UtcNow;
+        var pendingStatus = (int)PurchaseRequestStatus.Pending;
+        var pendingRequest = await dbContext.PurchaseRequests
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(
+                x => x.ConversationId == conversationId
+                     && x.Status == pendingStatus,
+                cancellationToken);
+        if (pendingRequest is null)
+        {
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到待回覆交易請求");
+        }
+
+        if (pendingRequest.ExpireAt <= now)
+        {
+            pendingRequest.Status = (int)PurchaseRequestStatus.Expired;
+            pendingRequest.RespondedAt = now;
+            pendingRequest.ResponseReason = "逾時未回覆";
+            await AddSystemMessageAsync(
+                pendingRequest.ConversationId,
+                pendingRequest.SellerId,
+                ExpireRequestSystemMessage,
+                now,
+                cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (null, "PURCHASE_REQUEST_EXPIRED", "此交易請求已逾時");
+        }
+
+        return (pendingRequest.Id, null, null);
+    }
+
+    private async Task<(Conversation? Conversation, string? ErrorCode, string? ErrorMessage)> EnsureConversationParticipantAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await dbContext.Conversations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return (null, "CONVERSATION_NOT_FOUND", "找不到對話");
+        }
+
+        if (!string.Equals(conversation.Participant1Id, currentUserId, StringComparison.Ordinal)
+            && !string.Equals(conversation.Participant2Id, currentUserId, StringComparison.Ordinal))
+        {
+            return (null, "CONVERSATION_ACCESS_DENIED", "無權限訪問此對話");
+        }
+
+        return (conversation, null, null);
     }
 
     private bool TryEnsurePending(

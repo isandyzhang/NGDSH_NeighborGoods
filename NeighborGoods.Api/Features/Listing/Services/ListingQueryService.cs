@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using NeighborGoods.Api.Features.Listing.Contracts;
+using NeighborGoods.Api.Features.PurchaseRequests;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Contracts;
 using NeighborGoods.Api.Shared.Persistence;
@@ -22,6 +23,7 @@ public sealed class ListingQueryService(
 
     public async Task<ListingDetailDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
         var categoryNames = await GetCategoryMapAsync(cancellationToken);
         var conditionNames = await GetConditionMapAsync(cancellationToken);
         var residenceNames = await GetResidenceMapAsync(cancellationToken);
@@ -45,6 +47,7 @@ public sealed class ListingQueryService(
             .Where(url => !string.IsNullOrWhiteSpace(url))
             .ToList();
         var mainImageUrl = resolvedImageUrls.FirstOrDefault();
+        var pendingSummary = await GetPendingPurchaseRequestSummaryAsync(id, now, cancellationToken);
 
         return new ListingDetailDto(
             listing.Id,
@@ -68,12 +71,15 @@ public sealed class ListingQueryService(
             listing.IsPinned,
             listing.PinnedStartDate,
             listing.PinnedEndDate,
+            pendingSummary?.ExpireAt,
+            pendingSummary?.RemainingSeconds,
             listing.CreatedAt,
             listing.UpdatedAt);
     }
 
     public async Task<PagedResult<ListingListItemDto>> QueryAsync(ListingQueryRequest request, CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
         var page = Math.Max(request.Page, 1);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var skip = (page - 1) * pageSize;
@@ -170,7 +176,14 @@ public sealed class ListingQueryService(
             .Take(pageSize)
             .Select(x => new ListingSummary(
                 x.Id,
+                x.SellerId,
                 x.Title,
+                x.Seller.DisplayName,
+                x.Seller.EmailConfirmed,
+                x.Seller.EmailNotificationEnabled,
+                x.Seller.LineUserId != null,
+                x.Seller.LineMessagingApiUserId != null,
+                x.Seller.IsQuickResponder,
                 x.Category,
                 x.Condition,
                 Convert.ToInt32(x.Price),
@@ -181,32 +194,51 @@ public sealed class ListingQueryService(
                 x.IsTradeable,
                 x.IsPinned,
                 x.PinnedEndDate,
+                null,
+                null,
                 dbContext.Conversations.Count(c => c.ListingId == x.Id)))
             .ToListAsync(cancellationToken);
 
         var coverImageMap = await GetCoverImageMapAsync(
             listings.Select(x => x.Id).ToList(),
             cancellationToken);
+        var pendingMap = await GetPendingPurchaseRequestMapAsync(
+            listings.Select(x => x.Id).ToList(),
+            now,
+            cancellationToken);
 
         var items = listings
-            .Select(x => new ListingListItemDto(
-                x.Id,
-                x.Title,
-                x.Category,
-                categoryNames.GetValueOrDefault(x.Category, "其他"),
-                x.Condition,
-                conditionNames.GetValueOrDefault(x.Condition, "良好"),
-                x.Price,
-                x.Residence,
-                residenceNames.GetValueOrDefault(x.Residence, "未指定"),
-                coverImageMap.GetValueOrDefault(x.Id),
-                x.Status,
-                x.IsFree,
-                x.IsCharity,
-                x.IsTradeable,
-                x.IsPinned,
-                x.PinnedEndDate,
-                x.InterestCount))
+            .Select(x =>
+            {
+                pendingMap.TryGetValue(x.Id, out var pendingSummary);
+                return new ListingListItemDto(
+                    x.Id,
+                    x.SellerId,
+                    x.Title,
+                    x.SellerDisplayName,
+                    x.SellerEmailVerified,
+                    x.SellerEmailNotificationEnabled,
+                    x.SellerLineLoginBound,
+                    x.SellerLineNotifyBound,
+                    x.SellerQuickResponder,
+                    x.Category,
+                    categoryNames.GetValueOrDefault(x.Category, "其他"),
+                    x.Condition,
+                    conditionNames.GetValueOrDefault(x.Condition, "良好"),
+                    x.Price,
+                    x.Residence,
+                    residenceNames.GetValueOrDefault(x.Residence, "未指定"),
+                    coverImageMap.GetValueOrDefault(x.Id),
+                    x.Status,
+                    x.IsFree,
+                    x.IsCharity,
+                    x.IsTradeable,
+                    x.IsPinned,
+                    x.PinnedEndDate,
+                    pendingSummary?.ExpireAt,
+                    pendingSummary?.RemainingSeconds,
+                    x.InterestCount);
+            })
             .ToList();
 
         return new PagedResult<ListingListItemDto>(page, pageSize, total, items);
@@ -264,6 +296,102 @@ public sealed class ListingQueryService(
             .ToList();
 
         return new PagedResult<MyListingListItemDto>(page, pageSize, total, items);
+    }
+
+    public async Task<SellerListingsQueryResultDto?> QueryBySellerAsync(
+        string sellerId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sellerId))
+        {
+            return null;
+        }
+
+        var seller = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .Where(x => x.Id == sellerId)
+            .Select(x => new { x.Id, x.DisplayName })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (seller is null)
+        {
+            return null;
+        }
+
+        var normalizedPage = Math.Max(page, 1);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, 100);
+        var skip = (normalizedPage - 1) * normalizedPageSize;
+        var active = (int)ListingStatus.Active;
+        var reserved = (int)ListingStatus.Reserved;
+        var sold = (int)ListingStatus.Sold;
+        var donated = (int)ListingStatus.Donated;
+        var givenOrTraded = (int)ListingStatus.GivenOrTraded;
+
+        var visibleStatuses = new[] { active, reserved, sold, donated, givenOrTraded };
+        var queryable = dbContext.Listings
+            .AsNoTracking()
+            .Where(x => x.SellerId == sellerId && visibleStatuses.Contains(x.Status))
+            .OrderByDescending(x => x.CreatedAt);
+
+        var total = await queryable.CountAsync(cancellationToken);
+        var rows = await queryable
+            .Skip(skip)
+            .Take(normalizedPageSize)
+            .Select(x => new
+            {
+                x.Id,
+                x.Title,
+                x.Category,
+                x.Price,
+                x.IsFree,
+                x.Status,
+                x.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        var categoryNames = await GetCategoryMapAsync(cancellationToken);
+        var coverImageMap = await GetCoverImageMapAsync(rows.Select(x => x.Id).ToList(), cancellationToken);
+
+        var items = rows
+            .Select(x => new SellerListingListItemDto(
+                x.Id,
+                x.Title,
+                x.Category,
+                categoryNames.GetValueOrDefault(x.Category, "其他"),
+                Convert.ToInt32(x.Price),
+                x.IsFree,
+                x.Status,
+                coverImageMap.GetValueOrDefault(x.Id),
+                x.CreatedAt))
+            .ToList();
+
+        var totalListings = await dbContext.Listings
+            .AsNoTracking()
+            .CountAsync(x => x.SellerId == sellerId, cancellationToken);
+        var activeListings = await dbContext.Listings
+            .AsNoTracking()
+            .CountAsync(x => x.SellerId == sellerId && x.Status == active, cancellationToken);
+        var completedListings = await dbContext.Listings
+            .AsNoTracking()
+            .CountAsync(
+                x => x.SellerId == sellerId &&
+                     (x.Status == sold || x.Status == donated || x.Status == givenOrTraded),
+                cancellationToken);
+
+        var sellerSummary = new SellerSummaryDto(
+            seller.Id,
+            string.IsNullOrWhiteSpace(seller.DisplayName) ? "賣家" : seller.DisplayName,
+            totalListings,
+            activeListings,
+            completedListings);
+
+        return new SellerListingsQueryResultDto(
+            sellerSummary,
+            items,
+            normalizedPage,
+            normalizedPageSize,
+            total);
     }
 
     private async Task<Dictionary<int, string>> GetCategoryMapAsync(CancellationToken cancellationToken)
@@ -372,4 +500,68 @@ public sealed class ListingQueryService(
 
         return blobStorage.BuildPublicUrl(storedPathOrUrl);
     }
+
+    private async Task<PendingPurchaseRequestSummary?> GetPendingPurchaseRequestSummaryAsync(
+        Guid listingId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var pendingStatus = (int)PurchaseRequestStatus.Pending;
+        var pendingExpireAt = await dbContext.PurchaseRequests
+            .AsNoTracking()
+            .Where(x => x.ListingId == listingId && x.Status == pendingStatus && x.ExpireAt > now)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => x.ExpireAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (pendingExpireAt == default)
+        {
+            return null;
+        }
+
+        return new PendingPurchaseRequestSummary(
+            pendingExpireAt,
+            ToRemainingSeconds(pendingExpireAt, now));
+    }
+
+    private async Task<Dictionary<Guid, PendingPurchaseRequestSummary>> GetPendingPurchaseRequestMapAsync(
+        IReadOnlyCollection<Guid> listingIds,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (listingIds.Count == 0)
+        {
+            return [];
+        }
+
+        var pendingStatus = (int)PurchaseRequestStatus.Pending;
+        var rows = await dbContext.PurchaseRequests
+            .AsNoTracking()
+            .Where(x => listingIds.Contains(x.ListingId) && x.Status == pendingStatus && x.ExpireAt > now)
+            .GroupBy(x => x.ListingId)
+            .Select(g => new
+            {
+                ListingId = g.Key,
+                ExpireAt = g.Min(x => x.ExpireAt)
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            x => x.ListingId,
+            x => new PendingPurchaseRequestSummary(
+                x.ExpireAt,
+                ToRemainingSeconds(x.ExpireAt, now)));
+    }
+
+    private static int ToRemainingSeconds(DateTime expireAt, DateTime now)
+    {
+        if (expireAt <= now)
+        {
+            return 0;
+        }
+
+        return Math.Max(0, (int)Math.Ceiling((expireAt - now).TotalSeconds));
+    }
+
+    private sealed record PendingPurchaseRequestSummary(DateTime ExpireAt, int RemainingSeconds);
 }

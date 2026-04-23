@@ -73,6 +73,8 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.LineUserId).HasMaxLength(100);
             entity.Property(e => e.NormalizedEmail).HasMaxLength(256);
             entity.Property(e => e.NormalizedUserName).HasMaxLength(256);
+            entity.Property(e => e.QuickResponderP75Minutes);
+            entity.Property(e => e.IsQuickResponder).HasDefaultValue(false);
             entity.Property(e => e.UserName).HasMaxLength(256);
 
             entity.HasMany(d => d.Roles).WithMany(p => p.Users)

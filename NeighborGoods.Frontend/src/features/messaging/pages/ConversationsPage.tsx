@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { messagingApi, type ConversationItem } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
+import { ErrorState } from '@/shared/ui/state/ErrorState'
+import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
 const formatDateTime = (value: string | null) => {
   if (!value) {
@@ -54,45 +57,66 @@ export const ConversationsPage = () => {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 md:py-8">
-      <section className="mb-6 space-y-2">
-        <h1 className="text-3xl font-semibold text-text-main sm:text-4xl">訊息中心</h1>
-        <p className="text-text-subtle">管理與買家/賣家的所有對話。</p>
+      <section className="mb-8 space-y-3 text-center">
+        <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
+        <h1 className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl">
+          訊息<span className="marker-wipe">中心</span>
+        </h1>
+        <p className="mx-auto max-w-2xl text-lg text-text-subtle">管理與買家/賣家的所有對話。</p>
       </section>
 
-      {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
+      {error ? <ErrorState description={error} /> : null}
 
-      {loading ? <Card className="h-40 animate-pulse bg-surface-2" /> : null}
+      {loading ? <PageSkeleton className="h-40" /> : null}
 
       {!loading && !items.length ? (
         <EmptyState title="目前沒有任何對話" description="當你開始與其他使用者聯繫後，訊息會出現在這裡。" />
       ) : null}
 
       {!loading && items.length ? (
-        <section className="space-y-3">
+        <motion.section
+          className="space-y-3"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: {
+              transition: {
+                staggerChildren: 0.08,
+              },
+            },
+          }}
+        >
           {items.map((item) => (
-            <Link to={`/messages/${item.conversationId}`} key={item.conversationId} className="block">
-              <Card className="transition hover:border-brand">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-sm text-text-subtle">{item.listingTitle}</p>
-                    <h2 className="text-lg font-semibold text-text-main">{item.otherDisplayName}</h2>
-                    <p className="mt-1 line-clamp-1 text-sm text-text-muted">
-                      {item.lastMessagePreview ?? '尚未有訊息內容'}
-                    </p>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-xs text-text-muted">{formatDateTime(item.lastMessageAt)}</p>
+            <motion.div
+              key={item.conversationId}
+              variants={{
+                hidden: { opacity: 0, y: 14 },
+                visible: { opacity: 1, y: 0 },
+              }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Link to={`/messages/${item.conversationId}`} className="block">
+                <Card className="transition hover:border-brand">
+                  <div className="space-y-2">
+                    <div className="flex items-baseline gap-2">
+                      <h2 className="text-2xl font-bold leading-none text-text-main">{item.otherDisplayName}</h2>
+                      <p className="line-clamp-1 text-sm text-text-subtle">{item.listingTitle}</p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="line-clamp-1 text-sm text-text-muted">{item.lastMessagePreview ?? '尚未有訊息內容'}</p>
+                      <p className="shrink-0 text-xs text-text-muted">{formatDateTime(item.lastMessageAt)}</p>
+                    </div>
                     {item.unreadCount > 0 ? (
-                      <span className="mt-2 inline-block rounded-full bg-brand px-2 py-1 text-xs text-brand-foreground">
+                      <span className="inline-block rounded-full bg-brand px-2 py-1 text-xs text-brand-foreground">
                         未讀 {item.unreadCount}
                       </span>
                     ) : null}
                   </div>
-                </div>
-              </Card>
-            </Link>
+                </Card>
+              </Link>
+            </motion.div>
           ))}
-        </section>
+        </motion.section>
       ) : null}
     </main>
   )
