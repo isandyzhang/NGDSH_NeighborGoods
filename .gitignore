@@ -162,6 +162,11 @@ appsettings*.json
 # Bicep local parameter files (often contain secrets)
 **/infra/bicep/*.local.json
 **/infra/bicep/**/*.local.json
+infra/bicep/deploy.parameters.json
 
 # Local scratch (e.g. one-off git author rewrite)
 .tmp-rewrite-author.ps1
+
+# Local build health output
+.tmp-api-build/
+.tmp-api-build-health/

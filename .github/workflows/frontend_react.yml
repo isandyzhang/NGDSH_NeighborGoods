@@ -1,0 +1,35 @@
+name: frontend_react
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Frontend/**'
+      - '.github/workflows/frontend_react.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: NeighborGoods.Frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: NeighborGoods.Frontend
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: NeighborGoods.Frontend/dist
