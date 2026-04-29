@@ -1271,7 +1271,7 @@ export const ListingHomePage = () => {
 
       {showLoadingSkeleton ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 md:gap-y-8 lg:grid-cols-4 2xl:grid-cols-5">
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: 8 }).map((_, index) => (
             <Card key={index} className="h-56 animate-pulse bg-surface-2" />
           ))}
         </div>

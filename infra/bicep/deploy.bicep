@@ -12,19 +12,34 @@ param environmentName string = 'prod'
 @description('Deploy Azure SignalR Service or not')
 param deploySignalR bool = true
 
-@description('Provision SQL resources in this resource group')
+@description('Provision SQL resources in this resource group (uses modules/legacy/sql.bicep)')
 param provisionSqlResources bool = true
 
-@description('Provision Storage resources in this resource group')
+@description('Provision Storage resources in this resource group (uses modules/legacy/storage.bicep)')
 param provisionStorageResources bool = true
 
-@description('Existing SQL connection string when using existing SQL')
+@description('Manage existing SQL resources (server/database) in this resource group via IaC')
+param manageExistingSql bool = false
+
+@description('Manage existing Storage resources (account/container) in this resource group via IaC')
+param manageExistingStorage bool = false
+
+@description('Existing SQL Server name (used when manageExistingSql=true)')
+param existingSqlServerName string = ''
+
+@description('Existing SQL Database name (used when manageExistingSql=true)')
+param existingSqlDatabaseName string = ''
+
+@description('Existing Storage Account name (used when manageExistingStorage=true)')
+param existingStorageAccountName string = ''
+
+@description('Existing SQL connection string injected to Container App when not provisioning SQL')
 param existingSqlConnectionString string = ''
 
-@description('Existing Blob connection string when using existing Storage')
+@description('Existing Blob connection string injected to Container App when not provisioning Storage')
 param existingBlobConnectionString string = ''
 
-@description('Existing Blob container name when using existing Storage')
+@description('Existing Blob container name')
 param existingBlobContainerName string = ''
 
 @description('Deploy Email resources in this resource group')
@@ -36,6 +51,30 @@ param sqlAdminLogin string = 'ngadmin'
 @secure()
 @description('Azure SQL admin password')
 param sqlAdminPassword string = ''
+
+@description('Azure SQL database SKU name (Serverless default: GP_S_Gen5_1)')
+param databaseSkuName string = 'GP_S_Gen5_1'
+
+@description('Azure SQL database SKU tier')
+param databaseTier string = 'GeneralPurpose'
+
+@description('Azure SQL database hardware family')
+param databaseFamily string = 'Gen5'
+
+@description('Azure SQL database vCore capacity')
+param databaseCapacity int = 1
+
+@description('Azure SQL database max size in bytes')
+param databaseMaxSizeBytes int = 34359738368
+
+@description('Azure SQL serverless minimum vCores')
+param databaseMinCapacity string = '0.5'
+
+@description('Azure SQL serverless auto-pause delay in minutes')
+param databaseAutoPauseDelay int = 60
+
+@description('Allow public blob access on the managed container (used when manageExistingStorage=true)')
+param manageExistingStoragePublicAccess bool = true
 
 @description('LINE OIDC ChannelId')
 param lineOidcChannelId string
@@ -141,7 +180,7 @@ param appLocation string = 'NeighborGoods.Frontend'
 @description('Build output location relative to appLocation')
 param outputLocation string = 'dist'
 
-module storage 'modules/storage.bicep' = if (provisionStorageResources) {
+module storage 'modules/legacy/storage.bicep' = if (provisionStorageResources) {
   name: 'storage-module'
   params: {
     location: location
@@ -151,7 +190,7 @@ module storage 'modules/storage.bicep' = if (provisionStorageResources) {
   }
 }
 
-module sql 'modules/sql.bicep' = if (provisionSqlResources) {
+module sql 'modules/legacy/sql.bicep' = if (provisionSqlResources) {
   name: 'sql-module'
   params: {
     location: location
@@ -159,6 +198,38 @@ module sql 'modules/sql.bicep' = if (provisionSqlResources) {
     environmentName: environmentName
     adminLogin: sqlAdminLogin
     adminPassword: sqlAdminPassword
+    databaseSkuName: databaseSkuName
+    databaseTier: databaseTier
+    databaseFamily: databaseFamily
+    databaseCapacity: databaseCapacity
+    databaseMaxSizeBytes: databaseMaxSizeBytes
+    databaseMinCapacity: databaseMinCapacity
+    databaseAutoPauseDelay: databaseAutoPauseDelay
+  }
+}
+
+module sqlManage 'modules/sql-manage-existing.bicep' = if (manageExistingSql && !provisionSqlResources) {
+  name: 'sql-manage-existing-module'
+  params: {
+    location: location
+    sqlServerName: existingSqlServerName
+    sqlDatabaseName: existingSqlDatabaseName
+    databaseSkuName: databaseSkuName
+    databaseTier: databaseTier
+    databaseFamily: databaseFamily
+    databaseCapacity: databaseCapacity
+    databaseMaxSizeBytes: databaseMaxSizeBytes
+    databaseMinCapacity: databaseMinCapacity
+    databaseAutoPauseDelay: databaseAutoPauseDelay
+  }
+}
+
+module storageManage 'modules/storage-manage-existing.bicep' = if (manageExistingStorage && !provisionStorageResources) {
+  name: 'storage-manage-existing-module'
+  params: {
+    storageAccountName: existingStorageAccountName
+    blobContainerName: existingBlobContainerName
+    publicAccess: manageExistingStoragePublicAccess
   }
 }
 

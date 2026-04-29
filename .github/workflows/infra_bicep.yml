@@ -39,7 +39,26 @@ jobs:
           az deployment group validate \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
-            --parameters infra/bicep/deploy.parameters.example.json \
+            --parameters infra/bicep/deploy.parameters.prod.json \
+            --parameters existingSqlConnectionString="${{ secrets.AZURE_SQL_CONNECTION_STRING }}" \
+            --parameters existingBlobConnectionString="${{ secrets.AZURE_BLOB_CONNECTION_STRING }}" \
+            --parameters sqlAdminLogin="${{ secrets.AZURE_SQL_ADMIN_LOGIN }}" \
+            --parameters sqlAdminPassword="${{ secrets.AZURE_SQL_ADMIN_PASSWORD }}" \
+            --parameters lineOidcChannelId="${{ secrets.LINE_OIDC_CHANNEL_ID }}" \
+            --parameters lineOidcChannelSecret="${{ secrets.LINE_OIDC_CHANNEL_SECRET }}" \
+            --parameters lineMessagingChannelId="${{ secrets.LINE_MESSAGING_CHANNEL_ID }}" \
+            --parameters lineMessagingChannelAccessToken="${{ secrets.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN }}" \
+            --parameters lineMessagingChannelSecret="${{ secrets.LINE_MESSAGING_CHANNEL_SECRET }}" \
+            --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
+            --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
+            --parameters containerImage="${{ vars.CONTAINER_IMAGE }}"
+
+      - name: What-if Bicep infrastructure
+        run: |
+          az deployment group what-if \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --template-file infra/bicep/deploy.bicep \
+            --parameters infra/bicep/deploy.parameters.prod.json \
             --parameters existingSqlConnectionString="${{ secrets.AZURE_SQL_CONNECTION_STRING }}" \
             --parameters existingBlobConnectionString="${{ secrets.AZURE_BLOB_CONNECTION_STRING }}" \
             --parameters sqlAdminLogin="${{ secrets.AZURE_SQL_ADMIN_LOGIN }}" \
@@ -80,7 +99,7 @@ jobs:
           az deployment group create \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
-            --parameters infra/bicep/deploy.parameters.example.json \
+            --parameters infra/bicep/deploy.parameters.prod.json \
             --parameters existingSqlConnectionString="${{ secrets.AZURE_SQL_CONNECTION_STRING }}" \
             --parameters existingBlobConnectionString="${{ secrets.AZURE_BLOB_CONNECTION_STRING }}" \
             --parameters sqlAdminLogin="${{ secrets.AZURE_SQL_ADMIN_LOGIN }}" \
