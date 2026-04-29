@@ -2,14 +2,8 @@ namespace NeighborGoods.Api.Features.Listing.Contracts;
 
 public sealed record ListingListItemDto(
     Guid Id,
-    string SellerId,
+    ListingListSellerInfoDto Seller,
     string Title,
-    string SellerDisplayName,
-    bool SellerEmailVerified,
-    bool SellerEmailNotificationEnabled,
-    bool SellerLineLoginBound,
-    bool SellerLineNotifyBound,
-    bool SellerQuickResponder,
     int CategoryCode,
     string CategoryName,
     int ConditionCode,

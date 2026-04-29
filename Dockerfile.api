@@ -1,0 +1,21 @@
+# 第一階段：編譯 (使用完整的 SDK)
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-env
+WORKDIR /app
+
+# 1. 先複製 API csproj (使用 Docker 快取)
+COPY NeighborGoods.Api/NeighborGoods.Api.csproj ./NeighborGoods.Api/
+RUN dotnet restore ./NeighborGoods.Api/NeighborGoods.Api.csproj
+
+# 2. 複製剩下的程式碼
+COPY . ./
+
+# 3. 發布 API 專案
+RUN dotnet publish ./NeighborGoods.Api/NeighborGoods.Api.csproj -c Release -o /out --no-restore
+
+# 第二階段：執行 (使用輕量 Runtime)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=build-env /out .
+ENTRYPOINT ["dotnet", "NeighborGoods.Api.dll"]
+
+

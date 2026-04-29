@@ -36,6 +36,25 @@ public sealed class ListingQueryService(
             return null;
         }
 
+        var seller = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .Where(x => x.Id == listing.SellerId)
+            .Select(x => new
+            {
+                x.Id,
+                x.DisplayName,
+                x.CreatedAt,
+                x.EmailConfirmed,
+                x.IsQuickResponder,
+                x.LineUserId,
+                x.LineMessagingApiUserId
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (seller is null)
+        {
+            return null;
+        }
+
         var storedImageUrls = await dbContext.ListingImages.AsNoTracking()
             .Where(x => x.ListingId == id)
             .OrderBy(x => x.SortOrder)
@@ -51,6 +70,14 @@ public sealed class ListingQueryService(
 
         return new ListingDetailDto(
             listing.Id,
+            new ListingSellerInfoDto(
+                seller.Id,
+                seller.DisplayName,
+                seller.CreatedAt,
+                Math.Max(1, (int)Math.Floor((now - seller.CreatedAt).TotalDays)),
+                seller.EmailConfirmed,
+                seller.IsQuickResponder,
+                !string.IsNullOrWhiteSpace(seller.LineUserId) || !string.IsNullOrWhiteSpace(seller.LineMessagingApiUserId)),
             listing.Title,
             listing.Description,
             listing.Category,
@@ -213,14 +240,15 @@ public sealed class ListingQueryService(
                 pendingMap.TryGetValue(x.Id, out var pendingSummary);
                 return new ListingListItemDto(
                     x.Id,
-                    x.SellerId,
+                    new ListingListSellerInfoDto(
+                        x.SellerId,
+                        x.SellerDisplayName,
+                        x.SellerEmailVerified,
+                        x.SellerEmailNotificationEnabled,
+                        x.SellerLineLoginBound,
+                        x.SellerLineNotifyBound,
+                        x.SellerQuickResponder),
                     x.Title,
-                    x.SellerDisplayName,
-                    x.SellerEmailVerified,
-                    x.SellerEmailNotificationEnabled,
-                    x.SellerLineLoginBound,
-                    x.SellerLineNotifyBound,
-                    x.SellerQuickResponder,
                     x.Category,
                     categoryNames.GetValueOrDefault(x.Category, "其他"),
                     x.Condition,

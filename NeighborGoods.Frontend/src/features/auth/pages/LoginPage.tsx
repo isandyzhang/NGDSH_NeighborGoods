@@ -64,19 +64,46 @@ export const LoginPage = () => {
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-start justify-center px-4 pb-8 pt-6 md:items-center md:py-10">
       <div className="grid w-full max-w-5xl gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center md:gap-10">
-        <section className="space-y-4 text-center md:text-left">
-          <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
-          <h1 className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl">
+        <motion.section
+          className="space-y-4 text-center md:text-left"
+          initial={{ opacity: 0, y: 36 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <motion.p
+            className="text-sm uppercase tracking-[0.18em] text-text-subtle"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+          >
+            NeighborGoods
+          </motion.p>
+          <motion.h1
+            className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.58, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          >
             <span className="block">
               社宅<span className="marker-wipe">專屬</span>
             </span>
             <span className="block">二手交易平台</span>
-          </h1>
-          <p className="mx-auto max-w-md text-lg text-text-subtle md:mx-0">
+          </motion.h1>
+          <motion.p
+            className="mx-auto max-w-md text-lg text-text-subtle md:mx-0"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
             使用同一組帳號登入，快速瀏覽社區物品、管理刊登並即時回覆訊息。
-          </p>
-        </section>
-        <div className="flex justify-center md:justify-end">
+          </motion.p>
+        </motion.section>
+        <motion.div
+          className="flex justify-center md:justify-end"
+          initial={{ opacity: 0, x: 42, y: 10, scale: 0.97 }}
+          animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+          transition={{ duration: 0.62, delay: 0.52, ease: [0.22, 1, 0.36, 1] }}
+        >
           <Card className="w-full max-w-[24rem] md:max-w-[25rem]">
             <h2 className="mb-6 text-center text-4xl font-semibold text-text-main">登入</h2>
             <div className="space-y-3">
@@ -141,7 +168,7 @@ export const LoginPage = () => {
               </p>
             </div>
           </Card>
-        </div>
+        </motion.div>
       </div>
     </main>
   )

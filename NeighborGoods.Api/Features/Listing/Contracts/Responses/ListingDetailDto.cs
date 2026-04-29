@@ -2,6 +2,7 @@ namespace NeighborGoods.Api.Features.Listing.Contracts;
 
 public sealed record ListingDetailDto(
     Guid Id,
+    ListingSellerInfoDto Seller,
     string Title,
     string? Description,
     int CategoryCode,

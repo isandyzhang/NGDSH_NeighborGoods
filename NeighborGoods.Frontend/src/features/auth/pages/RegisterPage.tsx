@@ -80,9 +80,9 @@ export const RegisterPage = () => {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl items-center justify-center px-4 py-6 md:py-8">
-      <Card className="w-full max-w-2xl">
-        <section className="mb-6 space-y-3 text-center">
+    <main className="mx-auto w-full max-w-4xl px-4 py-6 md:py-8">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 md:gap-5">
+        <section className="space-y-3 px-2 py-1 text-center">
           <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
           <h1 className="text-4xl font-semibold leading-tight text-text-main sm:text-5xl md:text-6xl">
             建立<span className="marker-wipe">帳號</span>
@@ -90,63 +90,65 @@ export const RegisterPage = () => {
           <p className="text-base text-text-subtle">完成註冊後可立即登入，開始收藏、刊登與私訊。</p>
         </section>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <Input label="帳號" value={userName} onChange={(event) => setUserName(event.target.value)} placeholder="至少 3 個字元" required />
-          <Input
-            label="顯示名稱"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="顯示在商品上的名字"
-            required
-          />
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <Card>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <Input label="帳號" value={userName} onChange={(event) => setUserName(event.target.value)} placeholder="至少 3 個字元" required />
             <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
+              label="顯示名稱"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="顯示在網頁上的名稱"
               required
             />
-            <Button
-              type="button"
-              variant="secondary"
-              className="self-end px-5 py-3 text-base font-semibold"
-              disabled={sendingCode || !email.trim()}
-              onClick={() => void handleSendCode()}
-            >
-              {sendingCode ? '寄送中...' : '寄驗證碼'}
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                className="self-end px-5 py-3 text-base font-semibold"
+                disabled={sendingCode || !email.trim()}
+                onClick={() => void handleSendCode()}
+              >
+                {sendingCode ? '寄送中...' : '寄驗證碼'}
+              </Button>
+            </div>
+            <Input
+              label="Email 驗證碼"
+              value={emailVerificationCode}
+              onChange={(event) => setEmailVerificationCode(event.target.value)}
+              placeholder="輸入信件中的驗證碼"
+              required
+            />
+            <Input
+              label="密碼"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="至少 8 碼"
+              required
+            />
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {successText ? <p className="text-sm text-[#2F7D4E]">{successText}</p> : null}
+            <Button type="submit" fullWidth className="min-h-[3rem] text-base font-semibold" disabled={submitting || !canSubmit}>
+              {submitting ? '註冊中...' : '完成註冊'}
             </Button>
-          </div>
-          <Input
-            label="Email 驗證碼"
-            value={emailVerificationCode}
-            onChange={(event) => setEmailVerificationCode(event.target.value)}
-            placeholder="輸入信件中的驗證碼"
-            required
-          />
-          <Input
-            label="密碼"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="至少 8 碼"
-            required
-          />
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
-          {successText ? <p className="text-sm text-[#2F7D4E]">{successText}</p> : null}
-          <Button type="submit" fullWidth className="min-h-[3rem] text-base font-semibold" disabled={submitting || !canSubmit}>
-            {submitting ? '註冊中...' : '完成註冊'}
-          </Button>
-        </form>
+          </form>
 
-        <p className="mt-4 text-center text-sm text-text-subtle">
-          已有帳號？{' '}
-          <Link to="/login" className="font-medium text-text-main underline-offset-2 hover:underline">
-            回到登入
-          </Link>
-        </p>
-      </Card>
+          <p className="mt-4 text-center text-sm text-text-subtle">
+            已有帳號？{' '}
+            <Link to="/login" className="font-medium text-text-main underline-offset-2 hover:underline">
+              回到登入
+            </Link>
+          </p>
+        </Card>
+      </div>
     </main>
   )
 }

@@ -2,9 +2,29 @@ import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetSta
 import { Link, useNavigate } from 'react-router-dom'
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { AnimatePresence, motion } from 'framer-motion'
+import {
+  Baby,
+  BookText,
+  Dumbbell,
+  Gamepad2,
+  Home,
+  MonitorSmartphone,
+  Package,
+  Rocket,
+  Shirt,
+  Sofa,
+  UtensilsCrossed,
+} from 'lucide-react'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { listingApi, type ListingItem } from '@/features/listings/api/listingApi'
+import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
+import { TopPinIntroModal } from '@/features/listings/components/TopPinIntroModal'
+import {
+  TOP_PIN_FOCUS_QUERY,
+  TOP_PIN_SECTION_HASH,
+  TOP_PIN_SKIP_INTRO_STORAGE_KEY,
+} from '@/features/listings/constants/topPin'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
@@ -47,6 +67,20 @@ const formatCountdown = (seconds: number) => {
   const minutes = Math.floor((normalized % 3600) / 60)
   const remainingSeconds = normalized % 60
   return [hours, minutes, remainingSeconds].map((value) => value.toString().padStart(2, '0')).join(':')
+}
+
+const getOptionIcon = (name: string) => {
+  const normalized = name.trim()
+  if (normalized.includes('家具')) return Sofa
+  if (normalized.includes('電子')) return MonitorSmartphone
+  if (normalized.includes('服飾')) return Shirt
+  if (normalized.includes('書籍')) return BookText
+  if (normalized.includes('運動')) return Dumbbell
+  if (normalized.includes('玩具')) return Gamepad2
+  if (normalized.includes('廚房')) return UtensilsCrossed
+  if (normalized.includes('生活')) return Home
+  if (normalized.includes('嬰幼兒')) return Baby
+  return Package
 }
 
 const QuickFilterLottieIcon = ({
@@ -103,8 +137,12 @@ export const ListingHomePage = () => {
   >({})
   const [favoriteBusyIds, setFavoriteBusyIds] = useState<Set<ListingItem['id']>>(() => new Set())
   const [conversationBusyIds, setConversationBusyIds] = useState<Set<ListingItem['id']>>(() => new Set())
+  const [purchaseBusyIds, setPurchaseBusyIds] = useState<Set<ListingItem['id']>>(() => new Set())
+  const [purchaseConfirmTarget, setPurchaseConfirmTarget] = useState<ListingItem | null>(null)
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
+  const [topPinTargetId, setTopPinTargetId] = useState<string | null>(null)
+  const [topPinSkipIntro, setTopPinSkipIntro] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const listingSectionRef = useRef<HTMLElement | null>(null)
   const desktopFilterRowRef = useRef<HTMLDivElement | null>(null)
@@ -112,6 +150,10 @@ export const ListingHomePage = () => {
   const quickFilterHoverTimerRef = useRef<number | null>(null)
   const marqueeRef = useRef<HTMLElement | null>(null)
   const marqueePointerXRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    setTopPinSkipIntro(window.localStorage.getItem(TOP_PIN_SKIP_INTRO_STORAGE_KEY) === '1')
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -490,7 +532,7 @@ export const ListingHomePage = () => {
       return
     }
 
-    if (tokens?.userId === item.sellerId) {
+    if (tokens?.userId === item.seller.id) {
       setError('這是你的商品，無法與自己建立對話')
       return
     }
@@ -503,7 +545,7 @@ export const ListingHomePage = () => {
     setError(null)
 
     try {
-      const conversationId = await messagingApi.ensureConversation(item.id, item.sellerId)
+      const conversationId = await messagingApi.ensureConversation(item.id, item.seller.id)
       navigate(`/messages/${conversationId}`)
     } catch (err) {
       const message = err instanceof ApiClientError ? err.message : '建立對話失敗'
@@ -511,6 +553,97 @@ export const ListingHomePage = () => {
     } finally {
       updateBusySet(item.id, false, setConversationBusyIds)
     }
+  }
+
+  const handlePurchase = async (item: ListingItem) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+
+    if (tokens?.userId === item.seller.id) {
+      setError('這是你的商品，無法購買自己的商品')
+      return
+    }
+
+    if (purchaseBusyIds.has(item.id)) {
+      return
+    }
+
+    updateBusySet(item.id, true, setPurchaseBusyIds)
+    setError(null)
+
+    try {
+      const request = await listingApi.createPurchaseRequest(item.id)
+      navigate(`/messages/${request.conversationId}`)
+    } catch (err) {
+      const message = err instanceof ApiClientError ? err.message : '送出購買請求失敗'
+      setError(message)
+    } finally {
+      updateBusySet(item.id, false, setPurchaseBusyIds)
+    }
+  }
+
+  const openPurchaseConfirm = (item: ListingItem) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+
+    if (tokens?.userId === item.seller.id) {
+      setError('這是你的商品，無法購買自己的商品')
+      return
+    }
+
+    setPurchaseConfirmTarget(item)
+  }
+
+  const confirmPurchase = () => {
+    if (!purchaseConfirmTarget) {
+      return
+    }
+
+    const target = purchaseConfirmTarget
+    setPurchaseConfirmTarget(null)
+    void handlePurchase(target)
+  }
+
+  const navigateToTopPinSection = (itemId: string) => {
+    navigate(`/listings/${itemId}/edit?focus=${TOP_PIN_FOCUS_QUERY}${TOP_PIN_SECTION_HASH}`)
+  }
+
+  const openTopPinFlow = (item: ListingItem) => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+
+    if (!topPinSkipIntro) {
+      setTopPinTargetId(item.id)
+      return
+    }
+
+    navigateToTopPinSection(item.id)
+  }
+
+  const handleTopPinConfirm = (skipNextReminder: boolean) => {
+    if (!topPinTargetId) {
+      return
+    }
+
+    if (skipNextReminder) {
+      window.localStorage.setItem(TOP_PIN_SKIP_INTRO_STORAGE_KEY, '1')
+      setTopPinSkipIntro(true)
+    }
+
+    const listingId = topPinTargetId
+    setTopPinTargetId(null)
+    navigateToTopPinSection(listingId)
+  }
+
+  const handleTopPinSubmission = () => {
+    setTopPinTargetId(null)
+    navigate('/top-pin-submissions/create')
   }
 
   const supportsDesktopHover = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches
@@ -582,15 +715,14 @@ export const ListingHomePage = () => {
   )
 
   const renderMultiOptions = (
-    title: string,
     options: LookupItem[],
     selected: number[],
     onToggle: (code: number) => void,
+    withIcon = false,
   ) => (
     <section className="space-y-3">
-      <h3 className="text-lg font-semibold text-text-main">{title}</h3>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => {
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option, index) => {
           const active = selected.includes(option.id)
           return (
             <Button
@@ -598,13 +730,24 @@ export const ListingHomePage = () => {
               type="button"
               onClick={() => onToggle(option.id)}
               variant="secondary"
-              className={`min-h-[3.25rem] rounded-full border px-4 py-2 text-lg font-semibold transition focus-visible:outline-none ${
+              className={`animate-fade-in min-h-[3.6rem] w-full rounded-xl border px-3 py-2 text-xl font-semibold transition focus-visible:outline-none ${
                 active
                   ? '!border-[#B08F68] !bg-[#D6B897] !text-text-main shadow-[0_4px_10px_rgba(37,25,16,0.18)] hover:!bg-[#CCAB87]'
                   : 'border-border bg-surface text-text-main hover:bg-surface-2'
               }`}
+              style={{ animationDelay: `${index * 45}ms` }}
             >
-              {option.displayName}
+              {withIcon ? (
+                <span className="inline-flex items-center gap-2.5">
+                  {(() => {
+                    const OptionIcon = getOptionIcon(option.displayName)
+                    return <OptionIcon className="h-5 w-5" aria-hidden="true" />
+                  })()}
+                  {option.displayName}
+                </span>
+              ) : (
+                option.displayName
+              )}
             </Button>
           )
         })}
@@ -960,7 +1103,17 @@ export const ListingHomePage = () => {
                         }`}
                         style={{ animationDelay: `${index * 55}ms` }}
                       >
-                        {option.displayName}
+                        {expandedDesktopGroup.key === 'category' ? (
+                          <span className="inline-flex items-center gap-2.5">
+                            {(() => {
+                              const OptionIcon = getOptionIcon(option.displayName)
+                              return <OptionIcon className="h-5 w-5" aria-hidden="true" />
+                            })()}
+                            {option.displayName}
+                          </span>
+                        ) : (
+                          option.displayName
+                        )}
                       </Button>
                     )
                   })}
@@ -1074,9 +1227,9 @@ export const ListingHomePage = () => {
             aria-label="關閉條件選單"
             onClick={() => setMobileSheetFilter(null)}
           />
-          <Card className="animate-sheet-up relative z-10 mx-auto max-h-[72vh] w-[calc(100%-1rem)] overflow-auto rounded-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-text-main">
+          <Card className="animate-sheet-up relative z-10 mx-auto flex h-[62vh] w-[calc(100%-1rem)] flex-col overflow-auto rounded-2xl p-0">
+            <div className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded-t-2xl border-b border-border bg-[#F3E7D8] px-4 py-3">
+              <h3 className="text-3xl font-semibold text-text-main">
                 {mobileSheetFilter === 'category'
                   ? '選擇分類'
                   : mobileSheetFilter === 'condition'
@@ -1086,27 +1239,30 @@ export const ListingHomePage = () => {
               <Button
                 type="button"
                 variant="secondary"
-                className="min-h-[3rem] px-4 text-lg font-semibold"
+                className="min-h-[3.3rem] px-5 text-xl font-semibold"
                 onClick={() => setMobileSheetFilter(null)}
               >
                 完成
               </Button>
             </div>
-            {mobileSheetFilter === 'category'
-              ? renderMultiOptions('分類', categories, selectedCategoryCodes, (code) =>
-                  toggleMultiCode(code, setSelectedCategoryCodes),
+            <div className="px-3 pb-4">
+              {mobileSheetFilter === 'category'
+                ? renderMultiOptions(categories, selectedCategoryCodes, (code) =>
+                    toggleMultiCode(code, setSelectedCategoryCodes),
+                  true,
                 )
-              : null}
-            {mobileSheetFilter === 'condition'
-              ? renderMultiOptions('品況', conditions, selectedConditionCodes, (code) =>
-                  toggleMultiCode(code, setSelectedConditionCodes),
-                )
-              : null}
-            {mobileSheetFilter === 'residence'
-              ? renderMultiOptions('社宅', residences, selectedResidenceCodes, (code) =>
-                  toggleMultiCode(code, setSelectedResidenceCodes),
-                )
-              : null}
+                : null}
+              {mobileSheetFilter === 'condition'
+                ? renderMultiOptions(conditions, selectedConditionCodes, (code) =>
+                    toggleMultiCode(code, setSelectedConditionCodes),
+                  )
+                : null}
+              {mobileSheetFilter === 'residence'
+                ? renderMultiOptions(residences, selectedResidenceCodes, (code) =>
+                    toggleMultiCode(code, setSelectedResidenceCodes),
+                  )
+                : null}
+            </div>
           </Card>
         </div>
       ) : null}
@@ -1114,7 +1270,7 @@ export const ListingHomePage = () => {
       {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
 
       {showLoadingSkeleton ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 md:gap-y-8 lg:grid-cols-4 2xl:grid-cols-5">
           {Array.from({ length: 6 }).map((_, index) => (
             <Card key={index} className="h-56 animate-pulse bg-surface-2" />
           ))}
@@ -1129,7 +1285,7 @@ export const ListingHomePage = () => {
         <>
           <motion.section
             layout
-            className={`grid grid-cols-2 gap-4 transition-opacity duration-150 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 ${
+            className={`grid grid-cols-2 gap-x-4 gap-y-8 transition-opacity duration-150 md:grid-cols-3 md:gap-y-8 lg:grid-cols-4 2xl:grid-cols-5 ${
               loading ? 'opacity-70' : 'opacity-100'
             }`}
           >
@@ -1139,8 +1295,9 @@ export const ListingHomePage = () => {
                 const isLiked = favoriteState?.isFavorited ?? false
                 const displayInterestCount = favoriteState?.favoriteCount ?? item.interestCount
                 const favoriteBusy = favoriteBusyIds.has(item.id)
-                const isOwnListing = tokens?.userId === item.sellerId
+                const isOwnListing = tokens?.userId === item.seller.id
                 const conversationBusy = conversationBusyIds.has(item.id)
+                const purchaseBusy = purchaseBusyIds.has(item.id)
                 const pendingExpireAt = item.pendingPurchaseRequestExpireAt
                 const pendingRemainingFromServer = item.pendingPurchaseRequestRemainingSeconds
                 const pendingRemainingFromNow =
@@ -1166,21 +1323,28 @@ export const ListingHomePage = () => {
                     },
                   }}
                 >
-                  <div className="flex h-full flex-col gap-2 rounded-2xl border border-border bg-surface p-3 shadow-soft">
-                    <div className="relative aspect-square overflow-hidden rounded-xl bg-surface-2">
-                      <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
-                        <span className="rounded-full bg-bg/90 px-2.5 py-1 text-[15px] font-semibold text-text-subtle">
+                  <div className="flex h-full flex-col gap-2">
+                    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+                      <div className="relative aspect-square overflow-hidden">
+                      {item.isPinned ? (
+                        <div className="absolute left-2 top-2 z-10">
+                          <span className="rounded-full bg-[#D64545] px-2.5 py-1 text-xs font-semibold text-white">
+                            置頂中
+                          </span>
+                        </div>
+                      ) : null}
+                      <div className="absolute right-2 top-2 z-10">
+                        <span className="rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
                           {item.categoryName}
                         </span>
-                        <span className="rounded-full bg-bg/90 px-2.5 py-1 text-[15px] font-semibold text-text-subtle">
-                          {item.conditionName}
-                        </span>
                       </div>
-                      {item.mainImageUrl ? (
-                        <img src={item.mainImageUrl} alt={item.title} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-sm text-text-muted">無圖片</div>
-                      )}
+                      <Link to={`/listings/${item.id}?from=listings`} className="block h-full w-full" aria-label={`查看商品：${item.title}`}>
+                        {item.mainImageUrl ? (
+                          <img src={item.mainImageUrl} alt={item.title} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-sm text-text-muted">無圖片</div>
+                        )}
+                      </Link>
                       {hasPendingPurchaseRequest ? (
                         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 bg-black/55 px-3 text-center text-white">
                           <p className="text-sm font-semibold tracking-wide">交易處理中</p>
@@ -1189,11 +1353,17 @@ export const ListingHomePage = () => {
                       ) : null}
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 px-4 pb-4 pt-4">
                       <>
-                            <h2 className="truncate text-xl font-semibold text-text-main">{item.title}</h2>
-                            <div className={`flex items-center ${isOwnListing ? 'justify-start' : 'justify-between'}`}>
-                              <span className={`text-xl font-semibold ${item.isFree ? 'text-[#3C8A65]' : 'text-text-subtle'}`}>
+                            <p className="text-xs font-medium tracking-wide text-text-muted">{item.conditionName}</p>
+                            <Link
+                              to={`/listings/${item.id}?from=listings`}
+                              className="block truncate text-lg font-semibold text-text-main underline-offset-2 hover:underline"
+                            >
+                              {item.title}
+                            </Link>
+                            <div className="flex items-center justify-between">
+                              <span className={`text-lg font-semibold ${item.isFree ? 'text-[#3C8A65]' : 'text-text-subtle'}`}>
                                 {formatPrice(item)}
                               </span>
                               {!isOwnListing ? (
@@ -1217,28 +1387,38 @@ export const ListingHomePage = () => {
                                     {displayInterestCount}
                                   </span>
                                 </button>
-                              ) : null}
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openTopPinFlow(item)}
+                                  className="inline-flex items-center justify-center rounded-full p-1.5 text-text-muted transition hover:text-[#B45B4D] focus-visible:outline-none"
+                                  aria-label="我要置頂"
+                                  title="我要置頂"
+                                >
+                                  <Rocket className="h-6 w-6" aria-hidden="true" />
+                                </button>
+                              )}
                             </div>
                             <div className="flex items-center gap-1.5">
                               <Link
-                                to={`/seller/${item.sellerId}`}
-                                className="min-w-0 flex-1 truncate text-xs text-text-muted underline-offset-2 hover:text-text-main hover:underline"
+                                to={`/seller/${item.seller.id}`}
+                                className="shrink-0 truncate text-sm text-text-muted underline-offset-2 hover:text-text-main hover:underline"
                               >
-                                販售者：{item.sellerDisplayName || '未提供'}
+                                {item.seller.displayName || '未提供'}
                               </Link>
-                              {item.sellerLineNotifyBound ? (
+                              {item.seller.lineNotifyBound ? (
                                 <span className="inline-flex h-6 w-6 items-center justify-center" title="LINE通知已綁定">
                                   <img src={LINE_NOTIFY_ICON} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
                                   <span className="sr-only">LINE通知已綁定</span>
                                 </span>
                               ) : null}
-                              {item.sellerEmailNotificationEnabled ? (
+                              {item.seller.emailNotificationEnabled ? (
                                 <span className="inline-flex h-6 w-6 items-center justify-center" title="Email通知已開啟">
                                   <img src={EMAIL_NOTIFY_ICON} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
                                   <span className="sr-only">Email通知已開啟</span>
                                 </span>
                               ) : null}
-                              {item.sellerQuickResponder ? (
+                              {item.seller.quickResponder ? (
                                 <span className="inline-flex h-6 w-6 items-center justify-center" title="快速回覆勳章已獲得">
                                   <img src={QUICK_RESPONDER_ICON} alt="" className="h-5 w-5 object-contain" aria-hidden="true" />
                                   <span className="sr-only">快速回覆勳章已獲得</span>
@@ -1247,8 +1427,8 @@ export const ListingHomePage = () => {
                             </div>
                       </>
                     </div>
-
-                    <div className={`mt-auto grid gap-2 pt-1 ${isOwnListing ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    </div>
+                    <div className={`grid gap-2 ${isOwnListing ? 'grid-cols-1' : 'grid-cols-2'}`}>
                       <Button
                         type="button"
                         onClick={() => void startConversation(item)}
@@ -1259,14 +1439,14 @@ export const ListingHomePage = () => {
                         {isOwnListing ? '自己的商品' : conversationBusy ? '連線中...' : '聊一下'}
                       </Button>
                       {!isOwnListing ? (
-                        <Link
-                          to={`/listings/${item.id}`}
-                          className={getButtonClassName({
-                            className: 'inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-lg font-semibold',
-                          })}
+                        <Button
+                          type="button"
+                          onClick={() => openPurchaseConfirm(item)}
+                          disabled={purchaseBusy}
+                          className="rounded-lg px-2.5 py-1.5 text-lg font-semibold"
                         >
-                          購買
-                        </Link>
+                          {purchaseBusy ? '處理中...' : '購買'}
+                        </Button>
                       ) : null}
                     </div>
                   </div>
@@ -1292,6 +1472,19 @@ export const ListingHomePage = () => {
           </footer>
         </>
       ) : null}
+      <TopPinIntroModal
+        open={topPinTargetId !== null}
+        onClose={() => setTopPinTargetId(null)}
+        onConfirmTopPin={handleTopPinConfirm}
+        onGoSubmission={handleTopPinSubmission}
+      />
+      <PurchaseConfirmModal
+        open={purchaseConfirmTarget !== null}
+        listingTitle={purchaseConfirmTarget?.title ?? ''}
+        busy={purchaseConfirmTarget ? purchaseBusyIds.has(purchaseConfirmTarget.id) : false}
+        onClose={() => setPurchaseConfirmTarget(null)}
+        onConfirm={confirmPurchase}
+      />
     </main>
   )
 }

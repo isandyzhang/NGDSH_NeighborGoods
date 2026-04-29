@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { CircleCheck } from 'lucide-react'
 import { useAuth } from '@/features/auth/components/AuthProvider'
+import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { MessageHubClient } from '@/features/messaging/services/messageHub'
 import { messagingApi, type ConversationPurchaseRequest, type MessageItem } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
@@ -53,11 +55,22 @@ const getPurchaseRequestStatusText = (status: number) => {
   }
 }
 
+const formatPrice = (item: ListingDetail) => {
+  if (item.isFree) {
+    return '免費'
+  }
+  return `NT$ ${item.price.toLocaleString()}`
+}
+
 export const ChatPage = () => {
   const { conversationId = '' } = useParams()
   const { tokens } = useAuth()
   const [messages, setMessages] = useState<MessageItem[]>([])
+  const [listingDetail, setListingDetail] = useState<ListingDetail | null>(null)
+  const [listingTitle, setListingTitle] = useState<string | null>(null)
+  const [listingLoading, setListingLoading] = useState(true)
   const [purchaseRequest, setPurchaseRequest] = useState<ConversationPurchaseRequest | null>(null)
+  const [purchaseRequestFetchedAtMs, setPurchaseRequestFetchedAtMs] = useState(() => Date.now())
   const [purchaseRequestLoading, setPurchaseRequestLoading] = useState(true)
   const [purchaseRequestBusy, setPurchaseRequestBusy] = useState(false)
   const [purchaseRequestError, setPurchaseRequestError] = useState<string | null>(null)
@@ -103,6 +116,50 @@ export const ChatPage = () => {
 
   useEffect(() => {
     let disposed = false
+    setListingLoading(true)
+    setListingDetail(null)
+    setListingTitle(null)
+
+    void messagingApi
+      .listConversations()
+      .then(async (conversations) => {
+        if (disposed) {
+          return
+        }
+        const current = conversations.find((item) => item.conversationId === conversationId)
+        if (!current) {
+          setListingLoading(false)
+          return
+        }
+
+        setListingTitle(current.listingTitle)
+
+        try {
+          const detail = await listingApi.getById(current.listingId)
+          if (!disposed) {
+            setListingDetail(detail)
+          }
+        } catch {
+          // Ignore listing detail loading failure; fall back to title-only block.
+        } finally {
+          if (!disposed) {
+            setListingLoading(false)
+          }
+        }
+      })
+      .catch(() => {
+        if (!disposed) {
+          setListingLoading(false)
+        }
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    let disposed = false
     setPurchaseRequestLoading(true)
     setPurchaseRequestError(null)
     void messagingApi
@@ -110,6 +167,7 @@ export const ChatPage = () => {
       .then((data) => {
         if (!disposed) {
           setPurchaseRequest(data)
+          setPurchaseRequestFetchedAtMs(Date.now())
         }
       })
       .catch((err) => {
@@ -209,6 +267,7 @@ export const ChatPage = () => {
               )
             : await messagingApi.cancelPurchaseRequest(conversationId)
       setPurchaseRequest(updated)
+      setPurchaseRequestFetchedAtMs(Date.now())
     } catch (err) {
       const message = err instanceof ApiClientError ? err.message : '交易操作失敗'
       setPurchaseRequestError(message)
@@ -218,14 +277,16 @@ export const ChatPage = () => {
   }
 
   const isPending = purchaseRequest?.status === PurchaseRequestStatus.Pending
+  const isAccepted = purchaseRequest?.status === PurchaseRequestStatus.Accepted
   const isSeller = purchaseRequest?.sellerId === tokens?.userId
   const isBuyer = purchaseRequest?.buyerId === tokens?.userId
+  const elapsedSinceRequestFetchSeconds = Math.max(0, Math.floor((countdownNowMs - purchaseRequestFetchedAtMs) / 1000))
   const remainingSeconds = !purchaseRequest
     ? null
-    : Math.max(0, Math.floor((new Date(purchaseRequest.expireAt).getTime() - countdownNowMs) / 1000))
+    : Math.max(0, purchaseRequest.remainingSeconds - elapsedSinceRequestFetchSeconds)
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-3 py-4 sm:px-4 md:py-8">
+    <main className="mx-auto w-full max-w-6xl px-3 pb-28 pt-4 sm:px-4 md:pb-0 md:py-8">
       <section className="mb-8 space-y-3 text-center">
         <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
         <h1 className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl">
@@ -233,87 +294,134 @@ export const ChatPage = () => {
         </h1>
       </section>
       <div className="mb-4">
-        <Link to="/messages" className="text-sm text-text-subtle hover:text-text-main">
+        <Link to="/messages" className="text-base text-text-subtle hover:text-text-main md:text-sm">
           ← 返回訊息列表
         </Link>
       </div>
-      {purchaseRequest ? (
-        <div className="mb-4 flex justify-end">
-          <Link
-            to={`/purchase-requests/${purchaseRequest.id}/review`}
-            className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-main transition hover:bg-surface-2"
-          >
-            交易完成後前往評價
-          </Link>
-        </div>
-      ) : null}
-      <Card className="h-[calc(100vh-8.5rem)] min-h-[34rem] p-0 md:h-[70vh]">
-        <header className="border-b border-border px-4 py-3">
-          <h2 className="text-lg font-semibold text-text-main">對話詳情</h2>
-          <p className="text-xs text-text-muted">Conversation ID: {conversationId}</p>
-          {purchaseRequestLoading ? (
-            <p className="mt-2 text-xs text-text-muted">讀取交易狀態中...</p>
-          ) : null}
-          {purchaseRequest ? (
-            <div className="mt-2 rounded-xl border border-border bg-surface-2 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-text-main">交易狀態：{getPurchaseRequestStatusText(purchaseRequest.status)}</p>
-                {isPending && remainingSeconds != null ? (
-                  <span className="rounded-full bg-black/70 px-2 py-0.5 text-xs font-semibold text-white tabular-nums">
-                    {formatCountdown(remainingSeconds)}
-                  </span>
-                ) : null}
+      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <Card className="h-full space-y-3">
+            <h2 className="text-base font-semibold text-text-main">商品資訊</h2>
+            {listingLoading ? <p className="text-sm text-text-subtle">載入商品中...</p> : null}
+            {!listingLoading && listingDetail ? (
+              <div className="space-y-3">
+                <div className="overflow-hidden rounded-xl border border-border bg-surface-2">
+                  {listingDetail.mainImageUrl ? (
+                    <img src={listingDetail.mainImageUrl} alt={listingDetail.title} className="aspect-square w-full object-cover" />
+                  ) : (
+                    <div className="flex aspect-square items-center justify-center text-sm text-text-muted">無圖片</div>
+                  )}
+                </div>
+                <h3 className="line-clamp-2 text-base font-semibold text-text-main">{listingDetail.title}</h3>
+                <p className="text-lg font-bold text-text-main">{formatPrice(listingDetail)}</p>
+                <p className="text-sm text-text-subtle">
+                  {listingDetail.categoryName}・{listingDetail.conditionName}
+                </p>
+                <Link
+                  to={`/listings/${listingDetail.id}?from=chat&conversationId=${conversationId}`}
+                  className="inline-flex min-h-[2.5rem] w-full items-center justify-center rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-text-main transition hover:bg-surface-2"
+                >
+                  查看商品頁
+                </Link>
               </div>
-              {isPending ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {isSeller ? (
-                    <>
-                      <Button type="button" onClick={() => void handlePurchaseRequestAction('accept')} disabled={purchaseRequestBusy}>
-                        {purchaseRequestBusy ? '處理中...' : '同意交易'}
-                      </Button>
+            ) : null}
+            {!listingLoading && !listingDetail && listingTitle ? (
+              <div className="space-y-2">
+                <p className="text-sm text-text-subtle">此對話對應商品</p>
+                <p className="text-base font-semibold text-text-main">{listingTitle}</p>
+              </div>
+            ) : null}
+          </Card>
+        </aside>
+
+        <section className="space-y-4">
+          <div className="rounded-2xl border border-brand/60 bg-brand/60 px-4 pb-4 pt-0 text-brand-foreground shadow-soft md:p-4">
+            {purchaseRequestLoading ? <p className="pt-2 text-base text-white/85 md:pt-0 md:text-xs">讀取交易狀態中...</p> : null}
+
+            {purchaseRequest ? (
+              <div className="mt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="inline-flex items-center gap-1.5 text-3xl font-semibold text-white md:text-xl">
+                    交易狀態：{getPurchaseRequestStatusText(purchaseRequest.status)}
+                    {isAccepted ? <CircleCheck className="h-5 w-5 text-[#D5F2DE] md:h-4 md:w-4" aria-hidden="true" /> : null}
+                  </p>
+                  {isPending && remainingSeconds != null ? (
+                    <span className="rounded-full bg-black/70 px-2.5 py-1 text-base font-semibold text-white tabular-nums md:px-2 md:py-0.5 md:text-xs">
+                      {formatCountdown(remainingSeconds)}
+                    </span>
+                  ) : null}
+                </div>
+                {isPending ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {isSeller ? (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={() => void handlePurchaseRequestAction('accept')}
+                          disabled={purchaseRequestBusy}
+                          className="text-lg md:text-sm"
+                        >
+                          {purchaseRequestBusy ? '處理中...' : '同意交易'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void handlePurchaseRequestAction('reject')}
+                          disabled={purchaseRequestBusy}
+                          className="text-lg md:text-sm"
+                        >
+                          {purchaseRequestBusy ? '處理中...' : '拒絕交易'}
+                        </Button>
+                      </>
+                    ) : null}
+                    {isBuyer ? (
                       <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => void handlePurchaseRequestAction('reject')}
+                        onClick={() => void handlePurchaseRequestAction('cancel')}
                         disabled={purchaseRequestBusy}
+                        className="text-lg md:text-sm"
                       >
-                        {purchaseRequestBusy ? '處理中...' : '拒絕交易'}
+                        {purchaseRequestBusy ? '處理中...' : '取消請求'}
                       </Button>
-                    </>
-                  ) : null}
-                  {isBuyer ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void handlePurchaseRequestAction('cancel')}
-                      disabled={purchaseRequestBusy}
+                    ) : null}
+                  </div>
+                ) : null}
+                {isAccepted ? (
+                  <div className="mt-3">
+                    <Link
+                      to={`/purchase-requests/${purchaseRequest.id}/review`}
+                      className="inline-flex min-h-[2.6rem] w-full items-center justify-center rounded-xl border border-white/35 bg-white/12 px-3 py-1.5 text-base font-semibold text-white transition hover:bg-white/18 md:w-auto md:text-sm"
                     >
-                      {purchaseRequestBusy ? '處理中...' : '取消請求'}
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {purchaseRequestError ? <p className="mt-2 text-xs text-danger">{purchaseRequestError}</p> : null}
-        </header>
-        <section className="flex h-[calc(100%-8.5rem)] flex-col gap-3 overflow-y-auto bg-surface-2 px-3 py-3 sm:px-4 sm:py-4">
-          {loading ? <p className="text-sm text-text-subtle">載入訊息中...</p> : null}
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
+                      交易完成後前往評價
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-3 text-lg text-white/85 md:text-sm">目前尚未建立交易請求，可先透過聊天與對方溝通。</p>
+            )}
+            {purchaseRequestError ? <p className="mt-2 text-base text-[#FFD3D3] md:text-xs">{purchaseRequestError}</p> : null}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-surface-2 shadow-soft">
+            <section className="flex h-[calc(100vh-26rem)] min-h-[23rem] flex-col gap-3 overflow-y-auto px-3 py-3 pb-24 sm:px-4 sm:py-4 md:h-[58vh] md:pb-4">
+          {loading ? <p className="text-lg text-text-subtle md:text-sm">載入訊息中...</p> : null}
+          {error ? <p className="text-lg text-danger md:text-sm">{error}</p> : null}
           {!loading &&
             messages.map((message) => {
               const isMine = message.senderId === tokens?.userId
               return (
                 <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm sm:max-w-[70%] sm:px-4 ${
+                    className={`max-w-[85%] rounded-2xl px-3 py-2 text-xl sm:max-w-[70%] sm:px-4 md:text-sm ${
                       isMine
                         ? 'bg-brand text-brand-foreground'
                         : 'border border-border bg-surface text-text-main'
                     }`}
                   >
                     <p>{message.content}</p>
-                    <p className={`mt-1 text-[11px] ${isMine ? 'text-brand-foreground/80' : 'text-text-muted'}`}>
+                    <p className={`mt-1 text-sm md:text-[11px] ${isMine ? 'text-brand-foreground/80' : 'text-text-muted'}`}>
                       {message.senderDisplayName}・
                       {new Date(message.createdAt).toLocaleTimeString('zh-TW', {
                         hour: '2-digit',
@@ -325,23 +433,25 @@ export const ChatPage = () => {
               )
             })}
           <div ref={bottomRef} />
+            </section>
+          </div>
+
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface p-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] sm:p-4 md:static md:rounded-2xl md:border md:shadow-soft">
+            <form onSubmit={handleSend} className="flex items-center gap-2">
+              <input
+                className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-xl outline-none focus:border-brand md:text-sm"
+                placeholder="輸入訊息..."
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={1000}
+              />
+              <Button type="submit" disabled={sending} className="shrink-0 text-xl md:text-sm">
+                {sending ? '送出中' : '送出'}
+              </Button>
+            </form>
+          </div>
         </section>
-        <form
-          onSubmit={handleSend}
-          className="flex flex-col gap-2 border-t border-border bg-surface px-3 py-3 sm:flex-row sm:px-4"
-        >
-          <input
-            className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-brand"
-            placeholder="輸入訊息..."
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={1000}
-          />
-          <Button type="submit" disabled={sending} className="sm:w-auto">
-            {sending ? '送出中' : '送出'}
-          </Button>
-        </form>
-      </Card>
+      </div>
     </main>
   )
 }

@@ -59,18 +59,14 @@ export const LineLoginCallbackPage = () => {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-6 md:py-8">
-      <section className="mb-8 space-y-3 text-center">
-        <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
-        <h1 className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl">
-          LINE 登入<span className="marker-wipe">處理中</span>
-        </h1>
-      </section>
-      <Card className="mx-auto w-full max-w-xl text-center">
+    <main className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md text-center">
+        <p className="mb-2 text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
+        <h1 className="text-2xl font-semibold text-text-main">LINE 登入</h1>
         {error ? (
-          <p className="text-sm text-danger">{error}</p>
+          <p className="mt-3 text-sm text-danger">{error}</p>
         ) : (
-          <p className="text-sm text-text-subtle">正在完成 LINE 驗證，請稍候...</p>
+          <p className="mt-3 text-sm text-text-subtle">驗證中，將自動跳轉...</p>
         )}
       </Card>
     </main>

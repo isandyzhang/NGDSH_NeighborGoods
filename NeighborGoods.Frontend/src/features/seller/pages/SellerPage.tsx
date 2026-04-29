@@ -97,7 +97,7 @@ export const SellerPage = () => {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <Card key={item.id} className="space-y-3">
-              <Link to={`/listings/${item.id}`} className="block overflow-hidden rounded-xl bg-surface-2">
+              <Link to={`/listings/${item.id}?from=seller`} className="block overflow-hidden rounded-xl bg-surface-2">
                 {item.mainImageUrl ? (
                   <img src={item.mainImageUrl} alt={item.title} className="aspect-[4/3] w-full object-cover" />
                 ) : (
@@ -105,7 +105,7 @@ export const SellerPage = () => {
                 )}
               </Link>
               <div className="space-y-2">
-                <Link to={`/listings/${item.id}`} className="line-clamp-2 text-xl font-semibold text-text-main hover:underline">
+                <Link to={`/listings/${item.id}?from=seller`} className="line-clamp-2 text-xl font-semibold text-text-main hover:underline">
                   {item.title}
                 </Link>
                 <div className="flex flex-wrap gap-2 text-sm text-text-subtle">

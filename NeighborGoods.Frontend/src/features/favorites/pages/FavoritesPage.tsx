@@ -87,7 +87,7 @@ export const FavoritesPage = () => {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <Card key={item.listingId} className="space-y-3">
-              <Link to={`/listings/${item.listingId}`} className="block overflow-hidden rounded-xl bg-surface-2">
+              <Link to={`/listings/${item.listingId}?from=favorites`} className="block overflow-hidden rounded-xl bg-surface-2">
                 {item.mainImageUrl ? (
                   <img src={item.mainImageUrl} alt={item.title} className="aspect-[4/3] w-full object-cover" />
                 ) : (
@@ -95,7 +95,7 @@ export const FavoritesPage = () => {
                 )}
               </Link>
               <div className="space-y-2">
-                <Link to={`/listings/${item.listingId}`} className="line-clamp-2 text-xl font-semibold text-text-main hover:underline">
+                <Link to={`/listings/${item.listingId}?from=favorites`} className="line-clamp-2 text-xl font-semibold text-text-main hover:underline">
                   {item.title}
                 </Link>
                 <div className="flex flex-wrap gap-2 text-sm text-text-subtle">

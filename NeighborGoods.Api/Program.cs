@@ -71,6 +71,10 @@ builder.Services.AddSingleton<ILineOAuthStateStore, LineOAuthStateStore>();
 builder.Services.AddHttpClient<ILineOAuthClient, LineOAuthClient>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services
+    .AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("db")
+    .AddCheck<AzureBlobHealthCheck>("blob");
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -97,7 +101,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins(corsAllowedOrigins)
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .AllowCredentials();
         }
     });
 });

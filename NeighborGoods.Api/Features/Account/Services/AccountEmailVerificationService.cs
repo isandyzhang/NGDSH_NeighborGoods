@@ -23,8 +23,44 @@ public sealed class AccountEmailVerificationService(
             return (false, "VALIDATION_ERROR", "Email 格式不正確。");
         }
 
+        var emailTakenByAnotherUser = await dbContext.AspNetUsers
+            .AnyAsync(
+                x => x.Id != userId && x.NormalizedEmail == normalizedEmail,
+                cancellationToken);
+        if (emailTakenByAnotherUser)
+        {
+            return (false, "EMAIL_ALREADY_BOUND", "此 Email 已被其他帳號綁定。");
+        }
+
         var code = GenerateCode();
         var now = DateTime.UtcNow;
+        var lastSentAt = await dbContext.EmailVerificationChallenges
+            .Where(x =>
+                x.Purpose == (byte)EmailVerificationPurpose.ListingEmail &&
+                x.UserId == userId &&
+                x.NormalizedEmail == normalizedEmail)
+            .MaxAsync(x => (DateTime?)x.CreatedAt, cancellationToken);
+        if (lastSentAt.HasValue)
+        {
+            var secondsSinceLastSend = (int)Math.Floor((now - lastSentAt.Value).TotalSeconds);
+            if (secondsSinceLastSend < AccountConstants.VerificationCodeResendCooldownSeconds)
+            {
+                var waitSeconds = AccountConstants.VerificationCodeResendCooldownSeconds - Math.Max(0, secondsSinceLastSend);
+                return (false, "EMAIL_CODE_COOLDOWN", $"寄送過於頻繁，請於 {waitSeconds} 秒後再試。");
+            }
+        }
+
+        var sentCountInLastHour = await dbContext.EmailVerificationChallenges
+            .CountAsync(x =>
+                x.Purpose == (byte)EmailVerificationPurpose.ListingEmail &&
+                x.UserId == userId &&
+                x.NormalizedEmail == normalizedEmail &&
+                x.CreatedAt >= now.AddHours(-1), cancellationToken);
+        if (sentCountInLastHour >= AccountConstants.VerificationCodeMaxSendsPerHour)
+        {
+            return (false, "EMAIL_CODE_RATE_LIMIT", "此 Email 驗證碼發送次數已達每小時上限，請稍後再試。");
+        }
+
         var challenge = new EmailVerificationChallenge
         {
             Id = Guid.NewGuid(),
@@ -61,10 +97,14 @@ public sealed class AccountEmailVerificationService(
         }
         catch (InvalidOperationException ex) when (ex.Message == "EMAIL_NOT_CONFIGURED")
         {
+            dbContext.EmailVerificationChallenges.Remove(challenge);
+            await dbContext.SaveChangesAsync(cancellationToken);
             return (false, "EMAIL_NOT_CONFIGURED", "Email 服務尚未設定。");
         }
         catch
         {
+            dbContext.EmailVerificationChallenges.Remove(challenge);
+            await dbContext.SaveChangesAsync(cancellationToken);
             return (false, "EMAIL_SEND_FAILED", "寄送驗證碼失敗，請稍後再試。");
         }
 
@@ -86,6 +126,15 @@ public sealed class AccountEmailVerificationService(
         if (user is null)
         {
             return (false, "USER_NOT_FOUND", "找不到使用者。");
+        }
+
+        var emailTakenByAnotherUser = await dbContext.AspNetUsers
+            .AnyAsync(
+                x => x.Id != userId && x.NormalizedEmail == normalizedEmail,
+                cancellationToken);
+        if (emailTakenByAnotherUser)
+        {
+            return (false, "EMAIL_ALREADY_BOUND", "此 Email 已被其他帳號綁定。");
         }
 
         var challenge = await dbContext.EmailVerificationChallenges

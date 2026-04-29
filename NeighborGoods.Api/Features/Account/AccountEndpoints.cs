@@ -276,7 +276,10 @@ public static class AccountEndpoints
         var statusCode = code switch
         {
             "USER_NOT_FOUND" => StatusCodes.Status404NotFound,
+            "EMAIL_ALREADY_BOUND" => StatusCodes.Status409Conflict,
             "EMAIL_NOT_CONFIGURED" => StatusCodes.Status503ServiceUnavailable,
+            "EMAIL_CODE_COOLDOWN" => StatusCodes.Status429TooManyRequests,
+            "EMAIL_CODE_RATE_LIMIT" => StatusCodes.Status429TooManyRequests,
             "LINE_BIND_PENDING_NOT_FOUND" => StatusCodes.Status404NotFound,
             _ => StatusCodes.Status400BadRequest
         };

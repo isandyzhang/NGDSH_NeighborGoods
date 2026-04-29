@@ -3,14 +3,16 @@ import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 
 export type ListingItem = {
   id: string
-  sellerId: string
+  seller: {
+    id: string
+    displayName: string
+    emailVerified: boolean
+    emailNotificationEnabled: boolean
+    lineLoginBound: boolean
+    lineNotifyBound: boolean
+    quickResponder: boolean
+  }
   title: string
-  sellerDisplayName: string
-  sellerEmailVerified: boolean
-  sellerEmailNotificationEnabled: boolean
-  sellerLineLoginBound: boolean
-  sellerLineNotifyBound: boolean
-  sellerQuickResponder: boolean
   categoryCode: number
   categoryName: string
   conditionCode: number
@@ -146,6 +148,15 @@ export type FavoriteStatusPayload = {
 
 export type ListingDetail = {
   id: string
+  seller: {
+    id: string
+    displayName: string
+    registeredAt: string
+    memberDays: number
+    emailVerified: boolean
+    quickResponder: boolean
+    lineBound: boolean
+  }
   title: string
   description: string | null
   categoryCode: number
@@ -183,6 +194,24 @@ export type ListingMutationPayload = {
   isFree: boolean
   isCharity: boolean
   isTradeable: boolean
+}
+
+export type TopPinPayload = {
+  id: string
+}
+
+export type PurchaseRequestPayload = {
+  id: string
+  listingId: string
+  conversationId: string
+  buyerId: string
+  sellerId: string
+  status: number
+  createdAt: string
+  expireAt: string
+  respondedAt: string | null
+  responseReason: string | null
+  remainingSeconds: number
 }
 
 type ListingStatusAction =
@@ -322,6 +351,16 @@ export const listingApi = {
 
   async getFavoriteStatus(id: string): Promise<FavoriteStatusPayload> {
     const response = await http.get<ApiResponse<FavoriteStatusPayload>>(`/api/v1/listings/${id}/favorite-status`)
+    return unwrapApiResponse(response.data)
+  },
+
+  async topPin(id: string): Promise<TopPinPayload> {
+    const response = await http.post<ApiResponse<TopPinPayload>>(`/api/v1/listings/${id}/top-pin`)
+    return unwrapApiResponse(response.data)
+  },
+
+  async createPurchaseRequest(id: string): Promise<PurchaseRequestPayload> {
+    const response = await http.post<ApiResponse<PurchaseRequestPayload>>(`/api/v1/listings/${id}/purchase-requests`)
     return unwrapApiResponse(response.data)
   },
 }

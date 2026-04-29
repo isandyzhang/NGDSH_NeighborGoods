@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { accountApi } from '@/features/account/api/accountApi'
 import { listingApi, type ListingMutationPayload } from '@/features/listings/api/listingApi'
+import { TOP_PIN_FOCUS_QUERY } from '@/features/listings/constants/topPin'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -11,6 +13,7 @@ import { Input } from '@/shared/ui/Input'
 export const EditListingPage = () => {
   const navigate = useNavigate()
   const { id = '' } = useParams()
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState<ListingMutationPayload | null>(null)
   const [categories, setCategories] = useState<LookupItem[]>([])
   const [conditions, setConditions] = useState<LookupItem[]>([])
@@ -21,9 +24,15 @@ export const EditListingPage = () => {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
+  const [topPinCredits, setTopPinCredits] = useState<number>(0)
+  const [isPinned, setIsPinned] = useState(false)
+  const [pinnedEndDate, setPinnedEndDate] = useState<string | null>(null)
+  const [topPinBusy, setTopPinBusy] = useState(false)
+  const [topPinHighlighted, setTopPinHighlighted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const galleryInputRef = useRef<HTMLInputElement | null>(null)
+  const topPinSectionRef = useRef<HTMLElement | null>(null)
   const toggleButtonClass = (tone: 'blue' | 'red' | 'green', active: boolean) => {
     if (tone === 'blue') {
       return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
@@ -60,8 +69,9 @@ export const EditListingPage = () => {
       lookupApi.conditions(),
       lookupApi.residences(),
       lookupApi.pickupLocations(),
+      accountApi.me(),
     ])
-      .then(([detail, c, cond, r, pick]) => {
+      .then(([detail, c, cond, r, pick, me]) => {
         if (disposed) {
           return
         }
@@ -83,6 +93,9 @@ export const EditListingPage = () => {
         })
         setExistingImageUrls(detail.imageUrls)
         setImageUrlsToDelete([])
+        setTopPinCredits(me.statistics.topPinCredits)
+        setIsPinned(detail.isPinned)
+        setPinnedEndDate(detail.pinnedEndDate)
       })
       .catch((err: unknown) => {
         if (!disposed) {
@@ -100,6 +113,22 @@ export const EditListingPage = () => {
     }
   }, [id])
 
+  useEffect(() => {
+    const shouldFocusTopPin = searchParams.get('focus') === TOP_PIN_FOCUS_QUERY
+    if (!shouldFocusTopPin || !form) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      topPinSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setTopPinHighlighted(true)
+    }, 120)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [form, searchParams])
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!form || !id) {
@@ -114,7 +143,7 @@ export const EditListingPage = () => {
         ...form,
         price: form.isFree ? 0 : form.price,
       }, imageUrlsToDelete, imageUrlsInOrder)
-      navigate(`/listings/${id}`)
+      navigate(`/listings/${id}?from=edit`)
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '更新商品失敗')
     } finally {
@@ -141,6 +170,26 @@ export const EditListingPage = () => {
       setError(err instanceof ApiClientError ? err.message : '上傳圖片失敗')
     } finally {
       setUploadingImages(false)
+    }
+  }
+
+  const handleUseTopPin = async () => {
+    if (!id || topPinBusy) {
+      return
+    }
+
+    setTopPinBusy(true)
+    setError(null)
+    try {
+      await listingApi.topPin(id)
+      const [detail, me] = await Promise.all([listingApi.getById(id), accountApi.me()])
+      setIsPinned(detail.isPinned)
+      setPinnedEndDate(detail.pinnedEndDate)
+      setTopPinCredits(me.statistics.topPinCredits)
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '置頂操作失敗')
+    } finally {
+      setTopPinBusy(false)
     }
   }
 
@@ -222,7 +271,7 @@ export const EditListingPage = () => {
               <button
                 type="button"
                 aria-pressed={form.isFree}
-                className={toggleButtonClass('blue', form.isFree)}
+                className={toggleButtonClass('green', form.isFree)}
                 onClick={() =>
                   setForm((current) =>
                     current ? { ...current, isFree: !current.isFree, price: !current.isFree ? 0 : current.price } : current,
@@ -242,7 +291,7 @@ export const EditListingPage = () => {
               <button
                 type="button"
                 aria-pressed={form.isTradeable}
-                className={toggleButtonClass('green', form.isTradeable)}
+                className={toggleButtonClass('blue', form.isTradeable)}
                 onClick={() => setForm((current) => (current ? { ...current, isTradeable: !current.isTradeable } : current))}
               >
                 以物易物
@@ -304,6 +353,35 @@ export const EditListingPage = () => {
                 <p className="text-base text-text-muted">目前沒有可顯示的圖片。</p>
               )}
             </div>
+
+            <section
+              id="top-pin"
+              ref={topPinSectionRef}
+              className={`space-y-3 rounded-2xl border p-4 transition ${
+                topPinHighlighted ? 'border-[#B08F68] bg-[#F5EBDD]' : 'border-border bg-surface'
+              }`}
+            >
+              <div className="space-y-1">
+                <h2 className="text-[1.45rem] font-bold leading-tight text-text-main">新增置頂功能區</h2>
+                <p className="text-base text-text-subtle">每次使用 1 次置頂，商品可置頂 7 天，讓曝光更穩定。</p>
+                <p className="text-sm text-text-muted">可用置頂次數：{topPinCredits}</p>
+                {isPinned ? (
+                  <p className="text-sm font-semibold text-[#8A6B45]">
+                    目前狀態：置頂中{pinnedEndDate ? `（到期：${new Date(pinnedEndDate).toLocaleString()}）` : ''}
+                  </p>
+                ) : (
+                  <p className="text-sm text-text-muted">目前狀態：尚未置頂</p>
+                )}
+              </div>
+              <Button
+                type="button"
+                onClick={() => void handleUseTopPin()}
+                disabled={topPinBusy || isPinned}
+                className="min-h-[3rem] px-5 font-semibold"
+              >
+                {isPinned ? '目前已置頂' : topPinBusy ? '處理中...' : '使用 1 次置頂（7 天）'}
+              </Button>
+            </section>
 
             <div className="space-y-2">
               <div className="flex flex-col gap-2 text-lg text-text-subtle">

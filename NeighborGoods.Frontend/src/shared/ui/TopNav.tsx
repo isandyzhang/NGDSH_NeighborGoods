@@ -101,7 +101,7 @@ export const TopNav = () => {
         <div className="flex h-20 items-center justify-between">
           <Link
             to="/listings"
-            className="text-[1.75rem] font-semibold tracking-tight text-text-subtle"
+            className="text-[1.4rem] font-semibold tracking-tight text-text-subtle md:text-[1.75rem]"
           >
             NeighborGoods
           </Link>
@@ -111,7 +111,7 @@ export const TopNav = () => {
                 type="button"
                 variant="secondary"
                 onClick={() => setMenuOpen((current) => !current)}
-                className="h-12 min-w-[10.5rem] px-4 text-4xl font-semibold"
+                className="h-12 min-w-[10.5rem] px-4 !text-[1.2rem] font-semibold md:!text-[1.35rem]"
                 aria-expanded={menuOpen}
                 aria-controls="topnav-user-menu"
               >

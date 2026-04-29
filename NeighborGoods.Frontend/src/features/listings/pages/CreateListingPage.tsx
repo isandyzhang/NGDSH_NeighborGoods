@@ -229,7 +229,7 @@ export const CreateListingPage = () => {
         },
         images,
       )
-      navigate(`/listings/${result.id}`)
+      navigate(`/listings/${result.id}?from=create`)
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '建立商品失敗')
     } finally {
@@ -314,7 +314,7 @@ export const CreateListingPage = () => {
             <button
               type="button"
               aria-pressed={form.isFree}
-              className={toggleButtonClass('blue', form.isFree)}
+              className={toggleButtonClass('green', form.isFree)}
               onClick={() =>
                 setForm((current) => ({ ...current, isFree: !current.isFree, price: !current.isFree ? 0 : current.price }))
               }
@@ -332,7 +332,7 @@ export const CreateListingPage = () => {
             <button
               type="button"
               aria-pressed={form.isTradeable}
-              className={toggleButtonClass('green', form.isTradeable)}
+              className={toggleButtonClass('blue', form.isTradeable)}
               onClick={() => setForm((current) => ({ ...current, isTradeable: !current.isTradeable }))}
             >
               以物易物
