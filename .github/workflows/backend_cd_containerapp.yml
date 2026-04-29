@@ -1,13 +1,6 @@
-name: Build and Deploy Docker to Azure Container Apps
+﻿name: Backend CD (Container App)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'NeighborGoods.Api/**'
-      - 'Dockerfile.api'
-      - '.github/workflows/containerapps_docker.yml'
   workflow_dispatch:
     inputs:
       image_tag:
@@ -16,8 +9,9 @@ on:
         default: ""
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write

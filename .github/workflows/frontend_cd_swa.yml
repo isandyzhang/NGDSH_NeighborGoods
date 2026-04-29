@@ -1,4 +1,4 @@
-name: frontend_deploy
+﻿name: Frontend CD (SWA)
 
 on:
   workflow_dispatch:

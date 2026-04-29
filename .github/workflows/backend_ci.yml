@@ -1,0 +1,43 @@
+﻿name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Api/**'
+      - 'NeighborGoods.Api.Tests/**'
+      - 'Dockerfile.api'
+      - '.github/workflows/backend_ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Api/**'
+      - 'NeighborGoods.Api.Tests/**'
+      - 'Dockerfile.api'
+      - '.github/workflows/backend_ci.yml'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore backend dependencies
+        run: dotnet restore NeighborGoods.sln
+
+      - name: Build backend
+        run: dotnet build NeighborGoods.sln --configuration Release --no-restore
+
+      - name: Run backend unit-only tests (exclude integration tests)
+        run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~EndpointsTests"
+

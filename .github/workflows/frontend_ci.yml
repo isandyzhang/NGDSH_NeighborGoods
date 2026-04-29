@@ -1,4 +1,4 @@
-name: frontend_react
+﻿name: Frontend CI
 
 on:
   push:
@@ -6,15 +6,14 @@ on:
       - main
     paths:
       - 'NeighborGoods.Frontend/**'
-      - '.github/workflows/frontend_react.yml'
+      - '.github/workflows/frontend_ci.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'NeighborGoods.Frontend/**'
-      - '.github/workflows/frontend_react.yml'
-  workflow_dispatch:
-
+      - '.github/workflows/frontend_ci.yml'
+  
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -45,3 +44,5 @@ jobs:
         with:
           name: frontend-dist
           path: NeighborGoods.Frontend/dist
+
+
