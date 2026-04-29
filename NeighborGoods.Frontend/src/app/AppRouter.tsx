@@ -20,7 +20,6 @@ import { CreateReviewPage } from '@/features/reviews/pages/CreateReviewPage'
 import { SellerPage } from '@/features/seller/pages/SellerPage'
 import { ErrorPage } from '@/features/system/pages/ErrorPage'
 import { NotFoundPage } from '@/features/system/pages/NotFoundPage'
-import { TopPinSubmissionPage } from '@/features/topPin/pages/TopPinSubmissionPage'
 import { AppLayout } from '@/app/AppLayout'
 
 export const AppRouter = () => {
@@ -49,7 +48,6 @@ export const AppRouter = () => {
           <Route path="/messages" element={<ConversationsPage />} />
           <Route path="/messages/:conversationId" element={<ChatPage />} />
           <Route path="/purchase-requests/:requestId/review" element={<CreateReviewPage />} />
-          <Route path="/top-pin-submissions/create" element={<TopPinSubmissionPage />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />
