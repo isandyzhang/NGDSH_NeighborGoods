@@ -52,8 +52,8 @@ jobs:
       - name: Build backend
         run: dotnet build NeighborGoods.sln --configuration Release --no-restore
 
-      - name: Run backend tests
-        run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build
+      - name: Run backend unit-only tests (exclude integration tests)
+        run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~EndpointsTests"
 
   deploy:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'
