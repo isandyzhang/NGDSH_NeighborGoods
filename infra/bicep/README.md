@@ -1,87 +1,73 @@
-# Bicep 基礎範本（單環境）
+# Bicep 基礎範本（單一生產部署）
 
-本資料夾提供 NeighborGoods 單環境部署範本，符合目前策略：
+本資料夾目前只保留單一生產部署入口 `deploy.bicep`，適用於：
 
-- 本地開發 + 單一 Azure 正式環境
-- 不使用 Key Vault（先以 App Settings 注入）
-- 優先低成本方案
-
----
-
-## 檔案說明
-
-- `main.bicep`
-  - 建立以下資源：
-    - App Service Plan
-    - Web App
-    - Azure SQL Server + Database（Basic）
-    - Storage Account + Blob Container
-    - Azure SignalR（可選，預設開啟）
-- `main.parameters.example.json`
-  - 參數範例，請複製成 `main.parameters.json` 後填入實際值
-- `containerapps.main.bicep`
-  - Container Apps 版本（使用 Docker image 部署）
-- `containerapps.parameters.example.json`
-  - Container Apps 版本參數範例
-- `CONTAINERAPPS.md`
-  - Container Apps 專用部署與成本說明
+- 單一 Azure 生產資源群組
+- Container App 後端 + Static Web Apps 前端混合部署
+- 以低成本部署為優先
+- 既有 SQL / Storage 也可重用
 
 ---
 
-## 使用前注意
+## 目前使用的檔案
 
-- 目前預設 `App Service Plan = F1 (Free, Windows)`，是最低成本起步。
-- 若你要改 Linux App Service，需改為 `B1+` 並調整 `reserved` 與 runtime 設定。
-- Azure SQL 沒有長期免費層，`Basic` 為低成本起步。
-- `sqlAdminPassword`、`lineOidcChannelSecret` 等參數屬敏感值，請勿提交到 git。
+- `deploy.bicep`
+  - 目前唯一實際部署入口
+- `deploy.parameters.json`
+  - 生產環境參數檔
+- `modules/`
+  - 包含 SQL / Storage / SignalR / Container App / Static Web App 等模組
 
 ---
 
-## 部署步驟
+## 部署流程
 
-1. 複製參數檔：
-
-```bash
-cp infra/bicep/main.parameters.example.json infra/bicep/main.parameters.json
-```
-
-2. 編輯 `infra/bicep/main.parameters.json`，填入真實參數。
-
-3. 先做驗證部署（what-if）：
+1. 編輯 `infra/bicep/deploy.parameters.json`
+2. 驗證部署：
 
 ```bash
 az deployment group what-if \
   --resource-group <YOUR_RG> \
-  --template-file infra/bicep/main.bicep \
-  --parameters @infra/bicep/main.parameters.json
+  --template-file infra/bicep/deploy.bicep \
+  --parameters @infra/bicep/deploy.parameters.prod.json
 ```
 
-4. 正式部署：
+3. 正式部署：
 
 ```bash
 az deployment group create \
   --resource-group <YOUR_RG> \
-  --template-file infra/bicep/main.bicep \
-  --parameters @infra/bicep/main.parameters.json
+  --template-file infra/bicep/deploy.bicep \
+  --parameters @infra/bicep/deploy.parameters.prod.json
 ```
 
 ---
 
-## 部署完成後
+## 注意事項
 
-- 在輸出中可取得 `webAppUrl`。
-- 建議立刻做：
-  - 開站健康檢查
-  - DB 連線測試
-  - Blob 上傳測試
-  - LINE OIDC 登入測試
+- 若你要重用既有 SQL / Storage，請設定：
+  - `provisionSqlResources: false`
+  - `provisionStorageResources: false`
+  - 並填入 `existingSqlConnectionString` / `existingBlobConnectionString` / `existingBlobContainerName`
+- 若要讓 Bicep 建立新的 SQL / Storage，請設定 `provisionSqlResources: true` 和 `provisionStorageResources: true`
+
+> 目前專案只保留正式環境部署，開發請在本地執行，不需要額外的 `dev` 參數檔。
+- `lineOidcChannelSecret`、`jwtSigningKey` 等敏感值請勿直接提交到 git
 
 ---
 
-## 下一步建議
+## 已移除的舊版 Bicep 範本
 
-- 後續可把此範本拆成 module：
-  - `app.bicep`
-  - `data.bicep`
-  - `realtime.bicep`
-- 等前後端分離後，可新增前端資源（Static Web Apps）模組。
+以下舊版檔案已移除，因為現在採用統一 `deploy.bicep`：
+
+- `main.bicep`
+- `main.json`
+- `main.parameters.example.json`
+- `containerapps.main.bicep`
+- `containerapps.main.json`
+- `containerapps.parameters.example.json`
+- `containerapps.parameters.local.json`
+- `staticwebapps.main.bicep`
+- `staticwebapps.main.json`
+- `staticwebapps.parameters.example.json`
+- `deploy.json`
