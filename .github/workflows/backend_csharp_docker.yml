@@ -1,0 +1,132 @@
+name: backend_csharp_docker
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Api/**'
+      - 'NeighborGoods.Api.Tests/**'
+      - 'Dockerfile.api'
+      - '.github/workflows/backend_csharp_docker.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Api/**'
+      - 'NeighborGoods.Api.Tests/**'
+      - 'Dockerfile.api'
+      - '.github/workflows/backend_csharp_docker.yml'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Optional custom image tag (default: short SHA)"
+        required: false
+        default: ""
+      deploy:
+        description: "Deploy to production Container App"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore backend dependencies
+        run: dotnet restore NeighborGoods.sln
+
+      - name: Build backend
+        run: dotnet build NeighborGoods.sln --configuration Release --no-restore
+
+      - name: Run backend tests
+        run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    env:
+      IMAGE_NAME: neighborgoods-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image metadata
+        id: meta
+        shell: bash
+        run: |
+          OWNER_LOWER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          INPUT_TAG="${{ github.event.inputs.image_tag }}"
+          if [ -n "${INPUT_TAG}" ]; then
+            TAG="${INPUT_TAG}"
+          else
+            TAG="${SHORT_SHA}"
+          fi
+          IMAGE="ghcr.io/${OWNER_LOWER}/${IMAGE_NAME}:${TAG}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.api
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy latest image to Container App
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ] || [ -z "${{ vars.AZURE_CONTAINER_APP_NAME }}" ]; then
+              echo "Missing repository variables: AZURE_RESOURCE_GROUP or AZURE_CONTAINER_APP_NAME"
+              exit 1
+            fi
+
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az containerapp update \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.AZURE_CONTAINER_APP_NAME }}" \
+              --image "${{ steps.meta.outputs.image }}"
+
+      - name: Deployment summary
+        run: |
+          echo "Deployed image: ${{ steps.meta.outputs.image }}"
