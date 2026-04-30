@@ -36,15 +36,13 @@ jobs:
       - name: Install Azure CLI Bicep
         run: az bicep install
 
-      - name: Ensure container image variable is set
-        run: |
-          if [ -z "${{ vars.CONTAINER_IMAGE }}" ]; then
-            echo "::error::CONTAINER_IMAGE is empty. Set the repository/environment variable before validation."
-            exit 1
-          fi
-
       - name: Validate Bicep infrastructure
         run: |
+          extra_params=()
+          if [ -n "${{ secrets.CONTAINER_IMAGE }}" ]; then
+            extra_params+=(--parameters "containerImage=${{ secrets.CONTAINER_IMAGE }}")
+          fi
+
           az deployment group validate \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
@@ -60,10 +58,15 @@ jobs:
             --parameters lineMessagingChannelSecret="${{ secrets.LINE_MESSAGING_CHANNEL_SECRET }}" \
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
-            --parameters containerImage="${{ vars.CONTAINER_IMAGE }}"
+            "${extra_params[@]}"
 
       - name: What-if Bicep infrastructure
         run: |
+          extra_params=()
+          if [ -n "${{ secrets.CONTAINER_IMAGE }}" ]; then
+            extra_params+=(--parameters "containerImage=${{ secrets.CONTAINER_IMAGE }}")
+          fi
+
           az deployment group what-if \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
@@ -79,4 +82,4 @@ jobs:
             --parameters lineMessagingChannelSecret="${{ secrets.LINE_MESSAGING_CHANNEL_SECRET }}" \
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
-            --parameters containerImage="${{ vars.CONTAINER_IMAGE }}"
+            "${extra_params[@]}"
