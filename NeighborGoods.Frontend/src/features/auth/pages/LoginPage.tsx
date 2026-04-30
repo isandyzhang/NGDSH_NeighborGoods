@@ -153,9 +153,9 @@ export const LoginPage = () => {
                 type="button"
                 onClick={handleLineLogin}
                 fullWidth
-                className="flex h-12 items-center justify-center gap-3 text-base font-semibold md:text-lg"
+                className="flex h-12 items-center justify-center gap-3 !bg-[#06C755] text-base font-semibold !text-white hover:!bg-[#05b64d]"
               >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-brand-foreground/20">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-white/20">
                   <img src={LINE_LOGIN_ICON} alt="" className="h-4 w-4 object-contain" aria-hidden="true" />
                 </span>
                 <span className="tracking-[0.02em]">使用 LINE 登入</span>

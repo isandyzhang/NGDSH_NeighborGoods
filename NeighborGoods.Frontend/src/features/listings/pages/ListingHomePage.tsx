@@ -813,8 +813,8 @@ export const ListingHomePage = () => {
   const mobileResidenceActive = mobileSheetFilter === 'residence' || selectedResidenceCodes.length > 0
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">
-      <section className="mb-0 flex min-h-[62vh] flex-col items-center justify-center space-y-3 text-center md:min-h-[75vh]">
+    <main className="mx-auto flex w-full max-w-6xl flex-col px-4 py-6 md:py-8">
+      <section className="order-2 mb-0 flex min-h-[62vh] flex-col items-center justify-center space-y-3 text-center md:order-1 md:min-h-[75vh]">
         <p className="animate-fade-in text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
         <h1
           className="animate-fade-in inline-block text-6xl font-semibold leading-[1.03] text-text-main sm:text-7xl md:text-8xl"
@@ -900,7 +900,7 @@ export const ListingHomePage = () => {
 
       <motion.section
         ref={marqueeRef}
-        className="marquee-divider h-[25vh] md:h-[75vh]"
+        className="marquee-divider order-1 h-auto min-h-[3.75rem] md:order-2 md:h-[75vh]"
         aria-label="交易安全提醒"
         initial={{ opacity: 0, y: 90 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -916,6 +916,7 @@ export const ListingHomePage = () => {
         </div>
       </motion.section>
 
+      <div className="order-3 md:order-3">
       <section ref={listingSectionRef} aria-label="商品篩選起點" className="h-0 scroll-mt-28" />
       <section className="animate-fade-rise mb-6 space-y-4" style={{ animationDelay: '360ms' }}>
         <div ref={desktopFilterAreaRef} className="hidden space-y-4 md:block">
@@ -1472,6 +1473,7 @@ export const ListingHomePage = () => {
           </footer>
         </>
       ) : null}
+      </div>
       <TopPinIntroModal
         open={topPinTargetId !== null}
         onClose={() => setTopPinTargetId(null)}

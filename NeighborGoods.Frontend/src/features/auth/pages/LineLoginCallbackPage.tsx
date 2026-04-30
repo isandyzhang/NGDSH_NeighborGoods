@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { authApi } from '@/features/auth/api/authApi'
 import { useAuth } from '@/features/auth/components/AuthProvider'
@@ -6,6 +7,7 @@ import { ApiClientError } from '@/shared/types/api'
 import { Card } from '@/shared/ui/Card'
 
 const LINE_RETURN_TO_KEY = 'line_login_return_to'
+const LINE_CALLBACK_LOTTIE = new URL('../../../lottie/Send Animated Icon.lottie', import.meta.url).href
 
 export const LineLoginCallbackPage = () => {
   const navigate = useNavigate()
@@ -66,7 +68,10 @@ export const LineLoginCallbackPage = () => {
         {error ? (
           <p className="mt-3 text-sm text-danger">{error}</p>
         ) : (
-          <p className="mt-3 text-sm text-text-subtle">驗證中，將自動跳轉...</p>
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <DotLottieReact src={LINE_CALLBACK_LOTTIE} autoplay loop style={{ width: '72px', height: '72px' }} />
+            <p className="text-sm text-text-subtle">驗證中，將自動跳轉...</p>
+          </div>
         )}
       </Card>
     </main>

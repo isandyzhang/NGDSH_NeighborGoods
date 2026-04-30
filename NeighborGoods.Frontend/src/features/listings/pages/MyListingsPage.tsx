@@ -14,6 +14,7 @@ const statusText: Record<number, string> = {
   4: '已下架',
   5: '已易物',
 }
+const SKELETON_CARD_COUNT = 6
 
 export const MyListingsPage = () => {
   const [items, setItems] = useState<MyListingItem[]>([])
@@ -121,8 +122,8 @@ export const MyListingsPage = () => {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-8">
-      <section className="mb-8 space-y-3 text-center">
-        <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
+      <section className="animate-fade-rise mb-8 space-y-3 text-center">
+        <p className="animate-fade-in text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
         <h1 className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl">
           我的<span className="marker-wipe">商品</span>
         </h1>
@@ -141,7 +142,24 @@ export const MyListingsPage = () => {
       </section>
 
       {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
-      {loading ? <Card className="h-40 animate-pulse bg-surface-2" /> : null}
+      {loading ? (
+        <section className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3" aria-label="載入我的商品中">
+          {Array.from({ length: SKELETON_CARD_COUNT }).map((_, index) => (
+            <Card
+              key={`my-listing-skeleton-${index}`}
+              className="space-y-2"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="aspect-[4/2.4] animate-pulse rounded-xl bg-surface-2 sm:aspect-[4/2.7]" />
+              <div className="h-7 w-4/5 animate-pulse rounded-lg bg-surface-2" />
+              <div className="h-7 w-3/5 animate-pulse rounded-lg bg-surface-2" />
+              <div className="h-6 w-1/2 animate-pulse rounded-lg bg-surface-2" />
+              <div className="h-[3.2rem] animate-pulse rounded-xl bg-surface-2" />
+              <div className="h-[3.2rem] animate-pulse rounded-xl bg-surface-2" />
+            </Card>
+          ))}
+        </section>
+      ) : null}
 
       {!loading && !items.length ? (
         <EmptyState title="你目前還沒有刊登商品" description="先新增一筆商品，讓其他住戶能找到你。" />
@@ -149,7 +167,7 @@ export const MyListingsPage = () => {
 
       {!loading && items.length ? (
         <>
-          <p className="mb-5 text-center text-xl font-semibold leading-relaxed text-text-main sm:text-2xl">
+          <p className="animate-fade-rise mb-5 text-center text-xl font-semibold leading-relaxed text-text-main sm:text-2xl">
             上架中{' '}
             <span className="stat-brush inline-block min-w-6 text-3xl font-bold tabular-nums sm:text-4xl">
               {animatedSummary.activeCount}
@@ -165,14 +183,14 @@ export const MyListingsPage = () => {
           </p>
 
           <section className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
-            {items.map((item) => (
+            {items.map((item, index) => (
               (() => {
                 const actions = getAvailableActions(item.statusCode)
                 const editButtonClass =
                   'inline-flex min-h-[3.2rem] w-full items-center justify-center rounded-xl border-[#D8C0A3] bg-[#F3E7D8] px-1 py-1 text-xl font-semibold leading-tight hover:bg-[#EBD9C3]'
 
                 return (
-                  <Card key={item.id} className="space-y-2">
+                  <Card key={item.id} className="animate-fade-rise space-y-2" style={{ animationDelay: `${Math.min(560, (index % 12) * 70)}ms` }}>
                     <div className="aspect-[4/2.4] overflow-hidden rounded-xl bg-surface-2 sm:aspect-[4/2.7]">
                       {item.mainImageUrl ? (
                         <img src={item.mainImageUrl} alt={item.title} className="h-full w-full object-cover" />

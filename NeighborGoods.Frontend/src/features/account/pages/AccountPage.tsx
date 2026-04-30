@@ -139,8 +139,8 @@ export const AccountPage = () => {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 md:py-8">
-      <section className="mb-8 space-y-3 text-center">
-        <p className="text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
+      <section className="animate-fade-rise mb-8 space-y-3 text-center">
+        <p className="animate-fade-in text-sm uppercase tracking-[0.18em] text-text-subtle">NeighborGoods</p>
         <h1 className="text-5xl font-semibold leading-tight text-text-main sm:text-6xl md:text-7xl">
           我的<span className="marker-wipe">帳號</span>
         </h1>
@@ -151,7 +151,7 @@ export const AccountPage = () => {
       {successText ? <p className="mb-4 text-base text-[#2F7D4E]">{successText}</p> : null}
 
       {!loading && profile ? (
-        <Card className="space-y-4">
+        <Card className="animate-fade-rise space-y-4" style={{ animationDelay: '120ms' }}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-xs text-text-muted">顯示名稱</p>
@@ -159,7 +159,7 @@ export const AccountPage = () => {
             </div>
             <div>
               <p className="text-xs text-text-muted">帳號</p>
-              <p className="text-lg font-semibold text-text-main">{profile.userName}</p>
+              <p className="break-all text-lg font-semibold text-text-main">{profile.userName}</p>
             </div>
             <div>
               <p className="text-xs text-text-muted">Email</p>
