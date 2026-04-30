@@ -14,6 +14,7 @@ type RetriableConfig = InternalAxiosRequestConfig & {
 let getTokenHandler: GetTokenHandler = () => null
 let refreshHandler: RefreshHandler = async () => null
 let logoutHandler: LogoutHandler = () => {}
+let refreshPromise: Promise<AuthTokens | null> | null = null
 
 export const setupHttpAuth = (handlers: {
   getAccessToken: GetTokenHandler
@@ -60,7 +61,13 @@ http.interceptors.response.use(
 
     if (status === 401 && config && !config._retry && !isRefreshRequest) {
       config._retry = true
-      const tokens = await refreshHandler()
+      if (!refreshPromise) {
+        refreshPromise = refreshHandler().finally(() => {
+          refreshPromise = null
+        })
+      }
+
+      const tokens = await refreshPromise
       if (tokens) {
         config.headers.Authorization = `Bearer ${tokens.accessToken}`
         return http(config)
