@@ -40,4 +40,4 @@ output emailServiceName string = emailService.name
 output communicationServiceName string = emailService.name
 output emailDomainName string = emailDomain.name
 @secure()
-output emailConnectionString string = listKeys(emailService.id, emailService.apiVersion).primaryConnectionString
+output emailConnectionString string = emailService.listKeys().primaryConnectionString

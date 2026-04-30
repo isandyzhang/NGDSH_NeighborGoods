@@ -285,9 +285,11 @@ module containerapp 'modules/containerapp.bicep' = {
     containerMemory: containerMemory
     minReplicas: minReplicas
     maxReplicas: maxReplicas
+    #disable-next-line BCP318
     sqlConnectionString: provisionSqlResources ? sql.outputs.sqlConnectionString : existingSqlConnectionString
+    #disable-next-line BCP318
     blobConnectionString: provisionStorageResources ? storage.outputs.storageAccountConnectionString : existingBlobConnectionString
-    blobContainerName: provisionStorageResources ? storage.outputs.blobContainerName : existingBlobContainerName
+    blobContainerName: provisionStorageResources ? storage!.outputs.blobContainerName : existingBlobContainerName
     lineOidcChannelId: lineOidcChannelId
     lineOidcChannelSecret: lineOidcChannelSecret
     jwtIssuer: jwtIssuer
@@ -302,11 +304,13 @@ module containerapp 'modules/containerapp.bicep' = {
     lineMessagingBaseUrl: lineMessagingBaseUrl
     lineOidcCallbackUrl: lineOidcCallbackUrl
     lineOidcScope: lineOidcScope
+    #disable-next-line BCP318
     emailConnectionString: deployEmailResources ? email.outputs.emailConnectionString : ''
     emailFromAddress: emailFromAddress
     emailFromDisplayName: emailFromDisplayName
     emailLogoUrl: emailLogoUrl
     emailBaseUrl: emailBaseUrl
+    #disable-next-line BCP318
     signalRConnectionString: deploySignalR ? signalr.outputs.signalRConnectionString : ''
     aspnetcoreEnvironment: aspnetcoreEnvironment
     corsAllowedOrigin0: corsAllowedOrigin0

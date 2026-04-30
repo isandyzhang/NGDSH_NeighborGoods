@@ -26,4 +26,4 @@ output logAnalyticsName string = logAnalytics.name
 output logAnalyticsId string = logAnalytics.id
 output customerId string = logAnalytics.properties.customerId
 @secure()
-output sharedKey string = listKeys(logAnalytics.id, logAnalytics.apiVersion).primarySharedKey
+output sharedKey string = logAnalytics.listKeys().primarySharedKey

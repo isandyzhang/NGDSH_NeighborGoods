@@ -4,9 +4,11 @@ targetScope = 'resourceGroup'
 param location string = resourceGroup().location
 
 @description('Resource name prefix')
+@minLength(1)
 param namePrefix string
 
 @description('Environment name')
+@minLength(1)
 param environmentName string = 'prod'
 
 @description('Storage account SKU')
@@ -16,7 +18,7 @@ param storageAccountSku string = 'Standard_LRS'
 param publicAccess bool = true
 
 var suffix = toLower(uniqueString(resourceGroup().id, namePrefix, environmentName))
-var storageAccountName = toLower(take(replace('${namePrefix}${environmentName}${suffix}', '-', ''), 24))
+var storageAccountName = toLower(take('stg${replace('${namePrefix}${environmentName}${suffix}', '-', '')}', 24))
 var blobContainerName = 'neighborgoods-images'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {

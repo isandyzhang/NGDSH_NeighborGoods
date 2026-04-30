@@ -23,6 +23,13 @@ jobs:
       - name: Install Azure CLI Bicep
         run: az bicep install
 
+      - name: Ensure container image variable is set
+        run: |
+          if [ -z "${{ vars.CONTAINER_IMAGE }}" ]; then
+            echo "::error::CONTAINER_IMAGE is empty. Set the repository/environment variable before deployment."
+            exit 1
+          fi
+
       - name: Deploy Bicep infrastructure
         run: |
           az deployment group create \

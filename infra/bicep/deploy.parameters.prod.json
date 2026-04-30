@@ -28,7 +28,7 @@
     "databaseTier": { "value": "Basic" },
     "databaseFamily": { "value": "Gen5" },
     "databaseCapacity": { "value": 5 },
-    "databaseMaxSizeBytes": { "value": 34359738368 },
+    "databaseMaxSizeBytes": { "value": 2147483648 },
     "databaseMinCapacity": { "value": "0.5" },
     "databaseAutoPauseDelay": { "value": 60 },
     "manageExistingStoragePublicAccess": { "value": true },

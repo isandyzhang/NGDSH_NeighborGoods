@@ -13,6 +13,7 @@ param environmentName string = 'prod'
 param logAnalyticsCustomerId string
 
 @description('Log Analytics shared key')
+@secure()
 param logAnalyticsSharedKey string
 
 var containerEnvName = '${namePrefix}-${environmentName}-cae'
