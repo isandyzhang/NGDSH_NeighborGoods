@@ -25,11 +25,6 @@ jobs:
 
       - name: Deploy Bicep infrastructure
         run: |
-          extra_params=()
-          if [ -n "${{ secrets.CONTAINER_IMAGE }}" ]; then
-            extra_params+=(--parameters "containerImage=${{ secrets.CONTAINER_IMAGE }}")
-          fi
-
           az deployment group create \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
@@ -44,5 +39,4 @@ jobs:
             --parameters lineMessagingChannelAccessToken="${{ secrets.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN }}" \
             --parameters lineMessagingChannelSecret="${{ secrets.LINE_MESSAGING_CHANNEL_SECRET }}" \
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
-            --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
-            "${extra_params[@]}"
+            --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}"
