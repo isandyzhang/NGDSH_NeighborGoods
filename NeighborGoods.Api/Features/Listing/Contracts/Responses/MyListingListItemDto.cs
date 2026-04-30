@@ -13,5 +13,10 @@ public sealed record MyListingListItemDto(
     int StatusCode,
     string? MainImageUrl,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    /// <summary>完成態時，對應之已接受購買請求（供評價連結）；可能為 null（例如無正式 PR 即標記售出）。</summary>
+    Guid? PurchaseRequestId = null,
+    string? BuyerDisplayName = null,
+    bool BuyerReviewCompleted = false,
+    bool SellerReviewCompleted = false
 );

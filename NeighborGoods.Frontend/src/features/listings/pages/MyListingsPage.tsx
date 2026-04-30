@@ -16,6 +16,35 @@ const statusText: Record<number, string> = {
 }
 const SKELETON_CARD_COUNT = 6
 
+type StatusActionKey = 'inactive' | 'sold' | 'activate' | 'reactivate' | 'donated' | 'given-or-traded'
+
+const getSecondaryActions = (item: MyListingItem): { key: StatusActionKey; label: string }[] => {
+  const { statusCode, isFree, isCharity, isTradeable } = item
+  const donationEligible = isFree || isCharity
+  const extras: { key: StatusActionKey; label: string }[] = []
+  if (donationEligible) {
+    extras.push({ key: 'donated', label: '標記已捐贈' })
+  }
+  if (isTradeable) {
+    extras.push({ key: 'given-or-traded', label: '標記已易物' })
+  }
+
+  switch (statusCode) {
+    case 0:
+      return [{ key: 'inactive', label: '下架' }, { key: 'sold', label: '標記已售出' }, ...extras]
+    case 1:
+      return [{ key: 'activate', label: '恢復上架' }, { key: 'inactive', label: '下架' }, { key: 'sold', label: '標記已售出' }, ...extras]
+    case 4:
+      return [{ key: 'reactivate', label: '重新上架' }]
+    default:
+      return []
+  }
+}
+
+const isTerminalStatus = (statusCode: number) => statusCode === 2 || statusCode === 3 || statusCode === 5
+
+const canShowEditLink = (statusCode: number) => statusCode === 0 || statusCode === 4
+
 export const MyListingsPage = () => {
   const [items, setItems] = useState<MyListingItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,27 +112,7 @@ export const MyListingsPage = () => {
     }
   }, [])
 
-  const getAvailableActions = (statusCode: number) => {
-    switch (statusCode) {
-      case 0:
-        return [
-          { key: 'inactive', label: '下架' },
-          { key: 'sold', label: '標記已售出' },
-        ] as const
-      case 1:
-        return [
-          { key: 'activate', label: '恢復上架' },
-          { key: 'inactive', label: '下架' },
-          { key: 'sold', label: '標記已售出' },
-        ] as const
-      case 4:
-        return [{ key: 'reactivate', label: '重新上架' }] as const
-      default:
-        return [] as const
-    }
-  }
-
-  const handleStatusAction = async (listingId: string, action: 'inactive' | 'sold' | 'activate' | 'reactivate') => {
+  const handleStatusAction = async (listingId: string, action: StatusActionKey) => {
     setBusyItemId(listingId)
     setError(null)
     try {
@@ -183,32 +192,67 @@ export const MyListingsPage = () => {
           </p>
 
           <section className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
-            {items.map((item, index) => (
-              (() => {
-                const actions = getAvailableActions(item.statusCode)
-                const editButtonClass =
-                  'inline-flex min-h-[3.2rem] w-full items-center justify-center rounded-xl border-[#D8C0A3] bg-[#F3E7D8] px-1 py-1 text-xl font-semibold leading-tight hover:bg-[#EBD9C3]'
+            {items.map((item, index) => {
+              const actions = getSecondaryActions(item)
+              const editButtonClass =
+                'inline-flex min-h-[3.2rem] w-full items-center justify-center rounded-xl border-[#D8C0A3] bg-[#F3E7D8] px-1 py-1 text-xl font-semibold leading-tight hover:bg-[#EBD9C3]'
 
-                return (
-                  <Card key={item.id} className="animate-fade-rise space-y-2" style={{ animationDelay: `${Math.min(560, (index % 12) * 70)}ms` }}>
-                    <div className="aspect-[4/2.4] overflow-hidden rounded-xl bg-surface-2 sm:aspect-[4/2.7]">
-                      {item.mainImageUrl ? (
-                        <img src={item.mainImageUrl} alt={item.title} className="h-full w-full object-cover" />
+              return (
+                <Card key={item.id} className="animate-fade-rise space-y-2" style={{ animationDelay: `${Math.min(560, (index % 12) * 70)}ms` }}>
+                  <div className="aspect-[4/2.4] overflow-hidden rounded-xl bg-surface-2 sm:aspect-[4/2.7]">
+                    {item.mainImageUrl ? (
+                      <img src={item.mainImageUrl} alt={item.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-text-muted">無圖片</div>
+                    )}
+                  </div>
+                  <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-text-main md:text-2xl">{item.title}</h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full border border-[#D8C0A3] bg-[#F3E7D8] px-3 py-1 text-lg font-semibold text-text-main">
+                      {item.categoryName}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-[#D8C0A3] bg-[#F3E7D8] px-3 py-1 text-lg font-semibold text-text-main">
+                      {item.isFree ? '免費' : `NT$ ${item.price.toLocaleString()}`}
+                    </span>
+                  </div>
+                  <p className="text-lg text-text-subtle">狀態：{statusText[item.statusCode] ?? `狀態 ${item.statusCode}`}</p>
+
+                  {isTerminalStatus(item.statusCode) ? (
+                    <div className="space-y-2 rounded-xl border border-border bg-surface-2 px-3 py-3 text-base text-text-main">
+                      {item.buyerDisplayName ? (
+                        <p>
+                          <span className="text-text-subtle">交易對象：</span>
+                          {item.buyerDisplayName}
+                        </p>
                       ) : (
-                        <div className="flex h-full items-center justify-center text-sm text-text-muted">無圖片</div>
+                        <p className="text-text-subtle">無法顯示交易對象（可能未經由已接受的購買請求完成交易）</p>
                       )}
+                      {item.purchaseRequestId ? (
+                        <div className="space-y-2">
+                          {!item.sellerReviewCompleted ? (
+                            <Link
+                              to={`/purchase-requests/${item.purchaseRequestId}/review`}
+                              className={getButtonClassName({
+                                variant: 'primary',
+                                className: 'inline-flex min-h-[3rem] w-full items-center justify-center rounded-xl text-base font-semibold',
+                              })}
+                            >
+                              前往評價
+                            </Link>
+                          ) : (
+                            <p className="font-semibold text-[#1E6B43]">你已完成對買家的評價</p>
+                          )}
+                          <p className="text-sm text-text-subtle">
+                            買家評價：
+                            {item.buyerReviewCompleted ? '已收到買家評價' : '買家尚未評價'}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
-                    <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-text-main md:text-2xl">{item.title}</h2>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center rounded-full border border-[#D8C0A3] bg-[#F3E7D8] px-3 py-1 text-lg font-semibold text-text-main">
-                        {item.categoryName}
-                      </span>
-                      <span className="inline-flex items-center rounded-full border border-[#D8C0A3] bg-[#F3E7D8] px-3 py-1 text-lg font-semibold text-text-main">
-                        {item.isFree ? '免費' : `NT$ ${item.price.toLocaleString()}`}
-                      </span>
-                    </div>
-                    <p className="text-lg text-text-subtle">狀態：{statusText[item.statusCode] ?? `狀態 ${item.statusCode}`}</p>
-                    <div className="grid grid-cols-1 gap-2 pt-1">
+                  ) : null}
+
+                  <div className="grid grid-cols-1 gap-2 pt-1">
+                    {canShowEditLink(item.statusCode) ? (
                       <Link
                         to={`/listings/${item.id}/edit`}
                         className={getButtonClassName({
@@ -218,23 +262,23 @@ export const MyListingsPage = () => {
                       >
                         編輯商品
                       </Link>
-                      {actions.map((action) => (
-                        <Button
-                          key={action.key}
-                          type="button"
-                          variant="secondary"
-                          className="min-h-[3.2rem] w-full rounded-xl border-[#D8C0A3] bg-[#F3E7D8] px-1 py-1 text-xl font-semibold leading-tight hover:bg-[#EBD9C3]"
-                          disabled={busyItemId === item.id}
-                          onClick={() => void handleStatusAction(item.id, action.key)}
-                        >
-                          {busyItemId === item.id ? '處理中...' : action.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </Card>
-                )
-              })()
-            ))}
+                    ) : null}
+                    {actions.map((action) => (
+                      <Button
+                        key={action.key}
+                        type="button"
+                        variant="secondary"
+                        className="min-h-[3.2rem] w-full rounded-xl border-[#D8C0A3] bg-[#F3E7D8] px-1 py-1 text-xl font-semibold leading-tight hover:bg-[#EBD9C3]"
+                        disabled={busyItemId === item.id}
+                        onClick={() => void handleStatusAction(item.id, action.key)}
+                      >
+                        {busyItemId === item.id ? '處理中...' : action.label}
+                      </Button>
+                    ))}
+                  </div>
+                </Card>
+              )
+            })}
           </section>
         </>
       ) : null}

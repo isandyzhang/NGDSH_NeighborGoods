@@ -66,10 +66,16 @@ jobs:
 
       - name: Deploy latest image to Container App
         uses: azure/cli@v2
+        env:
+          AZURE_SIGNALR_CONNECTION_STRING: ${{ secrets.AZURE_SIGNALR_CONNECTION_STRING }}
         with:
           inlineScript: |
             if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ] || [ -z "${{ vars.AZURE_CONTAINER_APP_NAME }}" ]; then
               echo "Missing repository variables: AZURE_RESOURCE_GROUP or AZURE_CONTAINER_APP_NAME"
+              exit 1
+            fi
+            if [ -z "${AZURE_SIGNALR_CONNECTION_STRING}" ]; then
+              echo "Missing secret: AZURE_SIGNALR_CONNECTION_STRING"
               exit 1
             fi
 
@@ -77,7 +83,8 @@ jobs:
             az containerapp update \
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --name "${{ vars.AZURE_CONTAINER_APP_NAME }}" \
-              --image "${{ steps.meta.outputs.image }}"
+              --image "${{ steps.meta.outputs.image }}" \
+              --set-env-vars "Azure__SignalR__ConnectionString=${AZURE_SIGNALR_CONNECTION_STRING}"
 
       - name: Deployment summary
         run: |

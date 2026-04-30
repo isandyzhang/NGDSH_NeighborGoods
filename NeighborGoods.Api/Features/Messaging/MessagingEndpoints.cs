@@ -136,6 +136,11 @@ public static class MessagingEndpoints
                 ct);
             if (data is null)
             {
+                // 對話尚未建立交易請求屬於正常狀態，回 200 + null，避免前端每次進聊天室都出現 404 噪音。
+                if (string.Equals(errorCode, "PURCHASE_REQUEST_NOT_FOUND", StringComparison.Ordinal))
+                {
+                    return Results.Ok(ApiResponseFactory.Success<object?>(null, httpContext));
+                }
                 return MessagingError(httpContext, errorCode!, errorMessage!);
             }
 

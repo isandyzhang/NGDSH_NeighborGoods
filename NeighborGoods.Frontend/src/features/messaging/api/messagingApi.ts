@@ -80,8 +80,8 @@ export const messagingApi = {
     await http.post(`/api/v1/conversations/${conversationId}/read`)
   },
 
-  async getCurrentPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest> {
-    const response = await http.get<ApiResponse<ConversationPurchaseRequest>>(
+  async getCurrentPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest | null> {
+    const response = await http.get<ApiResponse<ConversationPurchaseRequest | null>>(
       `/api/v1/conversations/${conversationId}/purchase-request/current`,
     )
     return unwrapApiResponse(response.data)

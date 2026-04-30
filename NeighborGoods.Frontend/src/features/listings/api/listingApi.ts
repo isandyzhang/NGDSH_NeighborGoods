@@ -55,6 +55,12 @@ export type MyListingItem = {
   mainImageUrl: string | null
   createdAt: string
   updatedAt: string
+  /** 已接受購買請求 Id（完成態且可對應時才有） */
+  purchaseRequestId: string | null
+  /** 買家顯示名稱 */
+  buyerDisplayName: string | null
+  buyerReviewCompleted: boolean
+  sellerReviewCompleted: boolean
 }
 
 type MyListPayload = {
@@ -264,7 +270,17 @@ export const listingApi = {
     const response = await http.get<ApiResponse<MyListPayload>>('/api/v1/listings/mine', {
       params: { page, pageSize },
     })
-    return unwrapApiResponse(response.data)
+    const payload = unwrapApiResponse(response.data)
+    return {
+      ...payload,
+      items: payload.items.map((item) => ({
+        ...item,
+        purchaseRequestId: item.purchaseRequestId ?? null,
+        buyerDisplayName: item.buyerDisplayName ?? null,
+        buyerReviewCompleted: item.buyerReviewCompleted ?? false,
+        sellerReviewCompleted: item.sellerReviewCompleted ?? false,
+      })),
+    }
   },
 
   async listFavorites(page = 1, pageSize = 20, categoryCode?: number): Promise<FavoriteListPayload> {

@@ -33,4 +33,6 @@ public partial class PurchaseRequest
     public virtual AspNetUser Buyer { get; set; } = null!;
 
     public virtual AspNetUser Seller { get; set; } = null!;
+
+    public virtual ICollection<Review> Reviews { get; set; } = new List<Review>();
 }

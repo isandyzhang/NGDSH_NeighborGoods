@@ -24,9 +24,11 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showEmailForm, setShowEmailForm] = useState(false)
+  const fromQuery = new URLSearchParams(location.search).get('from')
+  const fromState = (location.state as LocationState | null)?.from
+  const destination = fromQuery || fromState || '/listings'
 
   if (isAuthenticated) {
-    const destination = (location.state as LocationState | null)?.from ?? '/listings'
     return <Navigate to={destination} replace />
   }
 
@@ -37,7 +39,6 @@ export const LoginPage = () => {
 
     try {
       await login({ userNameOrEmail, password })
-      const destination = (location.state as LocationState | null)?.from ?? '/listings'
       navigate(destination, { replace: true })
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -51,7 +52,6 @@ export const LoginPage = () => {
   }
 
   const handleLineLogin = () => {
-    const destination = (location.state as LocationState | null)?.from ?? '/listings'
     sessionStorage.setItem(LINE_RETURN_TO_KEY, destination)
     window.location.assign(authApi.buildLineLoginUrl())
   }

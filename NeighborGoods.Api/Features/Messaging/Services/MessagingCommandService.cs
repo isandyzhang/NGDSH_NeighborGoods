@@ -147,10 +147,11 @@ public sealed class MessagingCommandService(
         var participantIds = new[] { conversation.Participant1Id, conversation.Participant2Id };
         await hubContext.Clients.Users(participantIds).SendAsync(
             "ReceiveMessage",
-            dto.SenderId,
-            dto.SenderDisplayName,
-            dto.Content,
-            dto.CreatedAt,
+            dto,
+            cancellationToken);
+        await hubContext.Clients.Group(MessageHub.ConversationGroupName(conversation.Id)).SendAsync(
+            "ReceiveMessage",
+            dto,
             cancellationToken);
 
         return (dto, null, null);

@@ -72,10 +72,24 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   }, [saveTokens, tokens?.refreshToken])
 
   useEffect(() => {
+    const redirectToLogin = () => {
+      const { pathname, search, hash } = window.location
+      // 避免在登入／註冊頁觸發重複導轉
+      if (pathname === '/login' || pathname === '/register') {
+        return
+      }
+      const from = `${pathname}${search}${hash}`
+      const encodedFrom = encodeURIComponent(from)
+      window.location.replace(`/login?from=${encodedFrom}`)
+    }
+
     setupHttpAuth({
       getAccessToken: () => tokens?.accessToken ?? null,
       refreshTokens,
-      onUnauthorized: () => saveTokens(null),
+      onUnauthorized: () => {
+        saveTokens(null)
+        redirectToLogin()
+      },
     })
   }, [refreshTokens, saveTokens, tokens?.accessToken])
 

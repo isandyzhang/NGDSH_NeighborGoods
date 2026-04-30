@@ -307,20 +307,91 @@ public sealed class ListingQueryService(
         var ids = rows.Select(r => r.Id).ToList();
         var coverImageMap = await GetCoverImageMapAsync(ids, cancellationToken);
 
+        var sold = (int)ListingStatus.Sold;
+        var donated = (int)ListingStatus.Donated;
+        var givenOrTraded = (int)ListingStatus.GivenOrTraded;
+        var terminalStatuses = new[] { sold, donated, givenOrTraded };
+        var terminalListingIds = rows.Where(r => terminalStatuses.Contains(r.Status)).Select(r => r.Id).Distinct().ToList();
+
+        Dictionary<Guid, TerminalListingExtra> terminalExtras = new();
+        if (terminalListingIds.Count > 0)
+        {
+            var accepted = (int)PurchaseRequestStatus.Accepted;
+            var prRows = await (
+                from pr in dbContext.PurchaseRequests.AsNoTracking()
+                join buyer in dbContext.AspNetUsers.AsNoTracking() on pr.BuyerId equals buyer.Id
+                where terminalListingIds.Contains(pr.ListingId)
+                      && pr.Status == accepted
+                      && pr.SellerId == sellerId
+                select new
+                {
+                    pr.ListingId,
+                    pr.Id,
+                    pr.BuyerId,
+                    BuyerDisplayName = buyer.DisplayName,
+                    SortKey = pr.RespondedAt ?? pr.CreatedAt,
+                }).ToListAsync(cancellationToken);
+
+            var bestPrByListing = prRows
+                .GroupBy(x => x.ListingId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.SortKey).First());
+
+            var prIds = bestPrByListing.Values.Select(x => x.Id).ToList();
+            List<(Guid PrId, string ReviewerId)> reviewRows;
+            if (prIds.Count == 0)
+            {
+                reviewRows = [];
+            }
+            else
+            {
+                var raw = await dbContext.Reviews
+                    .AsNoTracking()
+                    .Where(r => r.PurchaseRequestId != null && r.ReviewerId != null && prIds.Contains(r.PurchaseRequestId.Value))
+                    .Select(r => new { PrId = r.PurchaseRequestId!.Value, ReviewerId = r.ReviewerId! })
+                    .ToListAsync(cancellationToken);
+                reviewRows = raw.Select(x => (x.PrId, x.ReviewerId)).ToList();
+            }
+
+            var reviewersByPr = reviewRows
+                .GroupBy(x => x.PrId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.ReviewerId).ToHashSet(StringComparer.Ordinal));
+
+            foreach (var (listingId, pr) in bestPrByListing)
+            {
+                reviewersByPr.TryGetValue(pr.Id, out var reviewers);
+                reviewers ??= new HashSet<string>(StringComparer.Ordinal);
+                terminalExtras[listingId] = new TerminalListingExtra(
+                    pr.Id,
+                    pr.BuyerDisplayName,
+                    reviewers.Contains(pr.BuyerId),
+                    reviewers.Contains(sellerId));
+            }
+        }
+
         var items = rows
-            .Select(x => new MyListingListItemDto(
-                x.Id,
-                x.Title,
-                x.Category,
-                categoryNames.GetValueOrDefault(x.Category, "其他"),
-                Convert.ToInt32(x.Price),
-                x.IsFree,
-                x.IsCharity,
-                x.IsTradeable,
-                x.Status,
-                coverImageMap.GetValueOrDefault(x.Id),
-                x.CreatedAt,
-                x.UpdatedAt))
+            .Select(x =>
+            {
+                terminalExtras.TryGetValue(x.Id, out var extra);
+                return new MyListingListItemDto(
+                    x.Id,
+                    x.Title,
+                    x.Category,
+                    categoryNames.GetValueOrDefault(x.Category, "其他"),
+                    Convert.ToInt32(x.Price),
+                    x.IsFree,
+                    x.IsCharity,
+                    x.IsTradeable,
+                    x.Status,
+                    coverImageMap.GetValueOrDefault(x.Id),
+                    x.CreatedAt,
+                    x.UpdatedAt,
+                    extra?.PurchaseRequestId,
+                    extra?.BuyerDisplayName,
+                    extra?.BuyerReviewCompleted ?? false,
+                    extra?.SellerReviewCompleted ?? false);
+            })
             .ToList();
 
         return new PagedResult<MyListingListItemDto>(page, pageSize, total, items);
@@ -590,6 +661,12 @@ public sealed class ListingQueryService(
 
         return Math.Max(0, (int)Math.Ceiling((expireAt - now).TotalSeconds));
     }
+
+    private sealed record TerminalListingExtra(
+        Guid PurchaseRequestId,
+        string BuyerDisplayName,
+        bool BuyerReviewCompleted,
+        bool SellerReviewCompleted);
 
     private sealed record PendingPurchaseRequestSummary(DateTime ExpireAt, int RemainingSeconds);
 }

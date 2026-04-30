@@ -28,29 +28,50 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
             return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "無權限查看此交易請求的評價狀態");
         }
 
-        var review = await dbContext.Reviews
+        var reviews = await dbContext.Reviews
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.ListingId == request.ListingId && x.BuyerId == request.BuyerId,
-                cancellationToken);
-        var reviewDetail = review is null
-            ? null
-            : new ReviewDetailDto(
-                review.Id,
-                review.ListingId,
-                review.SellerId,
-                review.BuyerId,
-                review.Rating,
-                review.Content,
-                review.CreatedAt);
+            .Where(x =>
+                x.PurchaseRequestId == purchaseRequestId ||
+                (x.PurchaseRequestId == null && x.ListingId == request.ListingId && x.BuyerId == request.BuyerId))
+            .ToListAsync(cancellationToken);
 
-        var (canReview, reason) = await EvaluateCanReviewAsync(request, currentUserId, cancellationToken);
+        Review? buyerReviewEntity = reviews.FirstOrDefault(r =>
+            string.Equals(r.ReviewerId, request.BuyerId, StringComparison.Ordinal))
+            ?? reviews.FirstOrDefault(r =>
+                r.ReviewerId is null && string.Equals(r.BuyerId, request.BuyerId, StringComparison.Ordinal));
+        Review? sellerReviewEntity = reviews.FirstOrDefault(r =>
+            string.Equals(r.ReviewerId, request.SellerId, StringComparison.Ordinal));
+
+        var (buyerCan, buyerReason) = await EvaluateCanReviewAsync(request, request.BuyerId, cancellationToken);
+        var (sellerCan, sellerReason) = await EvaluateCanReviewAsync(request, request.SellerId, cancellationToken);
+
+        var buyerCanReview = buyerCan && buyerReviewEntity is null;
+        var sellerCanReview = sellerCan && sellerReviewEntity is null;
+        var viewerIsBuyer = string.Equals(request.BuyerId, currentUserId, StringComparison.Ordinal);
+        var viewerCanReview = viewerIsBuyer ? buyerCanReview : sellerCanReview;
+        var viewerReviewed = viewerIsBuyer ? buyerReviewEntity is not null : sellerReviewEntity is not null;
+        var viewerReviewBlockReason = viewerIsBuyer
+            ? (buyerReviewEntity is not null ? null : buyerReason)
+            : (sellerReviewEntity is not null ? null : sellerReason);
+        var viewerReview = viewerIsBuyer
+            ? (buyerReviewEntity is null ? null : ToDetailDto(buyerReviewEntity, purchaseRequestId))
+            : (sellerReviewEntity is null ? null : ToDetailDto(sellerReviewEntity, purchaseRequestId));
+
         return (new PurchaseRequestReviewStatusDto(
             request.Id,
-            canReview,
-            review is not null,
-            reason,
-            reviewDetail), null, null);
+            buyerCanReview,
+            buyerReviewEntity is not null,
+            buyerReviewEntity is not null ? null : buyerReason,
+            buyerReviewEntity is null ? null : ToDetailDto(buyerReviewEntity, purchaseRequestId),
+            sellerCanReview,
+            sellerReviewEntity is not null,
+            sellerReviewEntity is not null ? null : sellerReason,
+            sellerReviewEntity is null ? null : ToDetailDto(sellerReviewEntity, purchaseRequestId),
+            viewerIsBuyer,
+            viewerCanReview,
+            viewerReviewed,
+            viewerReviewBlockReason,
+            viewerReview), null, null);
     }
 
     public async Task<(ReviewDetailDto? Data, string? ErrorCode, string? ErrorMessage)> CreateAsync(
@@ -71,19 +92,20 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
             return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
-        if (!string.Equals(purchaseRequest.BuyerId, currentUserId, StringComparison.Ordinal))
+        if (!string.Equals(purchaseRequest.BuyerId, currentUserId, StringComparison.Ordinal) &&
+            !string.Equals(purchaseRequest.SellerId, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅買家本人可提交評價");
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅買家或賣家本人可提交評價");
         }
 
         var existing = await dbContext.Reviews
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                x => x.ListingId == purchaseRequest.ListingId && x.BuyerId == purchaseRequest.BuyerId,
+                x => x.PurchaseRequestId == purchaseRequestId && x.ReviewerId == currentUserId,
                 cancellationToken);
         if (existing is not null)
         {
-            return (null, "REVIEW_ALREADY_EXISTS", "此筆交易已提交過評價");
+            return (null, "REVIEW_ALREADY_EXISTS", "你已提交過此筆交易的評價");
         }
 
         var (canReview, reason) = await EvaluateCanReviewAsync(purchaseRequest, currentUserId, cancellationToken);
@@ -98,6 +120,8 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
             ListingId = purchaseRequest.ListingId,
             SellerId = purchaseRequest.SellerId,
             BuyerId = purchaseRequest.BuyerId,
+            PurchaseRequestId = purchaseRequest.Id,
+            ReviewerId = currentUserId,
             Rating = request.Rating,
             Content = string.IsNullOrWhiteSpace(request.Content) ? null : request.Content.Trim(),
             CreatedAt = DateTime.UtcNow
@@ -105,24 +129,30 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
         dbContext.Reviews.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return (new ReviewDetailDto(
-            entity.Id,
-            entity.ListingId,
-            entity.SellerId,
-            entity.BuyerId,
-            entity.Rating,
-            entity.Content,
-            entity.CreatedAt), null, null);
+        return (ToDetailDto(entity, purchaseRequest.Id), null, null);
     }
+
+    private static ReviewDetailDto ToDetailDto(Review review, Guid purchaseRequestId) =>
+        new(
+            review.Id,
+            review.PurchaseRequestId ?? purchaseRequestId,
+            review.ReviewerId ?? review.BuyerId,
+            review.ListingId,
+            review.SellerId,
+            review.BuyerId,
+            review.Rating,
+            review.Content,
+            review.CreatedAt);
 
     private async Task<(bool CanReview, string? Reason)> EvaluateCanReviewAsync(
         PurchaseRequest request,
-        string currentUserId,
+        string reviewerUserId,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(request.BuyerId, currentUserId, StringComparison.Ordinal))
+        if (!string.Equals(request.BuyerId, reviewerUserId, StringComparison.Ordinal) &&
+            !string.Equals(request.SellerId, reviewerUserId, StringComparison.Ordinal))
         {
-            return (false, "僅買家可填寫評價");
+            return (false, "僅買家或賣家可填寫評價");
         }
 
         if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Accepted)

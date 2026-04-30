@@ -115,6 +115,10 @@ Minimum required settings:
 - `AzureBlob__ConnectionString`
 - `AzureBlob__ContainerName`
 
+Optional (use Azure SignalR Service instead of in-process SignalR):
+
+- `Azure__SignalR__ConnectionString` (or `AzureSignalR__ConnectionString`)
+
 LINE login settings:
 
 - `Line__ChannelId`
@@ -162,6 +166,11 @@ Production values should not use localhost for:
 - `Cors__AllowedOrigins__0`
 - `Cors__AllowedOrigins__1`
 - `LineMessagingApi__BaseUrl`
+
+SignalR runtime mode:
+
+- If `Azure__SignalR__ConnectionString` is set, backend uses Azure SignalR Service.
+- If not set, backend falls back to in-process SignalR hub (`/hubs/messages`).
 
 ## 6. CI/CD
 

@@ -80,8 +80,13 @@ export const ChatPage = () => {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const accessTokenRef = useRef<string | null>(tokens?.accessToken ?? null)
 
   const hubClient = useMemo(() => new MessageHubClient(), [])
+
+  useEffect(() => {
+    accessTokenRef.current = tokens?.accessToken ?? null
+  }, [tokens?.accessToken])
 
   useEffect(() => {
     let disposed = false
@@ -194,19 +199,25 @@ export const ChatPage = () => {
   }, [conversationId])
 
   useEffect(() => {
-    if (!tokens?.accessToken || !conversationId) {
+    if (!conversationId || !accessTokenRef.current) {
       return
     }
 
-    void hubClient.connect(tokens.accessToken, (message) => {
+    void hubClient.connect(() => accessTokenRef.current, conversationId, (message) => {
       setMessages((current) => mergeMessages(current, [message]))
       void messagingApi.markRead(conversationId)
+    }).catch((err: unknown) => {
+      // React StrictMode 開發期會觸發 mount/unmount 重跑 effect，連線被中止時忽略這類 AbortError 噪音。
+      if (err instanceof Error && /stopped during negotiation|aborterror/i.test(err.message)) {
+        return
+      }
+      console.warn('SignalR connect failed', err)
     })
 
     return () => {
       void hubClient.disconnect()
     }
-  }, [conversationId, hubClient, tokens?.accessToken])
+  }, [conversationId, hubClient])
 
   useEffect(() => {
     if (!purchaseRequest || purchaseRequest.status !== PurchaseRequestStatus.Pending) {

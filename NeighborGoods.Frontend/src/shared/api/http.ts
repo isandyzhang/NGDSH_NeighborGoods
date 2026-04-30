@@ -84,6 +84,13 @@ http.interceptors.response.use(
       )
     }
 
+    if (status === 401) {
+      if (requestUrl.includes('/api/v1/auth/login')) {
+        throw new ApiClientError('帳號或密碼錯誤，請再確認一次', 'INVALID_CREDENTIALS', status)
+      }
+      throw new ApiClientError('登入已失效，請重新登入', 'UNAUTHORIZED', status)
+    }
+
     throw new ApiClientError(normalizeNetworkErrorMessage(error), 'NETWORK_ERROR', status)
   },
 )

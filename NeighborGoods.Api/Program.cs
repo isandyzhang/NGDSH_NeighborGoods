@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NeighborGoods.Api.Features.Account;
@@ -45,7 +46,17 @@ builder.Services.AddHostedService<QuickResponderBadgeWorker>();
 builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<ReviewService>();
 builder.Services.AddHostedService<PurchaseRequestExpirationWorker>();
-builder.Services.AddSignalR();
+var azureSignalRConnectionString = builder.Configuration["Azure:SignalR:ConnectionString"]
+    ?? builder.Configuration["AzureSignalR:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(azureSignalRConnectionString))
+{
+    builder.Services.AddSignalR().AddAzureSignalR(azureSignalRConnectionString);
+}
+else
+{
+    builder.Services.AddSignalR();
+}
+builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 builder.Services.AddScoped<AccountRegistrationService>();
 builder.Services.AddScoped<AccountEmailVerificationService>();
 builder.Services.AddScoped<AccountProfileService>();
@@ -183,6 +194,10 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+startupLogger.LogInformation(
+    "SignalR mode: {Mode}",
+    string.IsNullOrWhiteSpace(azureSignalRConnectionString) ? "InProcess" : "AzureSignalR");
 
 if (app.Environment.IsDevelopment())
 {

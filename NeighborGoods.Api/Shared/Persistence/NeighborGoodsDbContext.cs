@@ -352,12 +352,17 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
         {
             entity.HasIndex(e => e.BuyerId, "IX_Reviews_BuyerId");
 
-            entity.HasIndex(e => new { e.ListingId, e.BuyerId }, "IX_Reviews_ListingId_BuyerId").IsUnique();
+            entity.HasIndex(e => new { e.ListingId, e.BuyerId }, "IX_Reviews_ListingId_BuyerId");
 
             entity.HasIndex(e => e.SellerId, "IX_Reviews_SellerId");
 
+            entity.HasIndex(e => new { e.PurchaseRequestId, e.ReviewerId }, "IX_Reviews_PurchaseRequestId_ReviewerId")
+                .IsUnique()
+                .HasFilter("[PurchaseRequestId] IS NOT NULL AND [ReviewerId] IS NOT NULL");
+
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.Content).HasMaxLength(500);
+            entity.Property(e => e.ReviewerId).HasMaxLength(450);
 
             entity.HasOne(d => d.Buyer).WithMany(p => p.ReviewBuyers)
                 .HasForeignKey(d => d.BuyerId)
@@ -367,6 +372,11 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
 
             entity.HasOne(d => d.Seller).WithMany(p => p.ReviewSellers)
                 .HasForeignKey(d => d.SellerId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            entity.HasOne(d => d.PurchaseRequest)
+                .WithMany(p => p.Reviews)
+                .HasForeignKey(d => d.PurchaseRequestId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
     }
