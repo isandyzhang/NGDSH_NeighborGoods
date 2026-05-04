@@ -28,11 +28,13 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
             return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "無權限查看此交易請求的評價狀態");
         }
 
+        // 同一筆成交（同商品、同買賣家）只應有一份雙向評價；遷移或歷史資料可能把 PurchaseRequestId 指到非本次檢視的 PR，仍須納入同一交易配對下的既有評價。
         var reviews = await dbContext.Reviews
             .AsNoTracking()
             .Where(x =>
-                x.PurchaseRequestId == purchaseRequestId ||
-                (x.PurchaseRequestId == null && x.ListingId == request.ListingId && x.BuyerId == request.BuyerId))
+                x.ListingId == request.ListingId &&
+                x.BuyerId == request.BuyerId &&
+                x.SellerId == request.SellerId)
             .ToListAsync(cancellationToken);
 
         Review? buyerReviewEntity = reviews.FirstOrDefault(r =>
@@ -98,12 +100,17 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
             return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅買家或賣家本人可提交評價");
         }
 
-        var existing = await dbContext.Reviews
+        var existingSameDeal = await dbContext.Reviews
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.PurchaseRequestId == purchaseRequestId && x.ReviewerId == currentUserId,
+            .AnyAsync(
+                x => x.ListingId == purchaseRequest.ListingId
+                    && x.BuyerId == purchaseRequest.BuyerId
+                    && x.SellerId == purchaseRequest.SellerId
+                    && (
+                        x.ReviewerId == currentUserId
+                        || (x.ReviewerId == null && string.Equals(purchaseRequest.BuyerId, currentUserId, StringComparison.Ordinal))),
                 cancellationToken);
-        if (existing is not null)
+        if (existingSameDeal)
         {
             return (null, "REVIEW_ALREADY_EXISTS", "你已提交過此筆交易的評價");
         }

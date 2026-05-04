@@ -1,3 +1,5 @@
+using System;
+
 namespace NeighborGoods.Api.Shared.Persistence.LegacyEntities;
 
 public sealed class EmailVerificationChallenge

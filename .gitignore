@@ -40,6 +40,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Ad-hoc publish / copy output (avoid committing binaries)
+tmp-build/
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 

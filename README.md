@@ -20,14 +20,24 @@ The system is split into a React frontend and a .NET backend API, deployed on Az
 
 ```text
 NGDSH_NeighborGoods/
-├─ NeighborGoods.Frontend/        # React SPA
-├─ NeighborGoods.Api/             # ASP.NET Core API
-├─ NeighborGoods.Api.Tests/       # Backend tests
+├─ NeighborGoods.Frontend/        # React SPA (production UI)
+├─ NeighborGoods.Api/             # ASP.NET Core API (production HTTP API)
+├─ NeighborGoods.Api.Tests/       # Backend tests (Docker + SQL Server via Testcontainers)
+├─ NeighborGoods.Web/             # Legacy ASP.NET site (see 1.3)
 ├─ infra/bicep/                   # Azure IaC (Bicep modules + parameters)
 ├─ .github/workflows/             # CI/CD workflows
 ├─ Dockerfile.api                 # Backend container image definition
 └─ NeighborGoods.sln
 ```
+
+### 1.3 `NeighborGoods.Web` vs `NeighborGoods.Api`
+
+- **`NeighborGoods.Api`**: the **current production** backend. It owns **EF Core migrations** under [`NeighborGoods.Api/Migrations`](NeighborGoods.Api/Migrations). In normal releases, apply pending migrations against the shared database as part of the API deployment pipeline (or an explicit migration step), not ad hoc on developer machines for production.
+- **`NeighborGoods.Web`**: legacy full-stack application retained in the repository for historical parity or comparison. **Do not treat it as the primary deployment surface** alongside the React + API stack unless you have an explicit dual-run strategy. If both ever pointed at the same database, **coordinate schema ownership** so only one path applies additive migrations, avoiding duplicate or conflicting DDL.
+
+### 1.4 SQL persistence models
+
+- Database-aligned EF entity classes live under [`NeighborGoods.Api/Shared/Persistence/LegacyEntities`](NeighborGoods.Api/Shared/Persistence/LegacyEntities) (namespace `NeighborGoods.Api.Shared.Persistence.LegacyEntities`). The **`Listings`** table is mapped with [`NeighborGoods.Api/Features/Listing/Listing.cs`](NeighborGoods.Api/Features/Listing/Listing.cs).
 
 ## 2. Tech Stack
 
@@ -138,6 +148,12 @@ Default development URL from launch profile:
 
 - `http://localhost:5065`
 - `https://localhost:7233`
+
+### 4.4 Backend integration tests
+
+[`NeighborGoods.Api.Tests`](NeighborGoods.Api.Tests) uses **Testcontainers** to start **SQL Server in Docker**. Running `dotnet test` locally requires **Docker Desktop** (or another engine exposing the default Docker pipe) to be **running**; otherwise fixture startup fails with a `DockerUnavailableException`.
+
+CI agents that execute these tests must have Docker available. A separate “unit-only, no database” test tier is not wired yet (optional future work).
 
 ## 5. Production Configuration
 

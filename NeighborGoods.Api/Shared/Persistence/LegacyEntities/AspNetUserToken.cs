@@ -1,17 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace NeighborGoods.Api.Shared.Persistence.LegacyEntities;
 
-public partial class AspNetUserClaim
+public partial class AspNetUserToken
 {
-    public int Id { get; set; }
-
     public string UserId { get; set; } = null!;
 
-    public string? ClaimType { get; set; }
+    public string LoginProvider { get; set; } = null!;
 
-    public string? ClaimValue { get; set; }
+    public string Name { get; set; } = null!;
+
+    public string? Value { get; set; }
 
     public virtual AspNetUser User { get; set; } = null!;
 }

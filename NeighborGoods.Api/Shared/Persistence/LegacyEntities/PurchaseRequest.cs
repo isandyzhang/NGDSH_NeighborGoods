@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace NeighborGoods.Api.Shared.Persistence.LegacyEntities;
 
