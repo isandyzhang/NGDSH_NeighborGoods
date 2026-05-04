@@ -158,6 +158,9 @@ param apiDnsZoneName string = ''
 @description('上述 DNS 區域所在資源群組；空字串表示與本部署相同之 resourceGroup()。')
 param apiDnsZoneResourceGroupName string = ''
 
+@description('Managed Environment 內已存在之受控憑證資源名稱（與 apiCustomDomainHostName 同 subject）；填寫則不重複建立憑證，避免 DuplicateManagedCertificateInEnvironment。')
+param existingApiManagedCertificateName string = ''
+
 @description('Container image')
 param containerImage string
 
@@ -304,6 +307,7 @@ module containerapp 'modules/containerapp.bicep' = {
     managedEnvironmentName: containerAppEnvironment.outputs.containerAppEnvironmentName
     apiCustomDomainHostName: apiCustomDomainHostName
     apiCustomDomainBindManagedTls: apiCustomDomainBindManagedTls
+    existingApiManagedCertificateName: existingApiManagedCertificateName
     containerImage: containerImage
     containerPort: containerPort
     containerCpu: containerCpu

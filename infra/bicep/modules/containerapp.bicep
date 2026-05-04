@@ -21,6 +21,9 @@ param apiCustomDomainHostName string = ''
 @description('是否建立受控憑證並在 ingress 綁定 apiCustomDomainHostName。設 false 可搭配 Azure DNS 模組先寫 CNAME/TXT，再於第二次部署改 true。')
 param apiCustomDomainBindManagedTls bool = true
 
+@description('若 Managed Environment 內已有同 subject 之受控憑證（例如先前在 Portal 建立），填其**資源名稱**則不重複建立；留白則建立名為「主機名點改連字號」之新憑證。見 Portal：環境 → Certificates。')
+param existingApiManagedCertificateName string = ''
+
 @description('Container image, e.g. ghcr.io/org/neighborgoods-web:sha')
 param containerImage string
 
@@ -126,16 +129,24 @@ var shouldInjectSignalR = !empty(signalRConnectionString)
 var shouldInjectEmail = !empty(emailConnectionString)
 
 var bindApiTls = !empty(apiCustomDomainHostName) && apiCustomDomainBindManagedTls
-// 憑證子資源名稱須為 DNS 安全字元（以連字號取代點）
+// 憑證子資源名稱須為 DNS 安全字元（以連字號取代點）；僅在「新建受控憑證」時使用
 var apiManagedCertResourceName = !empty(apiCustomDomainHostName)
   ? replace(apiCustomDomainHostName, '.', '-')
   : ''
+
+var useExistingManagedCert = bindApiTls && !empty(existingApiManagedCertificateName)
+var createNewManagedCert = bindApiTls && empty(existingApiManagedCertificateName)
 
 resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: managedEnvironmentName
 }
 
-resource apiManagedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (bindApiTls) {
+resource apiManagedCertificateExisting 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' existing = if (useExistingManagedCert) {
+  parent: managedEnvironment
+  name: existingApiManagedCertificateName
+}
+
+resource apiManagedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (createNewManagedCert) {
   parent: managedEnvironment
   name: apiManagedCertResourceName
   location: location
@@ -144,6 +155,10 @@ resource apiManagedCertificate 'Microsoft.App/managedEnvironments/managedCertifi
     domainControlValidation: 'CNAME'
   }
 }
+
+// 既有憑證用 .id；新建憑證用父 id + 子路徑（與 apiManagedCertificate 資源一致）
+var newManagedCertificateArmId = '${managedEnvironment.id}/managedCertificates/${apiManagedCertResourceName}'
+var ingressTlsCertificateId = bindApiTls ? (useExistingManagedCert ? apiManagedCertificateExisting.id : newManagedCertificateArmId) : ''
 
 // 與容器內 ASP.NET Cors__AllowedOrigins 分開：此為 Container Apps **入口** CORS（preflight 在進 Kestrel 前處理）。
 // 若「允許的方法」為空，瀏覽器會擋 PUT/PATCH 等；見 https://learn.microsoft.com/azure/container-apps/cors
@@ -173,14 +188,13 @@ var ingressCorsBlock = length(ingressCorsOrigins) > 0
     }
   : {}
 
-// 勿用 resourceId(…/managedEnvironments, env, 'managedCertificates', cert)：編譯出的 ARM 在驗證期會誤判引數個數。改為父資源 id + 子路徑。
 var ingressTlsBlock = bindApiTls
   ? {
       customDomains: [
         {
           name: apiCustomDomainHostName
           bindingType: 'SniEnabled'
-          certificateId: '${managedEnvironment.id}/managedCertificates/${apiManagedCertResourceName}'
+          certificateId: ingressTlsCertificateId
         }
       ]
     }
@@ -199,7 +213,7 @@ var ingressConfig = union(
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
-  dependsOn: bindApiTls ? [ apiManagedCertificate ] : []
+  dependsOn: createNewManagedCert ? [ apiManagedCertificate ] : []
   properties: {
     managedEnvironmentId: containerAppEnvironmentId
     configuration: {

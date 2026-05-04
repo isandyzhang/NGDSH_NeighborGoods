@@ -53,6 +53,7 @@
     "corsAllowedOrigin0": { "value": "https://www.neighborgoodstw.com" },
     "corsAllowedOrigin1": { "value": "https://neighborgoodstw.com" },
     "apiCustomDomainHostName": { "value": "api.neighborgoodstw.com" },
+    "existingApiManagedCertificateName": { "value": "api.neighborgoodstw.com-neighbor-260428023756" },
     "apiCustomDomainBindManagedTls": { "value": true },
     "provisionApiDnsRecordsInAzureDns": { "value": false },
     "apiDnsZoneName": { "value": "" },
