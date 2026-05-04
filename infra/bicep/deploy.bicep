@@ -114,7 +114,10 @@ param lineMessagingChannelSecret string = ''
 param lineMessagingBotId string = ''
 
 @description('LINE Messaging API BaseUrl (optional)')
-param lineMessagingBaseUrl string = ''
+param lineMessagingBaseUrl string = 'https://api.line.me/v2/bot'
+
+@description('Public web base URL used in LINE message links')
+param lineMessagingWebBaseUrl string = ''
 
 @description('Email sender address (optional)')
 param emailFromAddress string = ''
@@ -331,6 +334,7 @@ module containerapp 'modules/containerapp.bicep' = {
     lineMessagingChannelSecret: lineMessagingChannelSecret
     lineMessagingBotId: lineMessagingBotId
     lineMessagingBaseUrl: lineMessagingBaseUrl
+    lineMessagingWebBaseUrl: lineMessagingWebBaseUrl
     lineOidcCallbackUrl: lineOidcCallbackUrl
     lineOidcScope: lineOidcScope
     #disable-next-line BCP318

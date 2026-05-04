@@ -181,7 +181,8 @@ Production values should not use localhost for:
 - `Line__CallbackUrl`
 - `Cors__AllowedOrigins__0`
 - `Cors__AllowedOrigins__1`
-- `LineMessagingApi__BaseUrl`
+- `LineMessagingApi__BaseUrl` (LINE API endpoint, normally `https://api.line.me/v2/bot`)
+- `LineMessagingApi__WebBaseUrl` (public frontend URL used in LINE message links)
 
 SignalR runtime mode:
 
