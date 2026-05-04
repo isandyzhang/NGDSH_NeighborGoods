@@ -166,6 +166,8 @@ appsettings*.json
 **/infra/bicep/*.local.json
 **/infra/bicep/**/*.local.json
 infra/bicep/deploy.parameters.json
+# `az bicep build` emits JSON next to the entry template
+infra/bicep/deploy.json
 
 # Local scratch (e.g. one-off git author rewrite)
 .tmp-rewrite-author.ps1

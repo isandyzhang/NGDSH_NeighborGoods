@@ -116,17 +116,48 @@ var containerAppName = '${namePrefix}-${environmentName}-api'
 var shouldInjectSignalR = !empty(signalRConnectionString)
 var shouldInjectEmail = !empty(emailConnectionString)
 
+// 與容器內 ASP.NET Cors__AllowedOrigins 分開：此為 Container Apps **入口** CORS（preflight 在進 Kestrel 前處理）。
+// 若「允許的方法」為空，瀏覽器會擋 PUT/PATCH 等；見 https://learn.microsoft.com/azure/container-apps/cors
+var ingressCorsOrigins = concat(
+  !empty(corsAllowedOrigin0) ? [corsAllowedOrigin0] : [],
+  !empty(corsAllowedOrigin1) ? [corsAllowedOrigin1] : []
+)
+
+var ingressConfig = length(ingressCorsOrigins) > 0
+  ? {
+      external: true
+      targetPort: containerPort
+      transport: 'auto'
+      corsPolicy: {
+        allowedOrigins: ingressCorsOrigins
+        allowedMethods: [
+          'GET'
+          'POST'
+          'PUT'
+          'PATCH'
+          'DELETE'
+          'OPTIONS'
+          'HEAD'
+        ]
+        allowedHeaders: ['*']
+        exposeHeaders: []
+        maxAge: 86400
+        allowCredentials: true
+      }
+    }
+  : {
+      external: true
+      targetPort: containerPort
+      transport: 'auto'
+    }
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
   properties: {
     managedEnvironmentId: containerAppEnvironmentId
     configuration: {
-      ingress: {
-        external: true
-        targetPort: containerPort
-        transport: 'auto'
-      }
+      ingress: ingressConfig
       secrets: concat([
         {
           name: 'sql-connection'
