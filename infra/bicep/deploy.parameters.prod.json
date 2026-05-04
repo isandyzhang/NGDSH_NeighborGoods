@@ -41,7 +41,7 @@
     "lineMessagingBotId": { "value": "__SET_BY_GITHUB_SECRETS__" },
     "jwtSigningKey": { "value": "__SET_BY_GITHUB_SECRETS__" },
 
-    "containerImage": { "value": "ghcr.io/<org>/neighborgoods-api:latest" },
+    "containerImage": { "value": "ghcr.io/isandyzhang/neighborgoods-api:latest" },
     "containerPort": { "value": 8080 },
     "containerCpu": { "value": "1" },
     "containerMemory": { "value": "2.0Gi" },
@@ -52,7 +52,7 @@
     "lineOidcCallbackUrl": { "value": "https://www.neighborgoodstw.com/auth/line/callback" },
     "corsAllowedOrigin0": { "value": "https://www.neighborgoodstw.com" },
     "corsAllowedOrigin1": { "value": "https://neighborgoodstw.com" },
-    "repositoryUrl": { "value": "https://github.com/<org>/NGDSH_NeighborGoods" },
+    "repositoryUrl": { "value": "https://github.com/isandyzhang/NGDSH_NeighborGoods" },
     "repositoryBranch": { "value": "main" },
     "appLocation": { "value": "NeighborGoods.Frontend" },
     "outputLocation": { "value": "dist" }

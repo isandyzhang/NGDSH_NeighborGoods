@@ -39,4 +39,6 @@ jobs:
             --parameters lineMessagingChannelAccessToken="${{ secrets.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN }}" \
             --parameters lineMessagingChannelSecret="${{ secrets.LINE_MESSAGING_CHANNEL_SECRET }}" \
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
-            --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}"
+            --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
+            --parameters containerImage="ghcr.io/${{ github.repository_owner }}/neighborgoods-api:latest" \
+            --parameters repositoryUrl="https://github.com/${{ github.repository }}"
