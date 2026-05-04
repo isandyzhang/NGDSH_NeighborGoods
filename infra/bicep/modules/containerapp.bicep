@@ -12,6 +12,12 @@ param environmentName string = 'prod'
 @description('Container App Environment resource ID')
 param containerAppEnvironmentId string
 
+@description('Managed Environment resource **name** (last segment of id); required for managed TLS cert + custom domain)')
+param managedEnvironmentName string
+
+@description('API 自訂主機名（例如 api.example.com）。空字串表示不建立受控憑證、不綁自訂網域。DNS：子網域須 CNAME 至本 Container App 的預設 FQDN，且通常需 TXT「asuid.<子網域>」驗證碼，見 https://learn.microsoft.com/azure/container-apps/custom-domains-managed-certificates')
+param apiCustomDomainHostName string = ''
+
 @description('Container image, e.g. ghcr.io/org/neighborgoods-web:sha')
 param containerImage string
 
@@ -116,6 +122,32 @@ var containerAppName = '${namePrefix}-${environmentName}-api'
 var shouldInjectSignalR = !empty(signalRConnectionString)
 var shouldInjectEmail = !empty(emailConnectionString)
 
+var bindApiCustomDomain = !empty(apiCustomDomainHostName)
+// 憑證子資源名稱須為 DNS 安全字元（以連字號取代點）
+var apiManagedCertResourceName = replace(apiCustomDomainHostName, '.', '-')
+var apiManagedCertificateId = bindApiCustomDomain
+  ? resourceId(
+      'Microsoft.App/managedEnvironments',
+      managedEnvironmentName,
+      'managedCertificates',
+      apiManagedCertResourceName
+    )
+  : ''
+
+resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
+  name: managedEnvironmentName
+}
+
+resource apiManagedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (bindApiCustomDomain) {
+  parent: managedEnvironment
+  name: apiManagedCertResourceName
+  location: location
+  properties: {
+    subjectName: apiCustomDomainHostName
+    domainControlValidation: 'CNAME'
+  }
+}
+
 // 與容器內 ASP.NET Cors__AllowedOrigins 分開：此為 Container Apps **入口** CORS（preflight 在進 Kestrel 前處理）。
 // 若「允許的方法」為空，瀏覽器會擋 PUT/PATCH 等；見 https://learn.microsoft.com/azure/container-apps/cors
 var ingressCorsOrigins = concat(
@@ -123,11 +155,8 @@ var ingressCorsOrigins = concat(
   !empty(corsAllowedOrigin1) ? [corsAllowedOrigin1] : []
 )
 
-var ingressConfig = length(ingressCorsOrigins) > 0
+var ingressCorsBlock = length(ingressCorsOrigins) > 0
   ? {
-      external: true
-      targetPort: containerPort
-      transport: 'auto'
       corsPolicy: {
         allowedOrigins: ingressCorsOrigins
         allowedMethods: [
@@ -145,15 +174,34 @@ var ingressConfig = length(ingressCorsOrigins) > 0
         allowCredentials: true
       }
     }
-  : {
-      external: true
-      targetPort: containerPort
-      transport: 'auto'
+  : {}
+
+var ingressTlsBlock = bindApiCustomDomain
+  ? {
+      customDomains: [
+        {
+          name: apiCustomDomainHostName
+          bindingType: 'SniEnabled'
+          certificateId: apiManagedCertificateId
+        }
+      ]
     }
+  : {}
+
+var ingressConfig = union(
+  {
+    external: true
+    targetPort: containerPort
+    transport: 'auto'
+  },
+  ingressCorsBlock,
+  ingressTlsBlock
+)
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
+  dependsOn: bindApiCustomDomain ? [ apiManagedCertificate ] : []
   properties: {
     managedEnvironmentId: containerAppEnvironmentId
     configuration: {
@@ -328,3 +376,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 
 output containerAppName string = containerApp.name
 output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+@description('有設定自訂 API 網域時的 HTTPS 基底 URL，否則與 containerAppUrl 相同')
+output apiPublicBaseUrl string = bindApiCustomDomain
+  ? 'https://${apiCustomDomainHostName}'
+  : 'https://${containerApp.properties.configuration.ingress.fqdn}'

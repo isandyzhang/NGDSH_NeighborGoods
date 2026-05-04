@@ -52,6 +52,7 @@
     "lineOidcCallbackUrl": { "value": "https://www.neighborgoodstw.com/auth/line/callback" },
     "corsAllowedOrigin0": { "value": "https://www.neighborgoodstw.com" },
     "corsAllowedOrigin1": { "value": "https://neighborgoodstw.com" },
+    "apiCustomDomainHostName": { "value": "api.neighborgoodstw.com" },
     "repositoryUrl": { "value": "https://github.com/isandyzhang/NGDSH_NeighborGoods" },
     "repositoryBranch": { "value": "main" },
     "appLocation": { "value": "NeighborGoods.Frontend" },

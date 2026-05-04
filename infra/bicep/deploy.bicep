@@ -143,6 +143,9 @@ param corsAllowedOrigin0 string = 'http://localhost:5173'
 @description('Allowed CORS origin #1')
 param corsAllowedOrigin1 string = ''
 
+@description('API 自訂網域（例：api.neighborgoodstw.com）。非空時於 Managed Environment 建立免費受控憑證並綁至 Container App ingress；須先完成 DNS（CNAME + 依 Portal/CLI 的 asuid TXT）。空字串則不建立。')
+param apiCustomDomainHostName string = ''
+
 @description('Container image')
 param containerImage string
 
@@ -279,6 +282,8 @@ module containerapp 'modules/containerapp.bicep' = {
     namePrefix: namePrefix
     environmentName: environmentName
     containerAppEnvironmentId: containerAppEnvironment.outputs.containerAppEnvironmentId
+    managedEnvironmentName: containerAppEnvironment.outputs.containerAppEnvironmentName
+    apiCustomDomainHostName: apiCustomDomainHostName
     containerImage: containerImage
     containerPort: containerPort
     containerCpu: containerCpu
@@ -339,6 +344,7 @@ output deploymentSummary object = {
   backend: {
     containerAppName: containerapp.outputs.containerAppName
     containerAppUrl: containerapp.outputs.containerAppUrl
+    apiPublicBaseUrl: containerapp.outputs.apiPublicBaseUrl
   }
   frontend: {
     staticWebAppName: staticwebapp.outputs.staticWebAppName
