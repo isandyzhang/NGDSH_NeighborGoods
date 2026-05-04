@@ -1,33 +1,21 @@
-﻿# 日常／完整部署：預設依 infra/bicep/deploy.parameters.prod.json（含 apiCustomDomainHostName、TLS、DNS 開關）。
-# 可用手動輸入覆寫「是否綁受控 TLS」「是否在 Azure DNS 寫紀錄」，無需改 commit。
-name: IaC Deploy
+# 全新／第一次：先建 Container App（不綁受控 TLS），並可選在 Azure DNS 寫 CNAME + asuid TXT。
+# 完成後請再手動執行「IaC Deploy」，並在該 workflow 將 bind_managed_tls 設為 true（或改 prod 參數檔）以啟用 HTTPS 自訂網域。
+name: IaC Deploy (Greenfield phase 1)
 
 on:
   workflow_dispatch:
     inputs:
-      bind_managed_tls:
-        type: choice
-        description: 是否覆寫「綁受控 TLS + ingress 自訂網域」；選「依參數檔」則使用 deploy.parameters.prod.json
-        options:
-          - '依參數檔'
-          - 'true'
-          - 'false'
-        default: '依參數檔'
-      provision_api_dns_in_azure:
-        type: choice
-        description: 是否覆寫「在 Azure DNS 建立 api CNAME / asuid TXT」
-        options:
-          - '依參數檔'
-          - 'true'
-          - 'false'
-        default: '依參數檔'
+      provision_azure_dns:
+        type: boolean
+        description: 是否在 Azure DNS 建立 api CNAME 與 asuid TXT（須已存在 DNS zone，且 api 主機名須符合 deploy.parameters.prod.json）
+        default: false
       api_dns_zone_name:
         type: string
-        description: 僅在「provision = true」時需要；覆寫 apiDnsZoneName（例 neighborgoodstw.com）。留白則不傳此參數。
+        description: Azure DNS 區域名（例 neighborgoodstw.com）。未勾選「建立 DNS」可留空。
         default: ''
       api_dns_zone_resource_group:
         type: string
-        description: 僅在「provision = true」且 zone 與 App 不同 RG 時填；留白則不傳。
+        description: DNS zone 所在資源群組；留空則使用與 Container App 相同的 AZURE_RESOURCE_GROUP secret。
         default: ''
 
 jobs:
@@ -50,26 +38,21 @@ jobs:
       - name: Install Azure CLI Bicep
         run: az bicep install
 
-      - name: Deploy Bicep infrastructure
+      - name: Deploy Bicep (phase 1 — 不綁受控 TLS)
         env:
-          BIND_TLS: ${{ inputs.bind_managed_tls }}
-          PROVISION_DNS: ${{ inputs.provision_api_dns_in_azure }}
+          PROVISION_DNS: ${{ inputs.provision_azure_dns }}
           DNS_ZONE: ${{ inputs.api_dns_zone_name }}
           DNS_ZONE_RG: ${{ inputs.api_dns_zone_resource_group }}
         run: |
           set -euo pipefail
-          EXTRA=""
-          if [ "${BIND_TLS}" != "依參數檔" ]; then
-            EXTRA="${EXTRA} --parameters apiCustomDomainBindManagedTls=${BIND_TLS}"
-          fi
-          if [ "${PROVISION_DNS}" != "依參數檔" ]; then
-            EXTRA="${EXTRA} --parameters provisionApiDnsRecordsInAzureDns=${PROVISION_DNS}"
-            if [ "${PROVISION_DNS}" = "true" ] && [ -n "${DNS_ZONE}" ]; then
-              EXTRA="${EXTRA} --parameters apiDnsZoneName='${DNS_ZONE}'"
+          EXTRA_DNS=""
+          if [ "${PROVISION_DNS}" = "true" ] && [ -n "${DNS_ZONE}" ]; then
+            EXTRA_DNS="--parameters provisionApiDnsRecordsInAzureDns=true --parameters apiDnsZoneName='${DNS_ZONE}'"
+            if [ -n "${DNS_ZONE_RG}" ]; then
+              EXTRA_DNS="${EXTRA_DNS} --parameters apiDnsZoneResourceGroupName='${DNS_ZONE_RG}'"
             fi
-            if [ "${PROVISION_DNS}" = "true" ] && [ -n "${DNS_ZONE_RG}" ]; then
-              EXTRA="${EXTRA} --parameters apiDnsZoneResourceGroupName='${DNS_ZONE_RG}'"
-            fi
+          else
+            EXTRA_DNS="--parameters provisionApiDnsRecordsInAzureDns=false"
           fi
 
           az deployment group create \
@@ -89,4 +72,9 @@ jobs:
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
             --parameters containerImage="ghcr.io/${{ github.repository_owner }}/neighborgoods-api:latest" \
             --parameters repositoryUrl="https://github.com/${{ github.repository }}" \
-            ${EXTRA}
+            --parameters apiCustomDomainBindManagedTls=false \
+            ${EXTRA_DNS}
+
+      - name: Next step hint
+        run: |
+          echo "::notice::Phase 1 完成後，待 DNS 生效，請執行「IaC Deploy」並將 bind_managed_tls 設為 true（或將 deploy.parameters.prod.json 內 apiCustomDomainBindManagedTls 改為 true）以啟用受控 TLS。"

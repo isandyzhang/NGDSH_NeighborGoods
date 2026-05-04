@@ -8,6 +8,7 @@ on:
       - 'infra/bicep/**'
       - '.github/workflows/infra_iac_check.yml'
       - '.github/workflows/infra_iac_deploy.yml'
+      - '.github/workflows/infra_iac_greenfield_phase1.yml'
   pull_request:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - 'infra/bicep/**'
       - '.github/workflows/infra_iac_check.yml'
       - '.github/workflows/infra_iac_deploy.yml'
+      - '.github/workflows/infra_iac_greenfield_phase1.yml'
   workflow_dispatch:
 
 jobs:
