@@ -89,7 +89,10 @@ param lineMessagingChannelSecret string = ''
 param lineMessagingBotId string = ''
 
 @description('LINE Messaging API BaseUrl (optional)')
-param lineMessagingBaseUrl string = ''
+param lineMessagingBaseUrl string = 'https://api.line.me/v2/bot'
+
+@description('Public web base URL used in LINE message links')
+param lineMessagingWebBaseUrl string = ''
 
 @description('LINE OIDC callback full URL')
 param lineOidcCallbackUrl string = ''
@@ -348,6 +351,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'LineMessagingApi__BaseUrl'
               value: lineMessagingBaseUrl
+            }
+            {
+              name: 'LineMessagingApi__WebBaseUrl'
+              value: lineMessagingWebBaseUrl
             }
             {
               name: 'EmailNotification__FromEmailAddress'
