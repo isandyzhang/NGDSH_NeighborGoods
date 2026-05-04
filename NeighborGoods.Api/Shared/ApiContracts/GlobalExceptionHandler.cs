@@ -56,6 +56,11 @@ public sealed class GlobalExceptionHandler(
                 string.IsNullOrWhiteSpace(unauthorizedAccessException.Message)
                     ? "需要登入"
                     : unauthorizedAccessException.Message),
+            InvalidOperationException { Message: var msg }
+                when msg.Contains("Line OAuth settings are incomplete", StringComparison.Ordinal) => (
+                StatusCodes.Status503ServiceUnavailable,
+                "LINE_OAUTH_MISCONFIGURED",
+                "LINE 登入尚未正確設定（ChannelId／ChannelSecret／CallbackUrl）。請確認 Container App 環境變數 Line__* 或對應的 Secret。"),
             DbUpdateException dbUpdateException when IsSqlUniqueConstraintViolation(dbUpdateException) => (
                 StatusCodes.Status409Conflict,
                 "DATABASE_CONFLICT",
