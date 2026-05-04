@@ -18,6 +18,9 @@ param managedEnvironmentName string
 @description('API 自訂主機名（例如 api.example.com）。空字串表示不建立受控憑證、不綁自訂網域。DNS：子網域須 CNAME 至本 Container App 的預設 FQDN，且通常需 TXT「asuid.<子網域>」驗證碼，見 https://learn.microsoft.com/azure/container-apps/custom-domains-managed-certificates')
 param apiCustomDomainHostName string = ''
 
+@description('是否建立受控憑證並在 ingress 綁定 apiCustomDomainHostName。設 false 可搭配 Azure DNS 模組先寫 CNAME/TXT，再於第二次部署改 true。')
+param apiCustomDomainBindManagedTls bool = true
+
 @description('Container image, e.g. ghcr.io/org/neighborgoods-web:sha')
 param containerImage string
 
@@ -122,10 +125,12 @@ var containerAppName = '${namePrefix}-${environmentName}-api'
 var shouldInjectSignalR = !empty(signalRConnectionString)
 var shouldInjectEmail = !empty(emailConnectionString)
 
-var bindApiCustomDomain = !empty(apiCustomDomainHostName)
+var bindApiTls = !empty(apiCustomDomainHostName) && apiCustomDomainBindManagedTls
 // 憑證子資源名稱須為 DNS 安全字元（以連字號取代點）
-var apiManagedCertResourceName = replace(apiCustomDomainHostName, '.', '-')
-var apiManagedCertificateId = bindApiCustomDomain
+var apiManagedCertResourceName = !empty(apiCustomDomainHostName)
+  ? replace(apiCustomDomainHostName, '.', '-')
+  : ''
+var apiManagedCertificateId = bindApiTls
   ? resourceId(
       'Microsoft.App/managedEnvironments',
       managedEnvironmentName,
@@ -138,7 +143,7 @@ resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' exist
   name: managedEnvironmentName
 }
 
-resource apiManagedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (bindApiCustomDomain) {
+resource apiManagedCertificate 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (bindApiTls) {
   parent: managedEnvironment
   name: apiManagedCertResourceName
   location: location
@@ -176,7 +181,7 @@ var ingressCorsBlock = length(ingressCorsOrigins) > 0
     }
   : {}
 
-var ingressTlsBlock = bindApiCustomDomain
+var ingressTlsBlock = bindApiTls
   ? {
       customDomains: [
         {
@@ -201,7 +206,7 @@ var ingressConfig = union(
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
-  dependsOn: bindApiCustomDomain ? [ apiManagedCertificate ] : []
+  dependsOn: bindApiTls ? [ apiManagedCertificate ] : []
   properties: {
     managedEnvironmentId: containerAppEnvironmentId
     configuration: {
@@ -376,7 +381,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 
 output containerAppName string = containerApp.name
 output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-@description('有設定自訂 API 網域時的 HTTPS 基底 URL，否則與 containerAppUrl 相同')
-output apiPublicBaseUrl string = bindApiCustomDomain
+@description('Ingress 預設 FQDN（不含 https://），供 CNAME 指向')
+output defaultIngressFqdn string = containerApp.properties.configuration.ingress.fqdn
+@description('綁定 asuid TXT 時使用之驗證字串（見 Azure Container Apps 自訂網域文件）')
+output customDomainVerificationId string = containerApp.properties.customDomainVerificationId
+@description('已啟用受控 TLS 且綁定自訂網域時為 https://<主機名>，否則同 containerAppUrl')
+output apiPublicBaseUrl string = bindApiTls
   ? 'https://${apiCustomDomainHostName}'
   : 'https://${containerApp.properties.configuration.ingress.fqdn}'

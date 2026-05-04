@@ -146,6 +146,18 @@ param corsAllowedOrigin1 string = ''
 @description('API 自訂網域（例：api.neighborgoodstw.com）。非空時於 Managed Environment 建立免費受控憑證並綁至 Container App ingress；須先完成 DNS（CNAME + 依 Portal/CLI 的 asuid TXT）。空字串則不建立。')
 param apiCustomDomainHostName string = ''
 
+@description('是否建立受控憑證並綁 ingress。若改 false，可與 provisionApiDnsRecordsInAzureDns 同次部署先寫 Azure DNS，再第二次改 true。')
+param apiCustomDomainBindManagedTls bool = true
+
+@description('是否在 Azure DNS 區域內自動建立 API 之 CNAME 與 asuid TXT（須 apiDnsZoneName 非空且 zone 須已存在於訂用帳戶內）。')
+param provisionApiDnsRecordsInAzureDns bool = false
+
+@description('Azure DNS 區域名稱（例 neighborgoodstw.com）。與 provisionApiDnsRecordsInAzureDns 搭配使用。')
+param apiDnsZoneName string = ''
+
+@description('上述 DNS 區域所在資源群組；空字串表示與本部署相同之 resourceGroup()。')
+param apiDnsZoneResourceGroupName string = ''
+
 @description('Container image')
 param containerImage string
 
@@ -275,6 +287,13 @@ module email 'modules/email.bicep' = if (deployEmailResources) {
   }
 }
 
+// api.example.com + zone example.com → 相對紀錄名 "api"
+var apiDnsRecordRelativeName = (provisionApiDnsRecordsInAzureDns && !empty(apiDnsZoneName) && !empty(apiCustomDomainHostName) && endsWith(toLower(apiCustomDomainHostName), toLower('.${apiDnsZoneName}')))
+  ? substring(apiCustomDomainHostName, 0, length(apiCustomDomainHostName) - length(apiDnsZoneName) - 1)
+  : ''
+
+var apiDnsZoneRg = !empty(apiDnsZoneResourceGroupName) ? apiDnsZoneResourceGroupName : resourceGroup().name
+
 module containerapp 'modules/containerapp.bicep' = {
   name: 'containerapp-module'
   params: {
@@ -284,6 +303,7 @@ module containerapp 'modules/containerapp.bicep' = {
     containerAppEnvironmentId: containerAppEnvironment.outputs.containerAppEnvironmentId
     managedEnvironmentName: containerAppEnvironment.outputs.containerAppEnvironmentName
     apiCustomDomainHostName: apiCustomDomainHostName
+    apiCustomDomainBindManagedTls: apiCustomDomainBindManagedTls
     containerImage: containerImage
     containerPort: containerPort
     containerCpu: containerCpu
@@ -323,6 +343,17 @@ module containerapp 'modules/containerapp.bicep' = {
   }
 }
 
+module apiDnsRecords 'modules/azure-dns-api-records.bicep' = if (provisionApiDnsRecordsInAzureDns && !empty(apiDnsZoneName) && !empty(apiCustomDomainHostName) && !empty(apiDnsRecordRelativeName)) {
+  name: 'api-dns-records-module'
+  scope: resourceGroup(subscription().subscriptionId, apiDnsZoneRg)
+  params: {
+    dnsZoneName: apiDnsZoneName
+    apiRecordRelativeName: apiDnsRecordRelativeName
+    containerAppIngressFqdn: containerapp.outputs.defaultIngressFqdn
+    domainVerificationId: containerapp.outputs.customDomainVerificationId
+  }
+}
+
 module staticwebapp 'modules/staticwebapp.bicep' = {
   name: 'staticwebapp-module'
   params: {
@@ -345,6 +376,8 @@ output deploymentSummary object = {
     containerAppName: containerapp.outputs.containerAppName
     containerAppUrl: containerapp.outputs.containerAppUrl
     apiPublicBaseUrl: containerapp.outputs.apiPublicBaseUrl
+    defaultIngressFqdn: containerapp.outputs.defaultIngressFqdn
+    customDomainVerificationId: containerapp.outputs.customDomainVerificationId
   }
   frontend: {
     staticWebAppName: staticwebapp.outputs.staticWebAppName
