@@ -130,14 +130,6 @@ var bindApiTls = !empty(apiCustomDomainHostName) && apiCustomDomainBindManagedTl
 var apiManagedCertResourceName = !empty(apiCustomDomainHostName)
   ? replace(apiCustomDomainHostName, '.', '-')
   : ''
-var apiManagedCertificateId = bindApiTls
-  ? resourceId(
-      'Microsoft.App/managedEnvironments',
-      managedEnvironmentName,
-      'managedCertificates',
-      apiManagedCertResourceName
-    )
-  : ''
 
 resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: managedEnvironmentName
@@ -181,13 +173,14 @@ var ingressCorsBlock = length(ingressCorsOrigins) > 0
     }
   : {}
 
+// 勿用 resourceId(…/managedEnvironments, env, 'managedCertificates', cert)：編譯出的 ARM 在驗證期會誤判引數個數。改為父資源 id + 子路徑。
 var ingressTlsBlock = bindApiTls
   ? {
       customDomains: [
         {
           name: apiCustomDomainHostName
           bindingType: 'SniEnabled'
-          certificateId: apiManagedCertificateId
+          certificateId: '${managedEnvironment.id}/managedCertificates/${apiManagedCertResourceName}'
         }
       ]
     }
