@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NeighborGoods.Api.Features.Auth.Services;
@@ -30,19 +29,15 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((_, configBuilder) =>
-        {
-            configBuilder.AddInMemoryCollection(
-            [
-                new KeyValuePair<string, string?>("ConnectionStrings:DefaultConnection", _connectionString),
-                new KeyValuePair<string, string?>("Line:ChannelId", "line-test-channel"),
-                new KeyValuePair<string, string?>("Line:ChannelSecret", "line-test-channel-secret"),
-                new KeyValuePair<string, string?>("Line:CallbackUrl", "https://localhost/api/v1/auth/line/callback"),
-                new KeyValuePair<string, string?>("LineMessagingApi:ChannelAccessToken", "line-msg-test-token"),
-                new KeyValuePair<string, string?>("LineMessagingApi:ChannelSecret", "line-msg-test-secret"),
-                new KeyValuePair<string, string?>("LineMessagingApi:BotId", "@bot_test")
-            ]);
-        });
+        // 使用 UseSetting（寫入 host 設定）而非僅 ConfigureAppConfiguration：在 .NET 6+ Minimal Hosting
+        // 與 WebApplicationFactory 下，Program 頂層讀取連線字串時，AppConfiguration 可能尚未合併。
+        builder.UseSetting("ConnectionStrings:DefaultConnection", _connectionString);
+        builder.UseSetting("Line:ChannelId", "line-test-channel");
+        builder.UseSetting("Line:ChannelSecret", "line-test-channel-secret");
+        builder.UseSetting("Line:CallbackUrl", "https://localhost/api/v1/auth/line/callback");
+        builder.UseSetting("LineMessagingApi:ChannelAccessToken", "line-msg-test-token");
+        builder.UseSetting("LineMessagingApi:ChannelSecret", "line-msg-test-secret");
+        builder.UseSetting("LineMessagingApi:BotId", "@bot_test");
 
         builder.ConfigureServices(services =>
         {

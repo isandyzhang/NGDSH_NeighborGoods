@@ -23,15 +23,13 @@ jobs:
         working-directory: NeighborGoods.Frontend
         run: npm ci
 
+      # 公開網址：Vite 在 build 時內嵌，不需放 Secrets。若要改 staging，可改此處或改用 vars 覆寫。
       - name: Build frontend
         working-directory: NeighborGoods.Frontend
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_SIGNALR_BASE_URL: ${{ vars.VITE_SIGNALR_BASE_URL }}
-        run: |
-          test -n "$VITE_API_BASE_URL" || (echo "Missing secret: VITE_API_BASE_URL" && exit 1)
-          test -n "$VITE_SIGNALR_BASE_URL" || (echo "Missing secret: VITE_SIGNALR_BASE_URL" && exit 1)
-          npm run build
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://api.neighborgoodstw.com' }}
+          VITE_SIGNALR_BASE_URL: ${{ vars.VITE_SIGNALR_BASE_URL || 'https://api.neighborgoodstw.com' }}
+        run: npm run build
 
       - name: Deploy frontend to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1

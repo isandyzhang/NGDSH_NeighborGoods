@@ -35,15 +35,13 @@ jobs:
         working-directory: NeighborGoods.Frontend
         run: npm run test --if-present
 
+      # 與 production 相同公開 API 基底（供 Vite 正式模式 build）；可用 vars 覆寫。
       - name: Build frontend
         working-directory: NeighborGoods.Frontend
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_SIGNALR_BASE_URL: ${{ vars.VITE_SIGNALR_BASE_URL }}
-        run: |
-          test -n "$VITE_API_BASE_URL" || (echo "::error::缺少 Actions Variable：VITE_API_BASE_URL（GitHub → Settings → Secrets and variables → Actions → Variables）" && exit 1)
-          test -n "$VITE_SIGNALR_BASE_URL" || (echo "::error::缺少 Actions Variable：VITE_SIGNALR_BASE_URL" && exit 1)
-          npm run build
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://api.neighborgoodstw.com' }}
+          VITE_SIGNALR_BASE_URL: ${{ vars.VITE_SIGNALR_BASE_URL || 'https://api.neighborgoodstw.com' }}
+        run: npm run build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
