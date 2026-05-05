@@ -374,7 +374,7 @@ export const AccountPage = () => {
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       className="text-sm font-semibold"
                       disabled={actionLoading}
                       onClick={() => void handleLineUnbind()}
