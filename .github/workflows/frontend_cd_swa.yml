@@ -29,7 +29,7 @@ jobs:
         env:
           VITE_API_BASE_URL: https://api.neighborgoodstw.com
           VITE_SIGNALR_BASE_URL: https://api.neighborgoodstw.com
-          VITE_LINE_LIFF_ID: ${{ secrets.VITE_LINE_LIFF_ID }}
+          VITE_LINE_LIFF_ID: "2008745853-Ui8PkOGi"
         run: npm run build
 
       - name: Deploy frontend to Azure Static Web Apps
