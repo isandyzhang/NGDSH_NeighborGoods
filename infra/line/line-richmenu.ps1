@@ -31,6 +31,7 @@ if (-not $WebBaseUrl.StartsWith("http://") -and -not $WebBaseUrl.StartsWith("htt
 
 $normalizedBaseUrl = $WebBaseUrl.TrimEnd("/")
 $apiBase = "https://api.line.me/v2/bot"
+$apiDataBase = "https://api-data.line.me/v2/bot"
 
 function New-AuthHeadersJson {
   param([string]$Token)
@@ -94,6 +95,7 @@ function Invoke-LineImageUploadWithRetry {
 
   for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     try {
+      $curlCommand = if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) { "curl.exe" } else { "curl" }
       $curlArgs = @(
         "--fail",
         "--show-error",
@@ -105,9 +107,9 @@ function Invoke-LineImageUploadWithRetry {
         "--data-binary", "@$FilePath"
       )
 
-      $null = & curl @curlArgs
+      $null = & $curlCommand @curlArgs
       if ($LASTEXITCODE -ne 0) {
-        throw "curl upload failed with exit code $LASTEXITCODE"
+        throw "$curlCommand upload failed with exit code $LASTEXITCODE"
       }
 
       return
@@ -130,6 +132,29 @@ function Invoke-LineImageUploadWithRetry {
       $delaySeconds = 5 * $attempt
       Write-Host "Retrying image upload in $delaySeconds seconds..."
       Start-Sleep -Seconds $delaySeconds
+    }
+  }
+}
+
+function Wait-LineRichMenuReady {
+  param(
+    [string]$RichMenuId,
+    [int]$MaxAttempts = 5
+  )
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    try {
+      $null = Invoke-LineApiJson -Method "GET" -Uri "$apiBase/richmenu/$RichMenuId"
+      return
+    }
+    catch {
+      $details = Get-HttpErrorDetails -ErrorRecord $_
+      $statusCode = $details.StatusCode
+      Write-Warning "Rich menu readiness check attempt $attempt/$MaxAttempts failed. StatusCode=$statusCode"
+      if ($attempt -ge $MaxAttempts) {
+        throw
+      }
+      Start-Sleep -Seconds (2 * $attempt)
     }
   }
 }
@@ -216,16 +241,23 @@ $definition = Build-RichMenuDefinition `
   -BarText $ChatBarText `
   -BaseUrl $normalizedBaseUrl
 $createResponse = Invoke-LineApiJson -Method "POST" -Uri "$apiBase/richmenu" -Body $definition
-$newRichMenuId = $createResponse.richMenuId
+$newRichMenuId = [string]$createResponse.richMenuId
+$newRichMenuId = $newRichMenuId.Trim()
 if ([string]::IsNullOrWhiteSpace($newRichMenuId)) {
   throw "LINE API did not return richMenuId."
 }
 Write-Host "Created richMenuId: $newRichMenuId"
 
+Write-Host "[1.5/4] Checking rich menu is queryable..."
+Wait-LineRichMenuReady -RichMenuId $newRichMenuId -MaxAttempts 5
+Write-Host "Rich menu ready."
+
 Write-Host "[2/4] Uploading rich menu image..."
+$uploadUri = "$apiDataBase/richmenu/$newRichMenuId/content"
+Write-Host "Upload target: $uploadUri"
 try {
   Invoke-LineImageUploadWithRetry `
-    -Uri "$apiBase/richmenu/$newRichMenuId/content" `
+    -Uri $uploadUri `
     -Token $ChannelAccessToken `
     -ContentType $ImageContentType `
     -FilePath $RichMenuImagePath `
