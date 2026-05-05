@@ -1,5 +1,5 @@
 import liff from '@line/liff'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { env } from '@/shared/config/env'
 import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
@@ -20,6 +20,7 @@ export const LineNotifyLiffPage = () => {
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorText, setErrorText] = useState<string | null>(null)
+  const isCheckingFriendshipRef = useRef(false)
 
   const postComplete = useCallback(async () => {
     const idToken = await liff.getIDToken()
@@ -60,11 +61,20 @@ export const LineNotifyLiffPage = () => {
   }, [finishAndClose, postComplete])
 
   const refreshFriendship = useCallback(async () => {
-    const f = await liff.getFriendship()
-    if (f.friendFlag) {
-      await runComplete()
-    } else {
-      setPhase('needFriend')
+    if (isCheckingFriendshipRef.current) {
+      return
+    }
+
+    isCheckingFriendshipRef.current = true
+    try {
+      const f = await liff.getFriendship()
+      if (f.friendFlag) {
+        await runComplete()
+      } else {
+        setPhase('needFriend')
+      }
+    } finally {
+      isCheckingFriendshipRef.current = false
     }
   }, [runComplete])
 
@@ -108,6 +118,25 @@ export const LineNotifyLiffPage = () => {
       disposed = true
     }
   }, [bindToken, refreshFriendship])
+
+  useEffect(() => {
+    if (phase !== 'needFriend') {
+      return
+    }
+
+    const autoResume = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshFriendship()
+      }
+    }
+
+    window.addEventListener('focus', autoResume)
+    document.addEventListener('visibilitychange', autoResume)
+    return () => {
+      window.removeEventListener('focus', autoResume)
+      document.removeEventListener('visibilitychange', autoResume)
+    }
+  }, [phase, refreshFriendship])
 
   const handleOpenAddFriend = () => {
     if (!botLink) {

@@ -99,6 +99,11 @@ export const AccountPage = () => {
       return
     }
 
+    if (bindingStart) {
+      await openLineBindingWindow(bindingStart)
+      return
+    }
+
     setActionLoading(true)
     setError(null)
     try {
@@ -389,24 +394,10 @@ export const AccountPage = () => {
             </div>
           </div>
 
-          {!profile.lineNotifyBound && bindingStart ? (
-            <Card className="border-dashed border-[#D8C0A3] bg-[#FFF9F1] p-4">
-              <p className="text-base font-semibold text-text-main">LINE 綁定（LIFF）</p>
-              <p className="mt-1 text-sm text-text-subtle">
-                請在已開啟的 LINE 畫面依序完成加好友（若需要）與「完成綁定」。若未自動開啟，請點下方連結。
-              </p>
-              <div className="mt-3 space-y-2">
-                <a
-                  href={bindingStart.liffUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-main transition hover:bg-surface-2"
-                >
-                  開啟 LINE 綁定畫面
-                </a>
-                <p className="text-xs text-text-muted">綁定完成後回到此頁重新整理，或依畫面提示啟用通知。</p>
-              </div>
-            </Card>
+          {!profile.lineNotifyBound ? (
+            <p className="text-xs text-text-muted">
+              點擊「開始綁定」後會直接開啟 LINE 綁定頁，並在有效期間內重用同一組綁定憑證。
+            </p>
           ) : null}
         </Card>
       ) : null}

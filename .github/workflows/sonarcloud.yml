@@ -1,0 +1,79 @@
+name: SonarCloud
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Api/**'
+      - 'NeighborGoods.Api.Tests/**'
+      - 'NeighborGoods.Frontend/**'
+      - '.github/workflows/sonarcloud.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'NeighborGoods.Api/**'
+      - 'NeighborGoods.Api.Tests/**'
+      - 'NeighborGoods.Frontend/**'
+      - '.github/workflows/sonarcloud.yml'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: NeighborGoods.Frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: NeighborGoods.Frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: NeighborGoods.Frontend
+        run: npm run build
+
+      - name: Restore backend dependencies
+        run: dotnet restore NeighborGoods.sln
+
+      - name: Build backend
+        run: dotnet build NeighborGoods.sln --configuration Release --no-restore
+
+      - name: Run backend tests
+        run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~EndpointsTests"
+
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.sources=NeighborGoods.Api,NeighborGoods.Frontend/src
+            -Dsonar.tests=NeighborGoods.Api.Tests
+            -Dsonar.exclusions=**/bin/**,**/obj/**,**/dist/**,**/node_modules/**

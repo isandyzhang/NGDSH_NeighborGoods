@@ -35,6 +35,9 @@ jobs:
       - name: Restore backend dependencies
         run: dotnet restore NeighborGoods.sln
 
+      - name: Verify backend formatting
+        run: dotnet format NeighborGoods.sln --verify-no-changes --verbosity minimal
+
       - name: Build backend
         run: dotnet build NeighborGoods.sln --configuration Release --no-restore
 

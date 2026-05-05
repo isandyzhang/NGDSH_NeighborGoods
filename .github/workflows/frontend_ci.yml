@@ -31,6 +31,14 @@ jobs:
         working-directory: NeighborGoods.Frontend
         run: npm ci
 
+      - name: Lint frontend
+        working-directory: NeighborGoods.Frontend
+        run: npm run lint
+
+      - name: Type-check frontend
+        working-directory: NeighborGoods.Frontend
+        run: npx tsc -b --pretty false
+
       - name: Run frontend tests (if present)
         working-directory: NeighborGoods.Frontend
         run: npm run test --if-present

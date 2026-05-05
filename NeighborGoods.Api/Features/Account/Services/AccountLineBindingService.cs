@@ -39,9 +39,49 @@ public sealed class AccountLineBindingService(
             return (null, "LINE_BIND_LIFF_NOT_CONFIGURED", "LIFF 尚未設定，請管理員設定 LineMessagingApi:LiffId。");
         }
 
-        await dbContext.LineBindingPendings
+        var now = DateTime.UtcNow;
+        var existingPendings = await dbContext.LineBindingPendings
             .Where(x => x.UserId == userId)
-            .ExecuteDeleteAsync(cancellationToken);
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var activePending = existingPendings
+            .FirstOrDefault(x => x.CreatedAt + BindingTokenTtl >= now);
+
+        if (activePending is not null)
+        {
+            // 同一使用者在有效期間重複點擊「開始綁定」時，重用現有 token，避免舊連結瞬間失效。
+            var existingBotId = string.IsNullOrWhiteSpace(_options.BotId) ? "@559fslxw" : _options.BotId.Trim();
+            if (!existingBotId.StartsWith("@", StringComparison.Ordinal))
+            {
+                existingBotId = "@" + existingBotId;
+            }
+
+            var existingBotLink = $"line://ti/p/{existingBotId}";
+            var existingLiffId = _options.LiffId.Trim();
+            var existingLiffUrl =
+                $"https://liff.line.me/{existingLiffId}?bindToken={Uri.EscapeDataString(activePending.Token)}&botLink={Uri.EscapeDataString(existingBotLink)}";
+
+            var staleIds = existingPendings
+                .Where(x => x.Id != activePending.Id)
+                .Select(x => x.Id)
+                .ToList();
+            if (staleIds.Count > 0)
+            {
+                await dbContext.LineBindingPendings
+                    .Where(x => staleIds.Contains(x.Id))
+                    .ExecuteDeleteAsync(cancellationToken);
+            }
+
+            return (new StartLineBindingResponse(activePending.Id, existingLiffUrl, activePending.Token, existingBotLink), null, null);
+        }
+
+        if (existingPendings.Count > 0)
+        {
+            await dbContext.LineBindingPendings
+                .Where(x => x.UserId == userId)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
 
         var token = Guid.NewGuid().ToString("N");
         var pending = new LineBindingPending
@@ -50,7 +90,7 @@ public sealed class AccountLineBindingService(
             UserId = userId,
             Token = token,
             LineUserId = null,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
 
         dbContext.LineBindingPendings.Add(pending);
