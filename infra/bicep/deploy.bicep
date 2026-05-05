@@ -116,6 +116,12 @@ param lineMessagingBotId string = ''
 @description('LINE Messaging API BaseUrl (optional)')
 param lineMessagingBaseUrl string = ''
 
+@description('前端網址（LIFF Endpoint、LineMessagingApi:WebBaseUrl）')
+param lineMessagingWebBaseUrl string = ''
+
+@description('LIFF App ID（LineMessagingApi:LiffId）')
+param lineMessagingLiffId string = ''
+
 @description('Email sender address (optional)')
 param emailFromAddress string = ''
 
@@ -331,6 +337,8 @@ module containerapp 'modules/containerapp.bicep' = {
     lineMessagingChannelSecret: lineMessagingChannelSecret
     lineMessagingBotId: lineMessagingBotId
     lineMessagingBaseUrl: lineMessagingBaseUrl
+    lineMessagingWebBaseUrl: lineMessagingWebBaseUrl
+    lineMessagingLiffId: lineMessagingLiffId
     lineOidcCallbackUrl: lineOidcCallbackUrl
     lineOidcScope: lineOidcScope
     #disable-next-line BCP318

@@ -80,6 +80,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ILineOAuthStateStore, LineOAuthStateStore>();
 builder.Services.AddHttpClient<ILineOAuthClient, LineOAuthClient>();
+builder.Services.AddHttpClient<ILineLiffIdTokenVerifier, LineLiffIdTokenVerifier>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services

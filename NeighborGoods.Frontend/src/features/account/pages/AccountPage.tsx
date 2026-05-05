@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  accountApi,
-  type AccountMe,
-  type LineBindingStatusResponse,
-  type LinePreferences,
-  type StartLineBindingResponse,
-} from '@/features/account/api/accountApi'
+import { useSearchParams } from 'react-router-dom'
+import { accountApi, type AccountMe, type LinePreferences, type StartLineBindingResponse } from '@/features/account/api/accountApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -13,10 +8,10 @@ import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
 export const AccountPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [profile, setProfile] = useState<AccountMe | null>(null)
   const [linePreferences, setLinePreferences] = useState<LinePreferences | null>(null)
   const [bindingStart, setBindingStart] = useState<StartLineBindingResponse | null>(null)
-  const [bindingStatus, setBindingStatus] = useState<LineBindingStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +24,16 @@ export const AccountPage = () => {
   }, [])
 
   useEffect(() => {
+    if (searchParams.get('lineBound') !== '1') {
+      return
+    }
+
+    setSuccessText('LINE 官方通知已綁定。若尚未啟用推播，請於下方啟用。')
+    setSearchParams({}, { replace: true })
+    void reloadData().catch(() => undefined)
+  }, [reloadData, searchParams, setSearchParams])
+
+  useEffect(() => {
     let disposed = false
     setError(null)
     setLoading(true)
@@ -37,7 +42,6 @@ export const AccountPage = () => {
       .then(() => {
         if (!disposed) {
           setBindingStart(null)
-          setBindingStatus(null)
         }
       })
       .catch((err: unknown) => {
@@ -90,48 +94,22 @@ export const AccountPage = () => {
       } else {
         const result = await accountApi.startLineBinding()
         setBindingStart(result)
-        setBindingStatus({ status: 'waiting', message: '請加入官方帳號後，回來按「檢查綁定狀態」。' })
-        window.open(result.botLink, '_blank', 'noopener,noreferrer')
+        try {
+          const liffMod = await import('@line/liff')
+          const liff = liffMod.default
+          const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+          if (liffId?.trim() && liff.isInClient()) {
+            await liff.init({ liffId: liffId.trim() })
+            await liff.openWindow({ url: result.liffUrl, external: false })
+          } else {
+            window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+          }
+        } catch {
+          window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+        }
       }
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '處理 LINE 通知設定失敗')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleCheckBindingStatus = async () => {
-    if (!bindingStart || actionLoading) {
-      return
-    }
-
-    setActionLoading(true)
-    setError(null)
-    try {
-      const status = await accountApi.getLineBindingStatus(bindingStart.pendingBindingId)
-      setBindingStatus(status)
-    } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : '檢查 LINE 綁定狀態失敗')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleConfirmBinding = async () => {
-    if (!bindingStart || actionLoading) {
-      return
-    }
-
-    setActionLoading(true)
-    setError(null)
-    try {
-      await accountApi.confirmLineBinding(bindingStart.pendingBindingId)
-      await reloadData()
-      await enableLineNotify()
-      setBindingStatus({ status: 'completed', message: 'LINE 官方通知綁定成功。' })
-      setSuccessText('LINE 官方通知已綁定並啟用')
-    } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : '確認 LINE 綁定失敗')
     } finally {
       setActionLoading(false)
     }
@@ -221,34 +199,20 @@ export const AccountPage = () => {
 
           {!profile.lineNotifyBound && bindingStart ? (
             <Card className="border-dashed border-[#D8C0A3] bg-[#FFF9F1] p-4">
-              <p className="text-base font-semibold text-text-main">LINE 綁定流程</p>
-              <p className="mt-1 text-sm text-text-subtle">1) 先加入官方帳號 2) 回來檢查狀態 3) 顯示 ready 後按確認綁定</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-[auto_1fr]">
-                <img src={bindingStart.qrCodeUrl} alt="LINE 綁定 QRCode" className="h-32 w-32 rounded-lg border border-border bg-white p-1" />
-                <div className="space-y-2">
-                  <a
-                    href={bindingStart.botLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-main transition hover:bg-surface-2"
-                  >
-                    開啟 LINE 官方帳號
-                  </a>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="secondary" className="text-sm" disabled={actionLoading} onClick={() => void handleCheckBindingStatus()}>
-                      檢查綁定狀態
-                    </Button>
-                    <Button
-                      type="button"
-                      className="text-sm"
-                      disabled={actionLoading || bindingStatus?.status !== 'ready'}
-                      onClick={() => void handleConfirmBinding()}
-                    >
-                      確認綁定
-                    </Button>
-                  </div>
-                  <p className="text-sm text-text-subtle">{bindingStatus?.message ?? '等待你完成官方帳號加入'}</p>
-                </div>
+              <p className="text-base font-semibold text-text-main">LINE 綁定（LIFF）</p>
+              <p className="mt-1 text-sm text-text-subtle">
+                請在已開啟的 LINE 畫面依序完成加好友（若需要）與「完成綁定」。若未自動開啟，請點下方連結。
+              </p>
+              <div className="mt-3 space-y-2">
+                <a
+                  href={bindingStart.liffUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-main transition hover:bg-surface-2"
+                >
+                  開啟 LINE 綁定畫面
+                </a>
+                <p className="text-xs text-text-muted">綁定完成後回到此頁重新整理，或依畫面提示啟用通知。</p>
               </div>
             </Card>
           ) : null}

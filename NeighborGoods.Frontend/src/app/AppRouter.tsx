@@ -13,6 +13,9 @@ const RegisterPage = lazy(() =>
   import('@/features/auth/pages/RegisterPage').then((module) => ({ default: module.RegisterPage })),
 )
 const AccountPage = lazy(() => import('@/features/account/pages/AccountPage').then((module) => ({ default: module.AccountPage })))
+const LineNotifyLiffPage = lazy(() =>
+  import('@/features/account/pages/LineNotifyLiffPage').then((module) => ({ default: module.LineNotifyLiffPage })),
+)
 const ContactAdminPage = lazy(() =>
   import('@/features/contact/pages/ContactAdminPage').then((module) => ({ default: module.ContactAdminPage })),
 )
@@ -59,6 +62,7 @@ export const AppRouter = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
+          <Route path="/liff/line-notify" element={<LineNotifyLiffPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/error" element={<ErrorPage />} />

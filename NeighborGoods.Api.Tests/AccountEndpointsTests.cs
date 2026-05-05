@@ -173,7 +173,7 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
     }
 
     [Fact]
-    public async Task LineBinding_FollowConfirmAndUnbind_WorksEndToEnd()
+    public async Task LineBinding_LiffCompleteAndUnbind_WorksEndToEnd()
     {
         using var factory = new ListingApiFactory(fixture.ConnectionString);
         using var client = factory.CreateClient();
@@ -182,49 +182,25 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         var startResponse = await client.PostAsync("/api/v1/account/line/bind/start", null);
         startResponse.EnsureSuccessStatusCode();
         var startBody = await startResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var pendingId = startBody.GetProperty("data").GetProperty("pendingBindingId").GetGuid();
+        var data = startBody.GetProperty("data");
+        var bindingToken = data.GetProperty("bindingToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(bindingToken));
+        var liffUrl = data.GetProperty("liffUrl").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(liffUrl));
+        Assert.Contains("bindToken=", liffUrl!, StringComparison.Ordinal);
+        Assert.Contains(bindingToken!, liffUrl!, StringComparison.Ordinal);
 
-        var waitingResponse = await client.GetAsync($"/api/v1/account/line/bind/status?pendingBindingId={pendingId}");
-        waitingResponse.EnsureSuccessStatusCode();
-        var waitingBody = await waitingResponse.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("waiting", waitingBody.GetProperty("data").GetProperty("status").GetString());
-
-        var lineUserId = "line-user-bind-001";
-        var webhookBody = $$"""
-            {
-              "events": [
-                {
-                  "type": "follow",
-                  "source": { "userId": "{{lineUserId}}" },
-                  "timestamp": 1735689600000
-                }
-              ]
-            }
-            """;
-        var webhookRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/integrations/line/webhook")
-        {
-            Content = new StringContent(webhookBody, Encoding.UTF8, "application/json")
-        };
-        webhookRequest.Headers.Add("X-Line-Signature", ComputeSignature(webhookBody, "line-msg-test-secret"));
-        var webhookResponse = await client.SendAsync(webhookRequest);
-        webhookResponse.EnsureSuccessStatusCode();
-
-        var readyResponse = await client.GetAsync($"/api/v1/account/line/bind/status?pendingBindingId={pendingId}");
-        readyResponse.EnsureSuccessStatusCode();
-        var readyBody = await readyResponse.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("ready", readyBody.GetProperty("data").GetProperty("status").GetString());
-        Assert.Equal(lineUserId, readyBody.GetProperty("data").GetProperty("lineUserId").GetString());
-
-        var confirmResponse = await client.PostAsJsonAsync(
-            "/api/v1/account/line/bind/confirm",
-            new { pendingBindingId = pendingId });
-        confirmResponse.EnsureSuccessStatusCode();
+        using var anon = factory.CreateClient();
+        var completeResponse = await anon.PostAsJsonAsync(
+            "/api/v1/account/line/bind/liff-complete",
+            new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
+        completeResponse.EnsureSuccessStatusCode();
 
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
             var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
-            Assert.Equal(lineUserId, user.LineMessagingApiUserId);
+            Assert.Equal(FakeLineLiffIdTokenVerifier.ValidTestSub, user.LineMessagingApiUserId);
             Assert.NotNull(user.LineMessagingApiAuthorizedAt);
         }
 

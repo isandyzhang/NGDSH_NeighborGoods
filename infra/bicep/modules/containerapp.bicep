@@ -91,6 +91,12 @@ param lineMessagingBotId string = ''
 @description('LINE Messaging API BaseUrl (optional)')
 param lineMessagingBaseUrl string = ''
 
+@description('前端網址（LIFF Endpoint、WebBaseUrl；須 HTTPS）')
+param lineMessagingWebBaseUrl string = ''
+
+@description('LINE Login channel 下建立的 LIFF App ID（例 2008745853-Ui8PkOGi）')
+param lineMessagingLiffId string = ''
+
 @description('LINE OIDC callback full URL')
 param lineOidcCallbackUrl string = ''
 
@@ -348,6 +354,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'LineMessagingApi__BaseUrl'
               value: lineMessagingBaseUrl
+            }
+            {
+              name: 'LineMessagingApi__WebBaseUrl'
+              value: lineMessagingWebBaseUrl
+            }
+            {
+              name: 'LineMessagingApi__LiffId'
+              value: lineMessagingLiffId
             }
             {
               name: 'EmailNotification__FromEmailAddress'

@@ -12,8 +12,11 @@ public sealed class AccountLineBindingService(
     NeighborGoodsDbContext dbContext,
     ILineMessageSender lineMessageSender,
     LineFlexMessageBuilder flexMessageBuilder,
-    IOptions<LineMessagingOptions> lineMessagingOptions)
+    IOptions<LineMessagingOptions> lineMessagingOptions,
+    ILineLiffIdTokenVerifier liffIdTokenVerifier)
 {
+    private static readonly TimeSpan BindingTokenTtl = TimeSpan.FromMinutes(15);
+
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
 
     public async Task<(StartLineBindingResponse? Data, string? ErrorCode, string? ErrorMessage)> StartAsync(
@@ -30,6 +33,15 @@ public sealed class AccountLineBindingService(
         {
             return (null, "LINE_BIND_ALREADY_BOUND", "您已經綁定 LINE 通知功能。");
         }
+
+        if (string.IsNullOrWhiteSpace(_options.LiffId))
+        {
+            return (null, "LINE_BIND_LIFF_NOT_CONFIGURED", "LIFF 尚未設定，請管理員設定 LineMessagingApi:LiffId。");
+        }
+
+        await dbContext.LineBindingPendings
+            .Where(x => x.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
 
         var token = Guid.NewGuid().ToString("N");
         var pending = new LineBindingPending
@@ -51,70 +63,59 @@ public sealed class AccountLineBindingService(
         }
 
         var botLink = $"line://ti/p/{botId}";
-        var qrCodeUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(botLink)}";
+        var liffId = _options.LiffId.Trim();
+        var liffUrl =
+            $"https://liff.line.me/{liffId}?bindToken={Uri.EscapeDataString(token)}&botLink={Uri.EscapeDataString(botLink)}";
 
-        return (new StartLineBindingResponse(pending.Id, botLink, qrCodeUrl), null, null);
+        return (new StartLineBindingResponse(pending.Id, liffUrl, token, botLink), null, null);
     }
 
-    public async Task<(LineBindingStatusResponse? Data, string? ErrorCode, string? ErrorMessage)> GetStatusAsync(
-        string userId,
-        Guid pendingBindingId,
+    public async Task<(bool Ok, string? ErrorCode, string? ErrorMessage)> CompleteLiffBindingAsync(
+        string bindingToken,
+        string idToken,
         CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.AspNetUsers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
-        if (user is null)
+        if (string.IsNullOrWhiteSpace(bindingToken))
         {
-            return (null, "USER_NOT_FOUND", "找不到使用者。");
+            return (false, "LINE_BIND_TOKEN_MISSING", "缺少綁定憑證。");
         }
 
-        if (!string.IsNullOrWhiteSpace(user.LineMessagingApiUserId))
-        {
-            return (new LineBindingStatusResponse("completed", "您已經綁定 LINE 通知功能"), null, null);
-        }
-
+        var trimmedToken = bindingToken.Trim();
         var pending = await dbContext.LineBindingPendings
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == pendingBindingId && x.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Token == trimmedToken, cancellationToken);
         if (pending is null)
         {
-            return (new LineBindingStatusResponse("not_found", "找不到綁定記錄，請重新開始"), null, null);
+            return (false, "LINE_BIND_PENDING_NOT_FOUND", "綁定連結無效或已使用，請回網站重新開始。");
         }
 
-        if (!string.IsNullOrWhiteSpace(pending.LineUserId))
+        if (pending.CreatedAt + BindingTokenTtl < DateTime.UtcNow)
         {
-            return (new LineBindingStatusResponse("ready", "已加入 Bot，請點擊確認綁定", pending.LineUserId), null, null);
+            dbContext.LineBindingPendings.Remove(pending);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (false, "LINE_BIND_TOKEN_EXPIRED", "綁定連結已過期，請回網站重新開始。");
         }
 
-        return (new LineBindingStatusResponse("waiting", "正在等待加入 Bot..."), null, null);
-    }
+        var (sub, verifyCode, verifyMessage) = await liffIdTokenVerifier.VerifyAsync(idToken, cancellationToken);
+        if (sub is null)
+        {
+            return (false, verifyCode!, verifyMessage!);
+        }
 
-    public async Task<(bool Ok, string? ErrorCode, string? ErrorMessage)> ConfirmAsync(
-        string userId,
-        Guid pendingBindingId,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await dbContext.AspNetUsers.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var user = await dbContext.AspNetUsers.FirstOrDefaultAsync(x => x.Id == pending.UserId, cancellationToken);
         if (user is null)
         {
             return (false, "USER_NOT_FOUND", "找不到使用者。");
         }
 
-        var pending = await dbContext.LineBindingPendings
-            .FirstOrDefaultAsync(x => x.Id == pendingBindingId && x.UserId == userId, cancellationToken);
-        if (pending is null)
+        if (!string.IsNullOrWhiteSpace(user.LineMessagingApiUserId))
         {
-            return (false, "LINE_BIND_PENDING_NOT_FOUND", "找不到綁定記錄。");
-        }
-
-        if (string.IsNullOrWhiteSpace(pending.LineUserId))
-        {
-            return (false, "LINE_BIND_LINE_USER_MISSING", "尚未收到 LINE follow 事件，請先加入 Bot。");
+            dbContext.LineBindingPendings.Remove(pending);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (false, "LINE_BIND_ALREADY_BOUND", "此帳號已綁定 LINE 通知。");
         }
 
         var lineUserIdExists = await dbContext.AspNetUsers
-            .AnyAsync(x => x.Id != userId && x.LineMessagingApiUserId == pending.LineUserId, cancellationToken);
+            .AnyAsync(x => x.Id != user.Id && x.LineMessagingApiUserId == sub, cancellationToken);
         if (lineUserIdExists)
         {
             dbContext.LineBindingPendings.Remove(pending);
@@ -122,7 +123,7 @@ public sealed class AccountLineBindingService(
             return (false, "LINE_BIND_LINE_USER_ALREADY_USED", "此 LINE 帳號已被其他用戶綁定。");
         }
 
-        user.LineMessagingApiUserId = pending.LineUserId;
+        user.LineMessagingApiUserId = sub;
         user.LineMessagingApiAuthorizedAt = DateTime.UtcNow;
         dbContext.LineBindingPendings.Remove(pending);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -168,38 +169,10 @@ public sealed class AccountLineBindingService(
             return;
         }
 
-        var pendingBindings = await dbContext.LineBindingPendings
-            .Where(x => x.LineUserId == null)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        if (pendingBindings.Count == 1)
-        {
-            var pending = pendingBindings[0];
-            pending.LineUserId = lineUserId;
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await SendFlexNoticeAsync(
-                lineUserId,
-                "LINE 綁定進行中",
-                "歡迎加入！請返回網站點擊「確認綁定」按鈕完成綁定。",
-                cancellationToken);
-            return;
-        }
-
-        if (pendingBindings.Count > 1)
-        {
-            await SendFlexNoticeAsync(
-                lineUserId,
-                "LINE 綁定提醒",
-                "歡迎加入！請返回網站完成 LINE 通知綁定。",
-                cancellationToken);
-            return;
-        }
-
         await SendFlexNoticeAsync(
             lineUserId,
-            "LINE 綁定提醒",
-            "歡迎加入！請前往網站個人資料頁面完成 LINE 通知綁定。",
+            "LINE 通知綁定",
+            "請至 NeighborGoods 網站「我的帳號」開啟 LINE 官方通知綁定，依畫面於 LINE 內完成即可收到訊息通知。",
             cancellationToken);
     }
 

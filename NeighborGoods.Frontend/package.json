@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@line/liff": "^2.28.0",
     "@lottiefiles/dotlottie-react": "^0.19.0",
     "@microsoft/signalr": "^10.0.0",
     "axios": "^1.15.1",

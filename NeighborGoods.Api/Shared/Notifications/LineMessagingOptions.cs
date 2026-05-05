@@ -8,6 +8,12 @@ public sealed class LineMessagingOptions
 
     public string ChannelSecret { get; set; } = string.Empty;
 
+    /// <summary>Messaging API channel id（與 Container 環境變數 LineMessagingApi__ChannelId 對應）。</summary>
+    public string ChannelId { get; set; } = string.Empty;
+
+    /// <summary>LINE Login channel 下建立的 LIFF App ID，用於組 liff.line.me 綁定網址。</summary>
+    public string LiffId { get; set; } = string.Empty;
+
     public string BotId { get; set; } = "@559fslxw";
 
     public string BaseUrl { get; set; } = "https://api.line.me/v2/bot";

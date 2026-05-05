@@ -107,7 +107,7 @@ export const ConversationsPage = () => {
                       <p className="shrink-0 text-xs text-text-muted">{formatDateTime(item.lastMessageAt)}</p>
                     </div>
                     {item.unreadCount > 0 ? (
-                      <span className="inline-block rounded-full bg-brand px-2 py-1 text-xs text-brand-foreground">
+                      <span className="inline-block rounded-full bg-danger px-3 py-1.5 text-sm font-semibold text-white">
                         未讀 {item.unreadCount}
                       </span>
                     ) : null}

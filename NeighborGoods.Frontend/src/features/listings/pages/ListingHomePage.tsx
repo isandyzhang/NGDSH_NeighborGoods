@@ -33,6 +33,7 @@ import { EmptyState } from '@/shared/ui/EmptyState'
 
 const PAGE_SIZE = 12
 const MIN_SKELETON_MS = 180
+const UNREAD_POLL_INTERVAL_MS = 60_000
 
 type ExpandableFilterKey = 'category' | 'condition' | 'residence'
 type QuickFilterKey = 'free' | 'charity' | 'tradeable'
@@ -310,23 +311,46 @@ export const ListingHomePage = () => {
     }
 
     let disposed = false
-    void messagingApi
-      .listConversations()
-      .then((conversations) => {
-        if (disposed) {
-          return
-        }
-        const totalUnread = conversations.reduce((sum, conversation) => sum + Math.max(0, conversation.unreadCount), 0)
-        setUnreadMessageCount(totalUnread)
-      })
-      .catch(() => {
-        if (!disposed) {
-          setUnreadMessageCount(0)
-        }
-      })
+
+    const loadUnreadTotal = () => {
+      void messagingApi
+        .listConversations()
+        .then((conversations) => {
+          if (disposed) {
+            return
+          }
+          const totalUnread = conversations.reduce((sum, conversation) => sum + Math.max(0, conversation.unreadCount), 0)
+          setUnreadMessageCount(totalUnread)
+        })
+        .catch(() => {
+          if (!disposed) {
+            setUnreadMessageCount(0)
+          }
+        })
+    }
+
+    loadUnreadTotal()
+
+    const pollId = window.setInterval(() => {
+      if (disposed || document.visibilityState !== 'visible') {
+        return
+      }
+      loadUnreadTotal()
+    }, UNREAD_POLL_INTERVAL_MS)
+
+    const handleVisibilityChange = () => {
+      if (disposed || document.visibilityState !== 'visible') {
+        return
+      }
+      loadUnreadTotal()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       disposed = true
+      window.clearInterval(pollId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [isAuthenticated, tokens?.userId])
 
@@ -889,7 +913,7 @@ export const ListingHomePage = () => {
                 </span>
               </span>
               {unreadMessageCount > 0 ? (
-                <span className="absolute right-2 top-2 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-[#D64545] px-1.5 text-xs font-bold text-white md:right-3 md:top-3 md:text-sm">
+                <span className="absolute right-2 top-2 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-[#D64545] px-1.5 text-lg font-bold leading-none text-white md:right-2.5 md:top-2.5 md:min-h-7 md:min-w-7 md:px-1.5 md:text-2xl">
                   {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
                 </span>
               ) : null}

@@ -159,34 +159,16 @@ public static class AccountEndpoints
         .RequireAuthorization()
         .RequireRateLimiting("AccountWrite");
 
-        app.MapGet("/api/v1/account/line/bind/status", async (
+        app.MapPost("/api/v1/account/line/bind/liff-complete", async (
             HttpContext httpContext,
-            ICurrentUserContext currentUser,
-            AccountLineBindingService lineBindingService,
-            Guid pendingBindingId,
-            CancellationToken ct = default) =>
-        {
-            var userId = currentUser.GetRequiredUserId();
-            var (data, errorCode, errorMessage) = await lineBindingService.GetStatusAsync(userId, pendingBindingId, ct);
-            if (data is null)
-            {
-                return AccountError(httpContext, errorCode!, errorMessage!);
-            }
-
-            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
-        })
-        .WithName("AccountLineBindStatusV1")
-        .RequireAuthorization();
-
-        app.MapPost("/api/v1/account/line/bind/confirm", async (
-            HttpContext httpContext,
-            ICurrentUserContext currentUser,
-            ConfirmLineBindingRequest request,
+            CompleteLineLiffBindingRequest request,
             AccountLineBindingService lineBindingService,
             CancellationToken ct = default) =>
         {
-            var userId = currentUser.GetRequiredUserId();
-            var (ok, errorCode, errorMessage) = await lineBindingService.ConfirmAsync(userId, request.PendingBindingId, ct);
+            var (ok, errorCode, errorMessage) = await lineBindingService.CompleteLiffBindingAsync(
+                request.BindingToken,
+                request.IdToken,
+                ct);
             if (!ok)
             {
                 return AccountError(httpContext, errorCode!, errorMessage!);
@@ -194,8 +176,8 @@ public static class AccountEndpoints
 
             return Results.Ok(ApiResponseFactory.Success(new { bound = true }, httpContext));
         })
-        .WithName("AccountLineBindConfirmV1")
-        .RequireAuthorization()
+        .WithName("AccountLineBindLiffCompleteV1")
+        .AllowAnonymous()
         .RequireRateLimiting("AccountWrite");
 
         app.MapPost("/api/v1/account/line/bind/unbind", async (
@@ -281,6 +263,11 @@ public static class AccountEndpoints
             "EMAIL_CODE_COOLDOWN" => StatusCodes.Status429TooManyRequests,
             "EMAIL_CODE_RATE_LIMIT" => StatusCodes.Status429TooManyRequests,
             "LINE_BIND_PENDING_NOT_FOUND" => StatusCodes.Status404NotFound,
+            "LINE_BIND_ALREADY_BOUND" => StatusCodes.Status409Conflict,
+            "LINE_BIND_LINE_USER_ALREADY_USED" => StatusCodes.Status409Conflict,
+            "LINE_BIND_LIFF_NOT_CONFIGURED" => StatusCodes.Status503ServiceUnavailable,
+            "LINE_OAUTH_MISCONFIGURED" => StatusCodes.Status503ServiceUnavailable,
+            "LINE_BIND_TOKEN_EXPIRED" => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status400BadRequest
         };
 

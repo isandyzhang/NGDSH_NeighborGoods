@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NeighborGoods.Api.Features.Auth.Services;
+using NeighborGoods.Api.Features.Integrations.Line.Services;
 using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Notifications;
@@ -38,11 +39,15 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
         builder.UseSetting("LineMessagingApi:ChannelAccessToken", "line-msg-test-token");
         builder.UseSetting("LineMessagingApi:ChannelSecret", "line-msg-test-secret");
         builder.UseSetting("LineMessagingApi:BotId", "@bot_test");
+        builder.UseSetting("LineMessagingApi:LiffId", "2008745853-testliff");
+        builder.UseSetting("LineMessagingApi:WebBaseUrl", "https://localhost:5173");
 
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<ILineOAuthClient>();
             services.AddSingleton<ILineOAuthClient, FakeLineOAuthClient>();
+            services.RemoveAll<ILineLiffIdTokenVerifier>();
+            services.AddSingleton<ILineLiffIdTokenVerifier, FakeLineLiffIdTokenVerifier>();
             services.RemoveAll<IBlobStorage>();
             services.AddSingleton<IBlobStorage, FakeBlobStorage>();
             services.RemoveAll<IEmailSender>();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { accountApi } from '@/features/account/api/accountApi'
+import siteLogo from '@/png/logo.png'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 
 export const TopNav = () => {
@@ -101,9 +102,11 @@ export const TopNav = () => {
         <div className="flex h-20 items-center justify-between">
           <Link
             to="/listings"
-            className="text-[1.4rem] font-semibold tracking-tight text-text-subtle md:text-[1.75rem]"
+            aria-label="NeighborGoods 首頁"
+            className="inline-flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-tight text-text-subtle md:gap-3 md:text-[1.75rem]"
           >
-            NeighborGoods
+            <img src={siteLogo} alt="" width={40} height={40} className="h-9 w-9 shrink-0 object-contain md:h-11 md:w-11" />
+            <span>NeighborGoods</span>
           </Link>
           {hideLoginAction ? null : isAuthenticated ? (
             <>

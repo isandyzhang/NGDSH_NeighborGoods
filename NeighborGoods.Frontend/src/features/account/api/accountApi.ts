@@ -54,14 +54,9 @@ export type LineQuotaStatus = {
 
 export type StartLineBindingResponse = {
   pendingBindingId: string
+  liffUrl: string
+  bindingToken: string
   botLink: string
-  qrCodeUrl: string
-}
-
-export type LineBindingStatusResponse = {
-  status: 'waiting' | 'ready' | 'completed' | 'not_found'
-  message: string
-  lineUserId?: string | null
 }
 
 export const accountApi = {
@@ -97,20 +92,6 @@ export const accountApi = {
 
   async startLineBinding(): Promise<StartLineBindingResponse> {
     const response = await http.post<ApiResponse<StartLineBindingResponse>>('/api/v1/account/line/bind/start')
-    return unwrapApiResponse(response.data)
-  },
-
-  async getLineBindingStatus(pendingBindingId: string): Promise<LineBindingStatusResponse> {
-    const response = await http.get<ApiResponse<LineBindingStatusResponse>>('/api/v1/account/line/bind/status', {
-      params: { pendingBindingId },
-    })
-    return unwrapApiResponse(response.data)
-  },
-
-  async confirmLineBinding(pendingBindingId: string): Promise<{ bound: boolean }> {
-    const response = await http.post<ApiResponse<{ bound: boolean }>>('/api/v1/account/line/bind/confirm', {
-      pendingBindingId,
-    })
     return unwrapApiResponse(response.data)
   },
 }

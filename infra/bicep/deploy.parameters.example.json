@@ -41,6 +41,8 @@
     "minReplicas": { "value": 1 },
     "maxReplicas": { "value": 3 },
     "lineMessagingBaseUrl": { "value": "https://api.neighborgoodstw.com" },
+    "lineMessagingWebBaseUrl": { "value": "https://你的前端網域" },
+    "lineMessagingLiffId": { "value": "LINE_Login_channel_下建立的_LIFF_ID" },
     "lineOidcCallbackUrl": { "value": "https://www.neighborgoodstw.com/auth/line/callback" },
     "corsAllowedOrigin0": { "value": "https://www.neighborgoodstw.com" },
     "corsAllowedOrigin1": { "value": "https://neighborgoodstw.com" },
