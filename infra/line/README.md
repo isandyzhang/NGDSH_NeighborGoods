@@ -27,6 +27,17 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 
 Postback values are aligned with current backend webhook routing.
 
+Current webhook reply behavior:
+
+- `action=myListings`
+  - Reply a Flex carousel first (max 5 listing cards)
+  - Each card includes listing status, favorite count, and a deep link to `/listings/{id}`
+  - Ordering priority: has unread messages > recently changed status (proxied by latest update time) > latest updated/created
+- `action=myMessages`
+  - Reply unread summary first
+  - Include up to 3 quick links to unread conversations (`/messages/{conversationId}`)
+  - Include a fallback button to `/messages`
+
 ## Example usage
 
 ```powershell
@@ -51,6 +62,53 @@ pwsh "./infra/line/line-richmenu.ps1" `
   1. Run in test/staging OA account first
   2. Verify image map and postback behavior
   3. Run in production OA account
+
+## Deployment strategy (IaC + CI/CD)
+
+For production maintenance, prefer version-controlled deployment instead of manual-only runs.
+
+1. Keep rich menu config and assets in repo
+   - Script: `infra/line/line-richmenu.ps1`
+   - Rich menu image: keep versioned file (for rollback and audit)
+2. Configure environment-specific secrets in CI/CD
+   - `LINE_CHANNEL_ACCESS_TOKEN`
+   - `LineMessagingApi__ChannelSecret`
+   - `LineMessagingApi__WebBaseUrl`
+   - `LineMessagingApi__LiffId`
+   - `Line__ChannelId`
+3. In pipeline, run rich menu deployment after backend/frontend deploy
+   - Deploy to staging first
+   - Smoke-test postback actions
+   - Deploy to production
+4. Rollback strategy
+   - Keep previous richMenuId in deployment output/log
+   - Re-assign previous richMenuId if newly deployed menu has issues
+
+## GitHub Actions workflow
+
+Workflow file:
+
+- `.github/workflows/line_richmenu_cd.yml`
+
+How to run:
+
+1. Go to GitHub Actions and choose `LINE Rich Menu CD`
+2. Click `Run workflow`
+3. The workflow is fixed to production defaults:
+   - Environment: `production`
+   - Assign to all users: `true`
+   - Delete old default rich menu: `true`
+   - Image content type: `image/png`
+
+Required GitHub Actions secrets (set in `production` Environment):
+
+- `LINE_CHANNEL_ACCESS_TOKEN`
+- `LINE_WEB_BASE_URL`
+
+Optional GitHub Actions variables (set in `production` Environment):
+
+- `LINE_RICHMENU_NAME` (default: `NeighborGoods Main Menu`)
+- `LINE_CHAT_BAR_TEXT` (default: `Open menu`)
 
 ## LINE 官方通知綁定（LIFF）
 

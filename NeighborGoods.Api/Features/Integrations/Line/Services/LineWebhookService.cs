@@ -84,7 +84,8 @@ public sealed class LineWebhookService(
         if (action == "myListings")
         {
             var summary = await lineMenuQueryService.GetMyListingsSummaryAsync(user.Id, cancellationToken);
-            var card = flexMessageBuilder.BuildMyListingsCard(summary);
+            var items = await lineMenuQueryService.GetMyListingCardItemsAsync(user.Id, 5, cancellationToken);
+            var card = flexMessageBuilder.BuildMyListingsCarousel(summary, items);
             await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, card.AltText, card.Contents, cancellationToken);
             return;
         }
@@ -92,7 +93,7 @@ public sealed class LineWebhookService(
         if (action == "myMessages")
         {
             var summary = await lineMenuQueryService.GetMyMessagesSummaryAsync(user.Id, cancellationToken);
-            var card = flexMessageBuilder.BuildMyMessagesCard(summary);
+            var card = flexMessageBuilder.BuildMyMessagesQuickLinksCard(summary);
             await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, card.AltText, card.Contents, cancellationToken);
             return;
         }

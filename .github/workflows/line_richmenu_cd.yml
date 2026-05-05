@@ -1,0 +1,41 @@
+name: LINE Rich Menu CD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy LINE rich menu
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate rich menu image exists
+        shell: bash
+        run: |
+          test -f "infra/line/linemenu.png"
+
+      - name: Run LINE rich menu deployment script
+        shell: pwsh
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_WEB_BASE_URL: ${{ secrets.LINE_WEB_BASE_URL }}
+          LINE_RICHMENU_NAME: ${{ vars.LINE_RICHMENU_NAME }}
+          LINE_CHAT_BAR_TEXT: ${{ vars.LINE_CHAT_BAR_TEXT }}
+        run: |
+          $richMenuName = if ([string]::IsNullOrWhiteSpace($env:LINE_RICHMENU_NAME)) { "NeighborGoods Main Menu" } else { $env:LINE_RICHMENU_NAME }
+          $chatBarText = if ([string]::IsNullOrWhiteSpace($env:LINE_CHAT_BAR_TEXT)) { "Open menu" } else { $env:LINE_CHAT_BAR_TEXT }
+
+          pwsh "./infra/line/line-richmenu.ps1" `
+            -ChannelAccessToken "$env:LINE_CHANNEL_ACCESS_TOKEN" `
+            -RichMenuImagePath "./infra/line/linemenu.png" `
+            -WebBaseUrl "$env:LINE_WEB_BASE_URL" `
+            -ImageContentType "image/png" `
+            -RichMenuName "$richMenuName" `
+            -ChatBarText "$chatBarText" `
+            -AssignToAllUsers:$true `
+            -DeleteOldDefaultRichMenu:$true
