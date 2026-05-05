@@ -11,8 +11,12 @@ const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
 
 export const LineNotifyLiffPage = () => {
   const [searchParams] = useSearchParams()
-  const bindToken = searchParams.get('bindToken') ?? ''
-  const botLink = searchParams.get('botLink') ?? ''
+  const liffStateRaw = searchParams.get('liff.state') ?? ''
+  const liffStateParams = liffStateRaw
+    ? new URLSearchParams(liffStateRaw.startsWith('?') ? liffStateRaw.slice(1) : liffStateRaw)
+    : null
+  const bindToken = searchParams.get('bindToken') ?? liffStateParams?.get('bindToken') ?? ''
+  const botLink = searchParams.get('botLink') ?? liffStateParams?.get('botLink') ?? ''
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorText, setErrorText] = useState<string | null>(null)
