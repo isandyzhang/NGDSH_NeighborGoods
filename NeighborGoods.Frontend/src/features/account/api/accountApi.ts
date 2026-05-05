@@ -96,6 +96,11 @@ export const accountApi = {
     return unwrapApiResponse(response.data)
   },
 
+  async unbindLineBinding(): Promise<{ unbound: boolean }> {
+    const response = await http.post<ApiResponse<{ unbound: boolean }>>('/api/v1/account/line/bind/unbind')
+    return unwrapApiResponse(response.data)
+  },
+
   async sendListingEmailCode(email: string): Promise<{ sent: boolean }> {
     const response = await http.post<ApiResponse<{ sent: boolean }>>('/api/v1/account/email/send-code', { email })
     return unwrapApiResponse(response.data)

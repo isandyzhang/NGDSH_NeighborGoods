@@ -146,6 +146,24 @@ export const AccountPage = () => {
     }
   }
 
+  const handleLineUnbind = async () => {
+    if (actionLoading) {
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    try {
+      await accountApi.unbindLineBinding()
+      await reloadData()
+      setBindingStart(null)
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '解除 LINE 綁定失敗')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const handleEmailOpenNotifications = async () => {
     if (actionLoading) {
       return
@@ -344,15 +362,26 @@ export const AccountPage = () => {
                     {actionLoading ? '處理中...' : '打開LINE通知'}
                   </Button>
                 ) : (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="text-sm font-semibold"
-                    disabled={actionLoading}
-                    onClick={() => void handleLineCancelNotifications()}
-                  >
-                    {actionLoading ? '處理中...' : '取消通知'}
-                  </Button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="text-sm font-semibold"
+                      disabled={actionLoading}
+                      onClick={() => void handleLineCancelNotifications()}
+                    >
+                      {actionLoading ? '處理中...' : '取消通知'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-sm font-semibold"
+                      disabled={actionLoading}
+                      onClick={() => void handleLineUnbind()}
+                    >
+                      {actionLoading ? '處理中...' : '解除綁定'}
+                    </Button>
+                  </div>
                 )}
                 </div>
               </div>
