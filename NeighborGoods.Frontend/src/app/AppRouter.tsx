@@ -76,9 +76,11 @@ export const AppRouter = () => {
           <Route path="/seller/:sellerId" element={<SellerPage />} />
           <Route element={<RequireAuth />}>
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/profile" element={<Navigate to="/account" replace />} />
             <Route path="/account/email-verify" element={<AccountEmailVerifyPage />} />
             <Route path="/notifications" element={<NotificationCenterPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/my-favorites" element={<Navigate to="/favorites" replace />} />
             <Route path="/my-listings" element={<MyListingsPage />} />
             <Route path="/listings/create" element={<CreateListingPage />} />
             <Route path="/listings/:id/edit" element={<EditListingPage />} />

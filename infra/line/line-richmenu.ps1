@@ -57,105 +57,29 @@ function Invoke-LineApiJson {
   return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $headers -Body $jsonBody
 }
 
-function Get-HttpErrorDetails {
-  param([System.Management.Automation.ErrorRecord]$ErrorRecord)
-
-  $statusCode = $null
-  $responseBody = $null
-
-  try {
-    $response = $ErrorRecord.Exception.Response
-    if ($null -ne $response -and $response.StatusCode) {
-      $statusCode = [int]$response.StatusCode
-    }
-  }
-  catch {}
-
-  try {
-    if ($null -ne $ErrorRecord.ErrorDetails -and -not [string]::IsNullOrWhiteSpace($ErrorRecord.ErrorDetails.Message)) {
-      $responseBody = $ErrorRecord.ErrorDetails.Message
-    }
-  }
-  catch {}
-
-  return @{
-    StatusCode = $statusCode
-    ResponseBody = $responseBody
-  }
-}
-
-function Invoke-LineImageUploadWithRetry {
+function Invoke-LineImageUpload {
   param(
     [string]$Uri,
     [string]$Token,
     [string]$ContentType,
-    [string]$FilePath,
-    [int]$MaxAttempts = 3
+    [string]$FilePath
   )
 
-  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-    try {
-      $curlCommand = if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) { "curl.exe" } else { "curl" }
-      $curlArgs = @(
-        "--fail",
-        "--show-error",
-        "--silent",
-        "--request", "POST",
-        "--url", $Uri,
-        "--header", "Authorization: Bearer $Token",
-        "--header", "Content-Type: $ContentType",
-        "--data-binary", "@$FilePath"
-      )
-
-      $null = & $curlCommand @curlArgs
-      if ($LASTEXITCODE -ne 0) {
-        throw "$curlCommand upload failed with exit code $LASTEXITCODE"
-      }
-
-      return
-    }
-    catch {
-      $details = Get-HttpErrorDetails -ErrorRecord $_
-      $statusCode = $details.StatusCode
-      $responseBody = $details.ResponseBody
-
-      $shouldRetry = $attempt -lt $MaxAttempts -and ($null -eq $statusCode -or $statusCode -ge 500)
-      Write-Warning "Image upload attempt $attempt/$MaxAttempts failed. StatusCode=$statusCode"
-      if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
-        Write-Warning "LINE error response: $responseBody"
-      }
-
-      if (-not $shouldRetry) {
-        throw
-      }
-
-      $delaySeconds = 5 * $attempt
-      Write-Host "Retrying image upload in $delaySeconds seconds..."
-      Start-Sleep -Seconds $delaySeconds
-    }
-  }
-}
-
-function Wait-LineRichMenuReady {
-  param(
-    [string]$RichMenuId,
-    [int]$MaxAttempts = 5
+  $curlCommand = if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) { "curl.exe" } else { "curl" }
+  $curlArgs = @(
+    "--fail",
+    "--show-error",
+    "--silent",
+    "--request", "POST",
+    "--url", $Uri,
+    "--header", "Authorization: Bearer $Token",
+    "--header", "Content-Type: $ContentType",
+    "--data-binary", "@$FilePath"
   )
 
-  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-    try {
-      $null = Invoke-LineApiJson -Method "GET" -Uri "$apiBase/richmenu/$RichMenuId"
-      return
-    }
-    catch {
-      $details = Get-HttpErrorDetails -ErrorRecord $_
-      $statusCode = $details.StatusCode
-      Write-Warning "Rich menu readiness check attempt $attempt/$MaxAttempts failed. StatusCode=$statusCode"
-      if ($attempt -ge $MaxAttempts) {
-        throw
-      }
-      Start-Sleep -Seconds (2 * $attempt)
-    }
+  $null = & $curlCommand @curlArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw "$curlCommand upload failed with exit code $LASTEXITCODE"
   }
 }
 
@@ -188,7 +112,7 @@ function Build-RichMenuDefinition {
         action = @{
           type = "postback"
           data = "action=myListings"
-          displayText = "My listings"
+          displayText = "正在查詢我的商品(｡•́ω•ˋ｡)"
         }
       },
       @{
@@ -196,7 +120,7 @@ function Build-RichMenuDefinition {
         action = @{
           type = "postback"
           data = "action=myMessages"
-          displayText = "My messages"
+          displayText = "我是個愛查看訊息的好人 ψ(｀∇´)ψ ！"
         }
       },
       # Row 2
@@ -211,7 +135,7 @@ function Build-RichMenuDefinition {
         bounds = @{ x = 833; y = 843; width = 834; height = 843 }
         action = @{
           type = "uri"
-          uri = "$BaseUrl/profile"
+          uri = "$BaseUrl/account"
         }
       },
       @{
@@ -248,20 +172,15 @@ if ([string]::IsNullOrWhiteSpace($newRichMenuId)) {
 }
 Write-Host "Created richMenuId: $newRichMenuId"
 
-Write-Host "[1.5/4] Checking rich menu is queryable..."
-Wait-LineRichMenuReady -RichMenuId $newRichMenuId -MaxAttempts 5
-Write-Host "Rich menu ready."
-
 Write-Host "[2/4] Uploading rich menu image..."
 $uploadUri = "$apiDataBase/richmenu/$newRichMenuId/content"
 Write-Host "Upload target: $uploadUri"
 try {
-  Invoke-LineImageUploadWithRetry `
+  Invoke-LineImageUpload `
     -Uri $uploadUri `
     -Token $ChannelAccessToken `
     -ContentType $ImageContentType `
-    -FilePath $RichMenuImagePath `
-    -MaxAttempts 3
+    -FilePath $RichMenuImagePath
 }
 catch {
   Write-Warning "Upload failed permanently. Cleaning up created rich menu: $newRichMenuId"

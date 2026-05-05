@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using NeighborGoods.Api.Features.Account.Services;
 using NeighborGoods.Api.Shared.Notifications;
@@ -12,8 +13,10 @@ public sealed class LineWebhookService(
     LineMenuQueryService lineMenuQueryService,
     LineFlexMessageBuilder flexMessageBuilder,
     ILineMessageSender lineMessageSender,
+    IMemoryCache memoryCache,
     IOptions<LineMessagingOptions> lineMessagingOptions)
 {
+    private static readonly TimeSpan MenuActionCooldown = TimeSpan.FromSeconds(30);
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
 
     public async Task<(bool Ok, string? ErrorCode, string? ErrorMessage)> ProcessAsync(
@@ -83,6 +86,11 @@ public sealed class LineWebhookService(
 
         if (action == "myListings")
         {
+            if (IsInMenuActionCooldown(evt.UserId!, action))
+            {
+                return;
+            }
+
             var summary = await lineMenuQueryService.GetMyListingsSummaryAsync(user.Id, cancellationToken);
             var items = await lineMenuQueryService.GetMyListingCardItemsAsync(user.Id, 5, cancellationToken);
             var card = flexMessageBuilder.BuildMyListingsCarousel(summary, items);
@@ -92,6 +100,11 @@ public sealed class LineWebhookService(
 
         if (action == "myMessages")
         {
+            if (IsInMenuActionCooldown(evt.UserId!, action))
+            {
+                return;
+            }
+
             var summary = await lineMenuQueryService.GetMyMessagesSummaryAsync(user.Id, cancellationToken);
             var card = flexMessageBuilder.BuildMyMessagesQuickLinksCard(summary);
             await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, card.AltText, card.Contents, cancellationToken);
@@ -126,6 +139,9 @@ public sealed class LineWebhookService(
             return null;
         }
 
+        var normalized = text.Trim().ToLowerInvariant();
+        var compact = normalized.Replace(" ", string.Empty, StringComparison.Ordinal);
+
         return text switch
         {
             "首頁" => "home",
@@ -135,6 +151,17 @@ public sealed class LineWebhookService(
             "menu:myListings" => "myListings",
             "menu:myMessages" => "myMessages",
             _ => null
+        } ?? normalized switch
+        {
+            "home" => "home",
+            "my listings" => "myListings",
+            "my messages" => "myMessages",
+            _ => compact switch
+            {
+                "mylistings" => "myListings",
+                "mymessages" => "myMessages",
+                _ => null
+            }
         };
     }
 
@@ -170,6 +197,18 @@ public sealed class LineWebhookService(
         }
 
         return null;
+    }
+
+    private bool IsInMenuActionCooldown(string lineUserId, string action)
+    {
+        var key = $"line:menu:cooldown:{lineUserId}:{action}";
+        if (memoryCache.TryGetValue(key, out _))
+        {
+            return true;
+        }
+
+        memoryCache.Set(key, true, MenuActionCooldown);
+        return false;
     }
 
     private bool ValidateSignature(string body, string? signature)
