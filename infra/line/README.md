@@ -98,7 +98,8 @@ How to run:
    - Environment: `production`
    - Assign to all users: `true`
    - Delete old default rich menu: `true`
-   - Image content type: `image/png`
+   - Image path: `infra/line/menu.jpg`
+   - Image content type: `image/jpeg`
 
 Required GitHub Actions secrets (set in `production` Environment):
 

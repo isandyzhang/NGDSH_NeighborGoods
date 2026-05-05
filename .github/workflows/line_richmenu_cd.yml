@@ -17,7 +17,7 @@ jobs:
       - name: Validate rich menu image exists
         shell: bash
         run: |
-          test -f "infra/line/linemenu.png"
+          test -f "infra/line/menu.jpg"
 
       - name: Run LINE rich menu deployment script
         shell: pwsh
@@ -32,9 +32,9 @@ jobs:
 
           pwsh "./infra/line/line-richmenu.ps1" `
             -ChannelAccessToken "$env:LINE_CHANNEL_ACCESS_TOKEN" `
-            -RichMenuImagePath "./infra/line/linemenu.png" `
+            -RichMenuImagePath "./infra/line/menu.jpg" `
             -WebBaseUrl "$env:LINE_WEB_BASE_URL" `
-            -ImageContentType "image/png" `
+            -ImageContentType "image/jpeg" `
             -RichMenuName "$richMenuName" `
             -ChatBarText "$chatBarText" `
             -AssignToAllUsers:$true `
