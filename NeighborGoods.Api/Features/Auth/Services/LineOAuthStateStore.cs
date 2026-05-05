@@ -1,17 +1,18 @@
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace NeighborGoods.Api.Features.Auth.Services;
 
-public sealed class LineOAuthStateStore(IMemoryCache cache) : ILineOAuthStateStore
+public sealed class LineOAuthStateStore(IDataProtectionProvider dataProtectionProvider) : ILineOAuthStateStore
 {
     private static readonly TimeSpan StateTtl = TimeSpan.FromMinutes(5);
-    private const string KeyPrefix = "line_oauth_state:";
+    private readonly ITimeLimitedDataProtector _protector = dataProtectionProvider
+        .CreateProtector("NeighborGoods.Auth.LineOAuthState.v1")
+        .ToTimeLimitedDataProtector();
 
     public string Create()
     {
-        var state = Guid.NewGuid().ToString("N");
-        cache.Set(BuildCacheKey(state), "valid", StateTtl);
-        return state;
+        var nonce = Guid.NewGuid().ToString("N");
+        return _protector.Protect(nonce, StateTtl);
     }
 
     public bool Consume(string state)
@@ -21,15 +22,14 @@ public sealed class LineOAuthStateStore(IMemoryCache cache) : ILineOAuthStateSto
             return false;
         }
 
-        var key = BuildCacheKey(state);
-        if (!cache.TryGetValue(key, out _))
+        try
+        {
+            var nonce = _protector.Unprotect(state);
+            return !string.IsNullOrWhiteSpace(nonce);
+        }
+        catch
         {
             return false;
         }
-
-        cache.Remove(key);
-        return true;
     }
-
-    private static string BuildCacheKey(string state) => $"{KeyPrefix}{state}";
 }

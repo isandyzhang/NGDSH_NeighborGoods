@@ -924,7 +924,7 @@ export const ListingHomePage = () => {
 
       <motion.section
         ref={marqueeRef}
-        className="marquee-divider order-1 h-auto min-h-[3.75rem] md:order-2 md:h-[75vh]"
+        className="marquee-divider order-1 h-auto min-h-[2.8rem] md:order-2 md:h-[75vh]"
         aria-label="交易安全提醒"
         initial={{ opacity: 0, y: 90 }}
         whileInView={{ opacity: 1, y: 0 }}

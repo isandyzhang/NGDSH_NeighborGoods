@@ -98,7 +98,7 @@ export const TopNav = () => {
   ] as const
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
+    <header className="sticky top-0 z-[1000] border-b border-border bg-bg/90 backdrop-blur">
       <div ref={menuContainerRef} className="mx-auto w-full max-w-6xl px-4">
         <div className="flex h-20 items-center justify-between">
           <Link
@@ -115,11 +115,11 @@ export const TopNav = () => {
                 type="button"
                 variant="secondary"
                 onClick={() => setMenuOpen((current) => !current)}
-                className="h-12 min-w-[10.5rem] px-4 !text-[1.2rem] font-semibold md:!text-[1.35rem]"
+                className="h-10 max-w-[8.5rem] px-2.5 !text-sm font-semibold sm:h-11 sm:max-w-[10.5rem] sm:px-3 sm:!text-base md:h-12 md:max-w-none md:min-w-[10.5rem] md:px-4 md:!text-[1.35rem]"
                 aria-expanded={menuOpen}
                 aria-controls="topnav-user-menu"
               >
-                {`Hi, ${displayName ?? '用戶'}`}
+                <span className="block truncate">{`Hi, ${displayName ?? '用戶'}`}</span>
               </Button>
             </>
           ) : (

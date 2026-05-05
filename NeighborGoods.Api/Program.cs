@@ -79,6 +79,7 @@ builder.Services.AddSingleton<LinePushPolicyService>();
 builder.Services.AddSingleton<IBlobStorage, AzureBlobStorage>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
+builder.Services.AddDataProtection();
 builder.Services.AddSingleton<ILineOAuthStateStore, LineOAuthStateStore>();
 builder.Services.AddHttpClient<ILineOAuthClient, LineOAuthClient>();
 builder.Services.AddHttpClient<ILineLiffIdTokenVerifier, LineLiffIdTokenVerifier>();
