@@ -175,3 +175,8 @@ infra/bicep/deploy.json
 # Local build health output
 .tmp-api-build/
 .tmp-api-build-health/
+
+# Ad-hoc CLI verify / test artifacts (repo root)
+_build_verify/
+_test_out/
+_test_out2/
