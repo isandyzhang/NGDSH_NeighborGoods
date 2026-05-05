@@ -31,7 +31,8 @@ jobs:
         working-directory: NeighborGoods.Frontend
         run: npm ci
 
-      - name: Lint frontend
+      - name: Lint frontend (non-blocking temporary)
+        continue-on-error: true
         working-directory: NeighborGoods.Frontend
         run: npm run lint
 

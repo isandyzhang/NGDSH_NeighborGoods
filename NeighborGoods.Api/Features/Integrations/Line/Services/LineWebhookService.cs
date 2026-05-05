@@ -76,6 +76,25 @@ public sealed class LineWebhookService(
             return;
         }
 
+        if (action == "bindingDebug")
+        {
+            var bound = await lineMenuQueryService.GetBoundUserAsync(evt.UserId!, cancellationToken);
+            if (bound is null)
+            {
+                var debugCard = flexMessageBuilder.BuildNoticeCard(
+                    "LINE 綁定診斷",
+                    "目前查無綁定的網站帳號。請到網站「我的帳號」重新完成 LINE 綁定。");
+                await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, debugCard.AltText, debugCard.Contents, cancellationToken);
+                return;
+            }
+
+            var debugOkCard = flexMessageBuilder.BuildNoticeCard(
+                "LINE 綁定診斷",
+                $"已綁定成功（網站帳號：{bound.DisplayName}）。可直接使用「我的商品 / 我的訊息」。");
+            await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, debugOkCard.AltText, debugOkCard.Contents, cancellationToken);
+            return;
+        }
+
         var user = await lineMenuQueryService.GetBoundUserAsync(evt.UserId!, cancellationToken);
         if (user is null)
         {
@@ -147,6 +166,8 @@ public sealed class LineWebhookService(
             "首頁" => "home",
             "我的商品" => "myListings",
             "我的訊息" => "myMessages",
+            "綁定診斷" => "bindingDebug",
+            "line綁定診斷" => "bindingDebug",
             "menu:home" => "home",
             "menu:myListings" => "myListings",
             "menu:myMessages" => "myMessages",
@@ -156,10 +177,14 @@ public sealed class LineWebhookService(
             "home" => "home",
             "my listings" => "myListings",
             "my messages" => "myMessages",
+            "line binding debug" => "bindingDebug",
+            "binding debug" => "bindingDebug",
             _ => compact switch
             {
                 "mylistings" => "myListings",
                 "mymessages" => "myMessages",
+                "linebindingdebug" => "bindingDebug",
+                "bindingdebug" => "bindingDebug",
                 _ => null
             }
         };
