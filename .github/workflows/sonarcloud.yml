@@ -20,6 +20,7 @@ on:
 
 jobs:
   scan:
+    if: ${{ false }} # Temporarily disabled until SonarCloud is provisioned.
     runs-on: ubuntu-latest
     permissions:
       contents: read

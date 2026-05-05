@@ -33,13 +33,19 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Restore backend dependencies
-        run: dotnet restore NeighborGoods.sln
+        run: |
+          dotnet restore NeighborGoods.Api/NeighborGoods.Api.csproj
+          dotnet restore NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj
 
       - name: Verify backend formatting
-        run: dotnet format NeighborGoods.sln --verify-no-changes --verbosity minimal
+        run: |
+          dotnet format NeighborGoods.Api/NeighborGoods.Api.csproj --verify-no-changes --verbosity minimal
+          dotnet format NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --verify-no-changes --verbosity minimal
 
       - name: Build backend
-        run: dotnet build NeighborGoods.sln --configuration Release --no-restore
+        run: |
+          dotnet build NeighborGoods.Api/NeighborGoods.Api.csproj --configuration Release --no-restore
+          dotnet build NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-restore
 
       - name: Run backend unit-only tests (exclude integration tests)
         run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~EndpointsTests"

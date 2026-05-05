@@ -40,17 +40,6 @@ function New-AuthHeadersJson {
   }
 }
 
-function New-AuthHeadersBinary {
-  param(
-    [string]$Token,
-    [string]$ContentType
-  )
-  return @{
-    Authorization = "Bearer $Token"
-    "Content-Type" = $ContentType
-  }
-}
-
 function Invoke-LineApiJson {
   param(
     [string]$Method,
@@ -65,6 +54,84 @@ function Invoke-LineApiJson {
 
   $jsonBody = $Body | ConvertTo-Json -Depth 15
   return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $headers -Body $jsonBody
+}
+
+function Get-HttpErrorDetails {
+  param([System.Management.Automation.ErrorRecord]$ErrorRecord)
+
+  $statusCode = $null
+  $responseBody = $null
+
+  try {
+    $response = $ErrorRecord.Exception.Response
+    if ($null -ne $response -and $response.StatusCode) {
+      $statusCode = [int]$response.StatusCode
+    }
+  }
+  catch {}
+
+  try {
+    if ($null -ne $ErrorRecord.ErrorDetails -and -not [string]::IsNullOrWhiteSpace($ErrorRecord.ErrorDetails.Message)) {
+      $responseBody = $ErrorRecord.ErrorDetails.Message
+    }
+  }
+  catch {}
+
+  return @{
+    StatusCode = $statusCode
+    ResponseBody = $responseBody
+  }
+}
+
+function Invoke-LineImageUploadWithRetry {
+  param(
+    [string]$Uri,
+    [string]$Token,
+    [string]$ContentType,
+    [string]$FilePath,
+    [int]$MaxAttempts = 3
+  )
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    try {
+      $curlArgs = @(
+        "--fail",
+        "--show-error",
+        "--silent",
+        "--request", "POST",
+        "--url", $Uri,
+        "--header", "Authorization: Bearer $Token",
+        "--header", "Content-Type: $ContentType",
+        "--data-binary", "@$FilePath"
+      )
+
+      $null = & curl @curlArgs
+      if ($LASTEXITCODE -ne 0) {
+        throw "curl upload failed with exit code $LASTEXITCODE"
+      }
+
+      return
+    }
+    catch {
+      $details = Get-HttpErrorDetails -ErrorRecord $_
+      $statusCode = $details.StatusCode
+      $responseBody = $details.ResponseBody
+
+      $shouldRetry = $attempt -lt $MaxAttempts -and ($null -eq $statusCode -or $statusCode -ge 500)
+      Write-Warning "Image upload attempt $attempt/$MaxAttempts failed. StatusCode=$statusCode"
+      if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+        Write-Warning "LINE error response: $responseBody"
+      }
+
+      if (-not $shouldRetry) {
+        throw
+      }
+
+      $delaySeconds = 5 * $attempt
+      Write-Host "Retrying image upload in $delaySeconds seconds..."
+      Start-Sleep -Seconds $delaySeconds
+    }
+  }
 }
 
 function Build-RichMenuDefinition {
@@ -156,12 +223,27 @@ if ([string]::IsNullOrWhiteSpace($newRichMenuId)) {
 Write-Host "Created richMenuId: $newRichMenuId"
 
 Write-Host "[2/4] Uploading rich menu image..."
-$binaryHeaders = New-AuthHeadersBinary -Token $ChannelAccessToken -ContentType $ImageContentType
-Invoke-RestMethod `
-  -Method "POST" `
-  -Uri "$apiBase/richmenu/$newRichMenuId/content" `
-  -Headers $binaryHeaders `
-  -InFile $RichMenuImagePath
+try {
+  Invoke-LineImageUploadWithRetry `
+    -Uri "$apiBase/richmenu/$newRichMenuId/content" `
+    -Token $ChannelAccessToken `
+    -ContentType $ImageContentType `
+    -FilePath $RichMenuImagePath `
+    -MaxAttempts 3
+}
+catch {
+  Write-Warning "Upload failed permanently. Cleaning up created rich menu: $newRichMenuId"
+  try {
+    Invoke-RestMethod `
+      -Method "DELETE" `
+      -Uri "$apiBase/richmenu/$newRichMenuId" `
+      -Headers @{ Authorization = "Bearer $ChannelAccessToken" }
+  }
+  catch {
+    Write-Warning "Cleanup failed for rich menu: $newRichMenuId"
+  }
+  throw
+}
 Write-Host "Image uploaded."
 
 $oldDefaultRichMenuId = $null
