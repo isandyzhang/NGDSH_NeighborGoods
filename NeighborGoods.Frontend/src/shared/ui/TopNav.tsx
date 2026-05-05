@@ -26,7 +26,8 @@ export const TopNav = () => {
       .me()
       .then((profile) => {
         if (!disposed) {
-          setDisplayName(profile.displayName || '用戶')
+          const name = profile.displayName?.trim() || profile.userName?.trim()
+          setDisplayName(name || '用戶')
         }
       })
       .catch(() => {

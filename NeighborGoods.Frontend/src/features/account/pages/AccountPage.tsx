@@ -16,7 +16,6 @@ export const AccountPage = () => {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [successText, setSuccessText] = useState<string | null>(null)
 
   const reloadData = useCallback(async () => {
     const [me, prefs] = await Promise.all([accountApi.me(), accountApi.getLinePreferences()])
@@ -29,7 +28,6 @@ export const AccountPage = () => {
       return
     }
 
-    setSuccessText('LINE 官方帳號已綁定。請在下方「通知開關」區塊啟用或管理推播。')
     setSearchParams({}, { replace: true })
     void reloadData().catch(() => undefined)
   }, [reloadData, searchParams, setSearchParams])
@@ -103,7 +101,6 @@ export const AccountPage = () => {
 
     setActionLoading(true)
     setError(null)
-    setSuccessText(null)
     try {
       const result = await accountApi.startLineBinding()
       setBindingStart(result)
@@ -122,11 +119,9 @@ export const AccountPage = () => {
 
     setActionLoading(true)
     setError(null)
-    setSuccessText(null)
     try {
       await enableLineNotify()
       await reloadData()
-      setSuccessText('已開啟 LINE 官方通知')
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '開啟 LINE 通知失敗')
     } finally {
@@ -141,11 +136,9 @@ export const AccountPage = () => {
 
     setActionLoading(true)
     setError(null)
-    setSuccessText(null)
     try {
       await accountApi.disableLineNotifications()
       await reloadData()
-      setSuccessText('已取消 LINE 官方通知')
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '取消 LINE 通知失敗')
     } finally {
@@ -160,11 +153,9 @@ export const AccountPage = () => {
 
     setActionLoading(true)
     setError(null)
-    setSuccessText(null)
     try {
       await accountApi.enableEmailNotifications()
       await reloadData()
-      setSuccessText('已開啟 Email 通知')
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '開啟 Email 通知失敗')
     } finally {
@@ -179,11 +170,9 @@ export const AccountPage = () => {
 
     setActionLoading(true)
     setError(null)
-    setSuccessText(null)
     try {
       await accountApi.disableEmailNotifications()
       await reloadData()
-      setSuccessText('已取消 Email 通知')
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '取消 Email 通知失敗')
     } finally {
@@ -228,7 +217,6 @@ export const AccountPage = () => {
 
       {loading ? <PageSkeleton className="h-52" /> : null}
       {error ? <ErrorState description={error} /> : null}
-      {successText ? <p className="mb-4 text-base text-[#2F7D4E]">{successText}</p> : null}
 
       {!loading && profile ? (
         <Card className="animate-fade-rise space-y-4" style={{ animationDelay: '120ms' }}>

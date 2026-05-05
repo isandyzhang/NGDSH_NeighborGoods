@@ -2,7 +2,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
@@ -71,27 +70,27 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   }, [saveTokens, tokens?.refreshToken])
 
-  useEffect(() => {
-    const redirectToLogin = () => {
-      const { pathname, search, hash } = window.location
-      // 避免在登入／註冊頁觸發重複導轉
-      if (pathname === '/login' || pathname === '/register') {
-        return
-      }
-      const from = `${pathname}${search}${hash}`
-      const encodedFrom = encodeURIComponent(from)
-      window.location.replace(`/login?from=${encodedFrom}`)
+  const redirectToLogin = useCallback(() => {
+    const { pathname, search, hash } = window.location
+    // 避免在登入／註冊頁觸發重複導轉
+    if (pathname === '/login' || pathname === '/register') {
+      return
     }
+    const from = `${pathname}${search}${hash}`
+    const encodedFrom = encodeURIComponent(from)
+    window.location.replace(`/login?from=${encodedFrom}`)
+  }, [])
 
-    setupHttpAuth({
-      getAccessToken: () => tokens?.accessToken ?? null,
-      refreshTokens,
-      onUnauthorized: () => {
-        saveTokens(null)
-        redirectToLogin()
-      },
-    })
-  }, [refreshTokens, saveTokens, tokens?.accessToken])
+  // 必須在 render 同步註冊：若放在 useEffect，子元件（如 TopNav）的 effect 會先執行，
+  // 首次 /api/v1/account/me 會拿不到 Bearer token，導致問候語卡在「用戶」。
+  setupHttpAuth({
+    getAccessToken: () => tokens?.accessToken ?? null,
+    refreshTokens,
+    onUnauthorized: () => {
+      saveTokens(null)
+      redirectToLogin()
+    },
+  })
 
   const value = useMemo<AuthContextValue>(
     () => ({
