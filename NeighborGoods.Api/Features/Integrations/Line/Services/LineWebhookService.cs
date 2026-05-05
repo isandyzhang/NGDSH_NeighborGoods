@@ -159,7 +159,15 @@ public sealed class LineWebhookService(
         }
 
         var normalized = text.Trim().ToLowerInvariant();
-        var compact = normalized.Replace(" ", string.Empty, StringComparison.Ordinal);
+        var compact = RemoveWhitespace(normalized);
+
+        if (compact.Contains("綁定診斷", StringComparison.Ordinal)
+            || compact.Contains("line綁定診斷", StringComparison.Ordinal)
+            || compact.Contains("bindingdebug", StringComparison.Ordinal)
+            || compact.Contains("linebindingdebug", StringComparison.Ordinal))
+        {
+            return "bindingDebug";
+        }
 
         return text switch
         {
@@ -188,6 +196,16 @@ public sealed class LineWebhookService(
                 _ => null
             }
         };
+    }
+
+    private static string RemoveWhitespace(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return string.Concat(value.Where(c => !char.IsWhiteSpace(c) && c != '\u3000'));
     }
 
     private static string? ParseActionFromPostback(string data)
