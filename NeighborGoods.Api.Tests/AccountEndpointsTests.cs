@@ -150,8 +150,102 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("tester", body.GetProperty("data").GetProperty("displayName").GetString());
-        Assert.True(body.GetProperty("data").GetProperty("statistics").GetProperty("totalListings").GetInt32() >= 1);
+        var data = body.GetProperty("data");
+        Assert.Equal("tester", data.GetProperty("displayName").GetString());
+        Assert.True(data.GetProperty("statistics").GetProperty("totalListings").GetInt32() >= 1);
+        Assert.True(data.GetProperty("emailNotificationEnabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task NotificationsDisable_ClearsEmailAndLineFlags()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var patchResponse = await client.PatchAsJsonAsync(
+            "/api/v1/account/line/preferences",
+            new
+            {
+                marketingPushEnabled = true,
+                preferenceNewListings = true,
+                preferencePriceDrop = false,
+                preferenceMessageDigest = true
+            });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var disableResponse = await client.PostAsync("/api/v1/account/notifications/disable", null);
+        disableResponse.EnsureSuccessStatusCode();
+        var disableBody = await disableResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(disableBody.GetProperty("data").GetProperty("emailNotificationEnabled").GetBoolean());
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+            var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
+            Assert.False(user.EmailNotificationEnabled);
+            Assert.Equal(0, user.LineNotificationPreference);
+        }
+
+        var meResponse = await client.GetAsync("/api/v1/account/me");
+        meResponse.EnsureSuccessStatusCode();
+        var meBody = await meResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(meBody.GetProperty("data").GetProperty("emailNotificationEnabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task NotificationsEmailDisable_AndEnable_UpdatesFlag()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "tester@example.com", UserPassword);
+
+        var disableResponse = await client.PostAsync("/api/v1/account/notifications/email/disable", null);
+        disableResponse.EnsureSuccessStatusCode();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+            var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "TESTER");
+            Assert.False(user.EmailNotificationEnabled);
+        }
+
+        var enableResponse = await client.PostAsync("/api/v1/account/notifications/email/enable", null);
+        enableResponse.EnsureSuccessStatusCode();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+            var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "TESTER");
+            Assert.True(user.EmailNotificationEnabled);
+        }
+    }
+
+    [Fact]
+    public async Task NotificationsLineDisable_ClearsPreference()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var patchResponse = await client.PatchAsJsonAsync(
+            "/api/v1/account/line/preferences",
+            new
+            {
+                marketingPushEnabled = true,
+                preferenceNewListings = true,
+                preferencePriceDrop = false,
+                preferenceMessageDigest = false
+            });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var disableLineResponse = await client.PostAsync("/api/v1/account/notifications/line/disable", null);
+        disableLineResponse.EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
+        Assert.Equal(0, user.LineNotificationPreference);
     }
 
     [Fact]

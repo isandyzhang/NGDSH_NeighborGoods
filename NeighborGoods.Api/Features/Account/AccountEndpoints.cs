@@ -117,6 +117,82 @@ public static class AccountEndpoints
         .WithName("AccountGetMeV1")
         .RequireAuthorization();
 
+        app.MapPost("/api/v1/account/notifications/disable", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            AccountNotificationPreferenceService notificationService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (ok, errorCode, errorMessage) = await notificationService.DisableAllAsync(userId, ct);
+            if (!ok)
+            {
+                return AccountError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(new { emailNotificationEnabled = false }, httpContext));
+        })
+        .WithName("AccountNotificationsDisableV1")
+        .RequireAuthorization()
+        .RequireRateLimiting("AccountWrite");
+
+        app.MapPost("/api/v1/account/notifications/email/enable", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            AccountNotificationPreferenceService notificationService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (ok, errorCode, errorMessage) = await notificationService.EnableEmailAsync(userId, ct);
+            if (!ok)
+            {
+                return AccountError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(new { emailNotificationEnabled = true }, httpContext));
+        })
+        .WithName("AccountNotificationsEmailEnableV1")
+        .RequireAuthorization()
+        .RequireRateLimiting("AccountWrite");
+
+        app.MapPost("/api/v1/account/notifications/email/disable", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            AccountNotificationPreferenceService notificationService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (ok, errorCode, errorMessage) = await notificationService.DisableEmailAsync(userId, ct);
+            if (!ok)
+            {
+                return AccountError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(new { emailNotificationEnabled = false }, httpContext));
+        })
+        .WithName("AccountNotificationsEmailDisableV1")
+        .RequireAuthorization()
+        .RequireRateLimiting("AccountWrite");
+
+        app.MapPost("/api/v1/account/notifications/line/disable", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            AccountNotificationPreferenceService notificationService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (ok, errorCode, errorMessage) = await notificationService.DisableLinePreferencesAsync(userId, ct);
+            if (!ok)
+            {
+                return AccountError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(new { lineNotificationsDisabled = true }, httpContext));
+        })
+        .WithName("AccountNotificationsLineDisableV1")
+        .RequireAuthorization()
+        .RequireRateLimiting("AccountWrite");
+
         app.MapPatch("/api/v1/account/me", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,

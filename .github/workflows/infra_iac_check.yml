@@ -28,6 +28,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 選填：LINE 官方通知 LIFF；未設時仍沿用 deploy.parameters.prod.json。設定方式見 infra/line/README.md
+      - name: LIFF 設定提示（LineMessagingApi:LiffId）
+        env:
+          LINE_MESSAGING_LIFF_ID: ${{ secrets.LINE_MESSAGING_LIFF_ID }}
+        run: |
+          if [ -z "${LINE_MESSAGING_LIFF_ID:-}" ]; then
+            echo "::warning title=LIFF::LIFF 尚未設定，請管理員設定 LineMessagingApi:LiffId。（可於 Repository secrets 新增 LINE_MESSAGING_LIFF_ID，或確認 deploy.parameters.prod.json 已設定 lineMessagingLiffId）"
+          fi
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -39,7 +48,19 @@ jobs:
         run: az bicep install
 
       - name: Validate Bicep infrastructure
+        env:
+          LINE_MESSAGING_LIFF_ID: ${{ secrets.LINE_MESSAGING_LIFF_ID }}
+          # 非機密：建議用 Repository variable（與 Vite 正式站網域一致，例 https://www.example.com）
+          LINE_MESSAGING_WEB_BASE_URL: ${{ vars.LINE_MESSAGING_WEB_BASE_URL }}
         run: |
+          set -euo pipefail
+          LIFF_EXTRA=""
+          if [ -n "${LINE_MESSAGING_LIFF_ID:-}" ]; then
+            LIFF_EXTRA="${LIFF_EXTRA} --parameters lineMessagingLiffId=${LINE_MESSAGING_LIFF_ID}"
+          fi
+          if [ -n "${LINE_MESSAGING_WEB_BASE_URL:-}" ]; then
+            LIFF_EXTRA="${LIFF_EXTRA} --parameters lineMessagingWebBaseUrl=${LINE_MESSAGING_WEB_BASE_URL}"
+          fi
           az deployment group validate \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
@@ -55,10 +76,23 @@ jobs:
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
             --parameters containerImage="ghcr.io/${{ github.repository_owner }}/neighborgoods-api:latest" \
-            --parameters repositoryUrl="https://github.com/${{ github.repository }}"
+            --parameters repositoryUrl="https://github.com/${{ github.repository }}" \
+            ${LIFF_EXTRA}
 
       - name: What-if Bicep infrastructure
+        env:
+          LINE_MESSAGING_LIFF_ID: ${{ secrets.LINE_MESSAGING_LIFF_ID }}
+          # 非機密：建議用 Repository variable（與 Vite 正式站網域一致，例 https://www.example.com）
+          LINE_MESSAGING_WEB_BASE_URL: ${{ vars.LINE_MESSAGING_WEB_BASE_URL }}
         run: |
+          set -euo pipefail
+          LIFF_EXTRA=""
+          if [ -n "${LINE_MESSAGING_LIFF_ID:-}" ]; then
+            LIFF_EXTRA="${LIFF_EXTRA} --parameters lineMessagingLiffId=${LINE_MESSAGING_LIFF_ID}"
+          fi
+          if [ -n "${LINE_MESSAGING_WEB_BASE_URL:-}" ]; then
+            LIFF_EXTRA="${LIFF_EXTRA} --parameters lineMessagingWebBaseUrl=${LINE_MESSAGING_WEB_BASE_URL}"
+          fi
           az deployment group what-if \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --template-file infra/bicep/deploy.bicep \
@@ -74,4 +108,5 @@ jobs:
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
             --parameters containerImage="ghcr.io/${{ github.repository_owner }}/neighborgoods-api:latest" \
-            --parameters repositoryUrl="https://github.com/${{ github.repository }}"
+            --parameters repositoryUrl="https://github.com/${{ github.repository }}" \
+            ${LIFF_EXTRA}

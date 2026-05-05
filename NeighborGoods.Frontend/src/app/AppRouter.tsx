@@ -13,6 +13,9 @@ const RegisterPage = lazy(() =>
   import('@/features/auth/pages/RegisterPage').then((module) => ({ default: module.RegisterPage })),
 )
 const AccountPage = lazy(() => import('@/features/account/pages/AccountPage').then((module) => ({ default: module.AccountPage })))
+const AccountEmailVerifyPage = lazy(() =>
+  import('@/features/account/pages/AccountEmailVerifyPage').then((module) => ({ default: module.AccountEmailVerifyPage })),
+)
 const LineNotifyLiffPage = lazy(() =>
   import('@/features/account/pages/LineNotifyLiffPage').then((module) => ({ default: module.LineNotifyLiffPage })),
 )
@@ -73,6 +76,7 @@ export const AppRouter = () => {
           <Route path="/seller/:sellerId" element={<SellerPage />} />
           <Route element={<RequireAuth />}>
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/account/email-verify" element={<AccountEmailVerifyPage />} />
             <Route path="/notifications" element={<NotificationCenterPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/my-listings" element={<MyListingsPage />} />

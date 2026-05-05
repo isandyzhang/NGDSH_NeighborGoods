@@ -37,6 +37,7 @@ public sealed class AccountProfileService(NeighborGoodsDbContext dbContext)
             user.DisplayName,
             user.Email,
             user.EmailConfirmed,
+            user.EmailNotificationEnabled,
             user.LineUserId,
             !string.IsNullOrWhiteSpace(user.LineMessagingApiUserId),
             user.CreatedAt,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { accountApi, type AccountMe, type LinePreferences, type StartLineBindingResponse } from '@/features/account/api/accountApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -8,6 +8,7 @@ import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
 export const AccountPage = () => {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [profile, setProfile] = useState<AccountMe | null>(null)
   const [linePreferences, setLinePreferences] = useState<LinePreferences | null>(null)
@@ -28,7 +29,7 @@ export const AccountPage = () => {
       return
     }
 
-    setSuccessText('LINE 官方通知已綁定。若尚未啟用推播，請於下方啟用。')
+    setSuccessText('LINE 官方帳號已綁定。請在下方「通知開關」區塊啟用或管理推播。')
     setSearchParams({}, { replace: true })
     void reloadData().catch(() => undefined)
   }, [reloadData, searchParams, setSearchParams])
@@ -79,7 +80,23 @@ export const AccountPage = () => {
     setLinePreferences(updated)
   }, [linePreferences])
 
-  const handleLineMainAction = async () => {
+  const openLineBindingWindow = useCallback(async (result: StartLineBindingResponse) => {
+    try {
+      const liffMod = await import('@line/liff')
+      const liff = liffMod.default
+      const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+      if (liffId?.trim() && liff.isInClient()) {
+        await liff.init({ liffId: liffId.trim() })
+        await liff.openWindow({ url: result.liffUrl, external: false })
+      } else {
+        window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch {
+      window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+    }
+  }, [])
+
+  const handleStartLineOfficialBinding = async () => {
     if (!profile || actionLoading) {
       return
     }
@@ -88,32 +105,117 @@ export const AccountPage = () => {
     setError(null)
     setSuccessText(null)
     try {
-      if (profile.lineNotifyBound) {
-        await enableLineNotify()
-        setSuccessText('已啟用 LINE 官方通知')
-      } else {
-        const result = await accountApi.startLineBinding()
-        setBindingStart(result)
-        try {
-          const liffMod = await import('@line/liff')
-          const liff = liffMod.default
-          const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
-          if (liffId?.trim() && liff.isInClient()) {
-            await liff.init({ liffId: liffId.trim() })
-            await liff.openWindow({ url: result.liffUrl, external: false })
-          } else {
-            window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
-          }
-        } catch {
-          window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
-        }
-      }
+      const result = await accountApi.startLineBinding()
+      setBindingStart(result)
+      await openLineBindingWindow(result)
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : '處理 LINE 通知設定失敗')
+      setError(err instanceof ApiClientError ? err.message : '無法開始 LINE 綁定')
     } finally {
       setActionLoading(false)
     }
   }
+
+  const handleLineOpenNotifications = async () => {
+    if (actionLoading) {
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    setSuccessText(null)
+    try {
+      await enableLineNotify()
+      await reloadData()
+      setSuccessText('已開啟 LINE 官方通知')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '開啟 LINE 通知失敗')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleLineCancelNotifications = async () => {
+    if (actionLoading) {
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    setSuccessText(null)
+    try {
+      await accountApi.disableLineNotifications()
+      await reloadData()
+      setSuccessText('已取消 LINE 官方通知')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '取消 LINE 通知失敗')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleEmailOpenNotifications = async () => {
+    if (actionLoading) {
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    setSuccessText(null)
+    try {
+      await accountApi.enableEmailNotifications()
+      await reloadData()
+      setSuccessText('已開啟 Email 通知')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '開啟 Email 通知失敗')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleEmailCancelNotifications = async () => {
+    if (actionLoading) {
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    setSuccessText(null)
+    try {
+      await accountApi.disableEmailNotifications()
+      await reloadData()
+      setSuccessText('已取消 Email 通知')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '取消 Email 通知失敗')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const emailNotifyStatusLine = useMemo(() => {
+    if (!profile) {
+      return ''
+    }
+    if (!profile.emailConfirmed) {
+      return '尚未完成 Email 驗證，無法開啟通知'
+    }
+    if (!profile.emailNotificationEnabled) {
+      return '目前狀態：通知已關閉'
+    }
+    return '目前狀態：通知已開啟'
+  }, [profile])
+
+  const lineNotifyStatusLine = useMemo(() => {
+    if (!profile) {
+      return ''
+    }
+    if (!profile.lineNotifyBound) {
+      return '尚未綁定 LINE 官方通知帳號'
+    }
+    if (!lineNotifyEnabled) {
+      return '目前狀態：通知已關閉'
+    }
+    return '目前狀態：通知已開啟'
+  }, [profile, lineNotifyEnabled])
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 md:py-8">
@@ -130,7 +232,9 @@ export const AccountPage = () => {
 
       {!loading && profile ? (
         <Card className="animate-fade-rise space-y-4" style={{ animationDelay: '120ms' }}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">帳號與綁定</p>
+            <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-xs text-text-muted">顯示名稱</p>
               <p className="text-lg font-semibold text-text-main">{profile.displayName}</p>
@@ -145,14 +249,18 @@ export const AccountPage = () => {
             </div>
             <div>
               <p className="text-xs text-text-muted">Email 驗證</p>
-              <p className={`text-lg font-semibold ${profile.emailConfirmed ? 'text-[#1E6B43]' : 'text-danger'}`}>
-                {profile.emailConfirmed ? '已驗證' : 'EMAIL未驗證'}
+              <p
+                className={`text-lg font-semibold ${profile.emailConfirmed ? 'text-[#1E6B43]' : 'text-text-muted'}`}
+              >
+                {profile.emailConfirmed ? '已驗證' : '未驗證'}
               </p>
             </div>
             <div>
               <p className="text-xs text-text-muted">LINE 綁定</p>
-              <p className={`text-lg font-semibold ${profile.lineUserId ? 'text-[#1E6B43]' : 'text-text-muted'}`}>
-                {profile.lineUserId ? '已綁定' : '未綁定'}
+              <p
+                className={`text-lg font-semibold ${profile.lineNotifyBound ? 'text-[#1E6B43]' : 'text-text-muted'}`}
+              >
+                {profile.lineNotifyBound ? '已綁定' : '未綁定'}
               </p>
             </div>
             <div>
@@ -161,41 +269,108 @@ export const AccountPage = () => {
                 {new Date(profile.createdAt).toLocaleDateString('zh-TW')}
               </p>
             </div>
+            </div>
           </div>
 
-          <div className="grid gap-3 border-t border-border pt-4">
-            <StatusRow
-              label="Email 驗證狀態"
-              ok={profile.emailConfirmed}
-              okText="Email 已驗證"
-              emptyText="EMAIL未驗證"
-            />
-            <StatusRow
-              label="LINE 官方通知"
-              ok={profile.lineNotifyBound && lineNotifyEnabled}
-              okText="LINE 官方通知已啟用"
-              emptyText={profile.lineNotifyBound ? '已綁定官方帳號，但通知尚未啟用' : 'LINE未綁定官方通知帳號'}
-            />
-          </div>
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">通知開關</p>
+            <div className="grid gap-3">
+            <div className="rounded-xl border border-border bg-surface-2 px-3 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-text-subtle">EMAIL 通知狀態</p>
+                  <p
+                    className={`mt-1 text-sm font-semibold ${
+                      profile.emailConfirmed && profile.emailNotificationEnabled ? 'text-[#1E6B43]' : 'text-text-main'
+                    }`}
+                  >
+                    {emailNotifyStatusLine}
+                  </p>
+                </div>
+                <div className="flex shrink-0 justify-end sm:justify-end">
+                {!profile.emailConfirmed ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="text-sm font-semibold"
+                    onClick={() => navigate('/account/email-verify')}
+                  >
+                    開始驗證
+                  </Button>
+                ) : !profile.emailNotificationEnabled ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="text-sm font-semibold"
+                    disabled={actionLoading}
+                    onClick={() => void handleEmailOpenNotifications()}
+                  >
+                    {actionLoading ? '處理中...' : '打開EMAIL通知'}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="text-sm font-semibold"
+                    disabled={actionLoading}
+                    onClick={() => void handleEmailCancelNotifications()}
+                  >
+                    {actionLoading ? '處理中...' : '取消通知'}
+                  </Button>
+                )}
+                </div>
+              </div>
+            </div>
 
-          <Button
-            type="button"
-            fullWidth
-            variant={profile.lineNotifyBound && lineNotifyEnabled ? 'secondary' : 'primary'}
-            className="min-h-[3rem] text-base font-semibold"
-            disabled={actionLoading || (profile.lineNotifyBound && lineNotifyEnabled)}
-            onClick={() => void handleLineMainAction()}
-          >
-            {profile.lineNotifyBound
-              ? lineNotifyEnabled
-                ? 'LINE 官方通知已啟用'
-                : actionLoading
-                  ? '啟用中...'
-                  : '啟用 LINE 官方通知'
-              : actionLoading
-                ? '準備綁定中...'
-                : '綁定 LINE 官方通知帳號'}
-          </Button>
+            <div className="rounded-xl border border-border bg-surface-2 px-3 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-text-subtle">LINE 通知狀態</p>
+                  <p
+                    className={`mt-1 text-sm font-semibold ${
+                      profile.lineNotifyBound && lineNotifyEnabled ? 'text-[#1E6B43]' : 'text-text-main'
+                    }`}
+                  >
+                    {lineNotifyStatusLine}
+                  </p>
+                </div>
+                <div className="flex shrink-0 justify-end sm:justify-end">
+                {!profile.lineNotifyBound ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="text-sm font-semibold"
+                    disabled={actionLoading}
+                    onClick={() => void handleStartLineOfficialBinding()}
+                  >
+                    {actionLoading ? '準備中...' : '開始綁定'}
+                  </Button>
+                ) : !lineNotifyEnabled ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="text-sm font-semibold"
+                    disabled={actionLoading}
+                    onClick={() => void handleLineOpenNotifications()}
+                  >
+                    {actionLoading ? '處理中...' : '打開LINE通知'}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="text-sm font-semibold"
+                    disabled={actionLoading}
+                    onClick={() => void handleLineCancelNotifications()}
+                  >
+                    {actionLoading ? '處理中...' : '取消通知'}
+                  </Button>
+                )}
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
 
           {!profile.lineNotifyBound && bindingStart ? (
             <Card className="border-dashed border-[#D8C0A3] bg-[#FFF9F1] p-4">
@@ -221,23 +396,3 @@ export const AccountPage = () => {
     </main>
   )
 }
-
-const StatusRow = ({
-  label,
-  ok,
-  okText,
-  emptyText,
-}: {
-  label: string
-  ok: boolean
-  okText: string
-  emptyText: string
-}) => (
-  <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2 px-3 py-2">
-    <span className="text-sm text-text-subtle">{label}</span>
-    <span className={`inline-flex items-center gap-2 text-sm font-semibold ${ok ? 'text-[#1E6B43]' : 'text-text-muted'}`}>
-      <span className={`h-3 w-3 rounded-full border ${ok ? 'border-[#1E6B43] bg-[#1E6B43]' : 'border-border bg-transparent'}`} />
-      {ok ? okText : emptyText}
-    </span>
-  </div>
-)

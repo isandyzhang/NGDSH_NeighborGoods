@@ -6,6 +6,7 @@ public sealed record AccountMeResponse(
     string DisplayName,
     string? Email,
     bool EmailConfirmed,
+    bool EmailNotificationEnabled,
     string? LineUserId,
     bool LineNotifyBound,
     DateTime CreatedAt,

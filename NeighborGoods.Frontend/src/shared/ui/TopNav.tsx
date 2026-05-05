@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { accountApi } from '@/features/account/api/accountApi'
 import siteLogo from '@/png/logo.png'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 
 export const TopNav = () => {
-  const navigate = useNavigate()
   const { pathname } = useLocation()
   const { isAuthenticated, tokens, logout } = useAuth()
   const hideLoginAction = pathname === '/login'
@@ -79,7 +78,8 @@ export const TopNav = () => {
     try {
       await logout()
       setMenuOpen(false)
-      navigate('/listings')
+      // 完整重新載入以清乾淨登入狀態與快取，並導向登入頁
+      window.location.replace('/login')
     } finally {
       setLoggingOut(false)
     }

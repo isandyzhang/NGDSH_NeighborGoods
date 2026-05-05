@@ -2,7 +2,7 @@ import liff from '@line/liff'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { env } from '@/shared/config/env'
-import type { ApiResponse } from '@/shared/types/api'
+import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 
 type Phase = 'loading' | 'needLineApp' | 'needFriend' | 'submitting' | 'done' | 'error'
@@ -25,9 +25,7 @@ export const LineNotifyLiffPage = () => {
       body: JSON.stringify({ bindingToken: bindToken, idToken }),
     })
     const json = (await res.json()) as ApiResponse<{ bound: boolean }>
-    if (!json.success) {
-      throw new Error(json.error.message)
-    }
+    unwrapApiResponse(json)
   }, [bindToken])
 
   const finishAndClose = useCallback(async () => {

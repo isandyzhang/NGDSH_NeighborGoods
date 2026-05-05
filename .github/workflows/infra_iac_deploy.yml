@@ -50,14 +50,33 @@ jobs:
       - name: Install Azure CLI Bicep
         run: az bicep install
 
+      # 選填 secret：LINE_MESSAGING_LIFF_ID；未設時沿用 deploy.parameters.prod.json
+      - name: LIFF 設定提示（LineMessagingApi:LiffId）
+        env:
+          LINE_MESSAGING_LIFF_ID: ${{ secrets.LINE_MESSAGING_LIFF_ID }}
+        run: |
+          if [ -z "${LINE_MESSAGING_LIFF_ID:-}" ]; then
+            echo "::warning title=LIFF::LIFF 尚未設定，請管理員設定 LineMessagingApi:LiffId。（可於 Repository secrets 新增 LINE_MESSAGING_LIFF_ID，或確認 deploy.parameters.prod.json 已設定 lineMessagingLiffId）"
+          fi
+
       - name: Deploy Bicep infrastructure
         env:
           BIND_TLS: ${{ inputs.bind_managed_tls }}
           PROVISION_DNS: ${{ inputs.provision_api_dns_in_azure }}
           DNS_ZONE: ${{ inputs.api_dns_zone_name }}
           DNS_ZONE_RG: ${{ inputs.api_dns_zone_resource_group }}
+          LINE_MESSAGING_LIFF_ID: ${{ secrets.LINE_MESSAGING_LIFF_ID }}
+          # 非機密：建議用 Repository variable（前端公開網址）
+          LINE_MESSAGING_WEB_BASE_URL: ${{ vars.LINE_MESSAGING_WEB_BASE_URL }}
         run: |
           set -euo pipefail
+          LIFF_EXTRA=""
+          if [ -n "${LINE_MESSAGING_LIFF_ID:-}" ]; then
+            LIFF_EXTRA="${LIFF_EXTRA} --parameters lineMessagingLiffId=${LINE_MESSAGING_LIFF_ID}"
+          fi
+          if [ -n "${LINE_MESSAGING_WEB_BASE_URL:-}" ]; then
+            LIFF_EXTRA="${LIFF_EXTRA} --parameters lineMessagingWebBaseUrl=${LINE_MESSAGING_WEB_BASE_URL}"
+          fi
           EXTRA=""
           if [ "${BIND_TLS}" != "依參數檔" ]; then
             EXTRA="${EXTRA} --parameters apiCustomDomainBindManagedTls=${BIND_TLS}"
@@ -88,4 +107,5 @@ jobs:
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
             --parameters containerImage="ghcr.io/${{ github.repository_owner }}/neighborgoods-api:latest" \
             --parameters repositoryUrl="https://github.com/${{ github.repository }}" \
+            ${LIFF_EXTRA} \
             ${EXTRA}

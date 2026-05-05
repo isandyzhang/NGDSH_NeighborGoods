@@ -7,6 +7,7 @@ export type AccountMe = {
   displayName: string
   email: string | null
   emailConfirmed: boolean
+  emailNotificationEnabled: boolean
   lineUserId: string | null
   lineNotifyBound: boolean
   createdAt: string
@@ -92,6 +93,47 @@ export const accountApi = {
 
   async startLineBinding(): Promise<StartLineBindingResponse> {
     const response = await http.post<ApiResponse<StartLineBindingResponse>>('/api/v1/account/line/bind/start')
+    return unwrapApiResponse(response.data)
+  },
+
+  async sendListingEmailCode(email: string): Promise<{ sent: boolean }> {
+    const response = await http.post<ApiResponse<{ sent: boolean }>>('/api/v1/account/email/send-code', { email })
+    return unwrapApiResponse(response.data)
+  },
+
+  async verifyListingEmail(email: string, code: string): Promise<{ verified: boolean }> {
+    const response = await http.post<ApiResponse<{ verified: boolean }>>('/api/v1/account/email/verify', {
+      email,
+      code,
+    })
+    return unwrapApiResponse(response.data)
+  },
+
+  async disableNotifications(): Promise<{ emailNotificationEnabled: boolean }> {
+    const response = await http.post<ApiResponse<{ emailNotificationEnabled: boolean }>>(
+      '/api/v1/account/notifications/disable',
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async enableEmailNotifications(): Promise<{ emailNotificationEnabled: boolean }> {
+    const response = await http.post<ApiResponse<{ emailNotificationEnabled: boolean }>>(
+      '/api/v1/account/notifications/email/enable',
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async disableEmailNotifications(): Promise<{ emailNotificationEnabled: boolean }> {
+    const response = await http.post<ApiResponse<{ emailNotificationEnabled: boolean }>>(
+      '/api/v1/account/notifications/email/disable',
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async disableLineNotifications(): Promise<{ lineNotificationsDisabled: boolean }> {
+    const response = await http.post<ApiResponse<{ lineNotificationsDisabled: boolean }>>(
+      '/api/v1/account/notifications/line/disable',
+    )
     return unwrapApiResponse(response.data)
   },
 }

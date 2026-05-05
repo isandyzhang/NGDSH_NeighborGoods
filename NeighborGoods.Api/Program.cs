@@ -60,6 +60,7 @@ builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 builder.Services.AddScoped<AccountRegistrationService>();
 builder.Services.AddScoped<AccountEmailVerificationService>();
 builder.Services.AddScoped<AccountProfileService>();
+builder.Services.AddScoped<AccountNotificationPreferenceService>();
 builder.Services.AddScoped<AccountLineBindingService>();
 builder.Services.AddScoped<AccountLinePreferenceService>();
 builder.Services.AddScoped<LineWebhookService>();
