@@ -1,11 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Listing;
+using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Persistence;
 using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Integrations.Line.Services;
 
-public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
+public sealed class LineMenuQueryService(
+    NeighborGoodsDbContext dbContext,
+    IBlobStorage blobStorage)
 {
     public async Task<AspNetUser?> GetBoundUserAsync(string lineUserId, CancellationToken cancellationToken = default)
     {
@@ -40,11 +43,12 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
         int maxItems = 5,
         CancellationToken cancellationToken = default)
     {
-        maxItems = Math.Clamp(maxItems, 1, 5);
+        maxItems = Math.Clamp(maxItems, 1, 3);
+        var soldStatus = (int)ListingStatus.Sold;
 
         var listings = await dbContext.Listings
             .AsNoTracking()
-            .Where(x => x.SellerId == userId)
+            .Where(x => x.SellerId == userId && x.Status != soldStatus)
             .Select(x => new
             {
                 x.Id,
@@ -62,6 +66,7 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
         }
 
         var listingIds = listings.Select(x => x.Id).ToList();
+        var coverImageMap = await GetCoverImageMapAsync(listingIds, cancellationToken);
 
         var favoriteCounts = await dbContext.ListingFavorites
             .AsNoTracking()
@@ -70,7 +75,7 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
             .Select(g => new { ListingId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ListingId, x => x.Count, cancellationToken);
 
-        var unreadConversationListingIds = await (
+        var unreadCountByListingId = await (
             from c in dbContext.Conversations.AsNoTracking()
             join m in dbContext.Messages.AsNoTracking() on c.Id equals m.ConversationId
             where listingIds.Contains(c.ListingId)
@@ -78,30 +83,33 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
                 && m.SenderId != userId
                 && ((c.Participant1Id == userId && (c.Participant1LastReadAt == null || m.CreatedAt > c.Participant1LastReadAt.Value))
                     || (c.Participant2Id == userId && (c.Participant2LastReadAt == null || m.CreatedAt > c.Participant2LastReadAt.Value)))
-            select c.ListingId
+            group m by c.ListingId
+            into g
+            select new { ListingId = g.Key, UnreadCount = g.Count() }
         )
-        .Distinct()
-        .ToListAsync(cancellationToken);
-
-        var unreadListingIdSet = unreadConversationListingIds.ToHashSet();
+        .ToDictionaryAsync(x => x.ListingId, x => x.UnreadCount, cancellationToken);
 
         return listings
             .Select(x =>
             {
                 favoriteCounts.TryGetValue(x.Id, out var favoriteCount);
+                coverImageMap.TryGetValue(x.Id, out var imageUrl);
+                unreadCountByListingId.TryGetValue(x.Id, out var unreadCount);
                 return new LineMyListingCardItem(
                     x.Id,
                     x.Title,
+                    imageUrl,
                     x.Status,
                     x.IsFree,
                     x.Price,
                     favoriteCount,
                     LastStatusChangedAt: x.UpdatedAt,
-                    HasUnreadMessages: unreadListingIdSet.Contains(x.Id),
+                    UnreadCount: unreadCount,
                     x.UpdatedAt,
                     x.CreatedAt);
             })
-            .OrderByDescending(x => x.HasUnreadMessages)
+            .OrderByDescending(x => x.Status == (int)ListingStatus.Reserved)
+            .ThenByDescending(x => x.UnreadCount > 0)
             .ThenByDescending(x => x.LastStatusChangedAt)
             .ThenByDescending(x => x.UpdatedAt)
             .ThenByDescending(x => x.CreatedAt)
@@ -109,18 +117,66 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
             .ToList();
     }
 
+    private async Task<Dictionary<Guid, string?>> GetCoverImageMapAsync(
+        IReadOnlyCollection<Guid> listingIds,
+        CancellationToken cancellationToken)
+    {
+        if (listingIds.Count == 0)
+        {
+            return [];
+        }
+
+        var images = await dbContext.ListingImages
+            .AsNoTracking()
+            .Where(x => listingIds.Contains(x.ListingId))
+            .OrderBy(x => x.ListingId)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .Select(x => new { x.ListingId, x.ImageUrl })
+            .ToListAsync(cancellationToken);
+
+        return images
+            .GroupBy(x => x.ListingId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var raw = g.FirstOrDefault()?.ImageUrl;
+                    return string.IsNullOrWhiteSpace(raw) ? null : ResolveImageUrl(raw);
+                });
+    }
+
+    private string ResolveImageUrl(string storedPathOrUrl)
+    {
+        if (storedPathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            storedPathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return storedPathOrUrl;
+        }
+
+        return blobStorage.BuildPublicUrl(storedPathOrUrl);
+    }
+
     public async Task<LineMyMessagesSummary> GetMyMessagesSummaryAsync(string userId, CancellationToken cancellationToken = default)
     {
+        var selfUser = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .Where(x => x.Id == userId)
+            .Select(x => new { x.Id, x.CreatedAt })
+            .FirstOrDefaultAsync(cancellationToken);
+
         var conversations = await dbContext.Conversations
             .AsNoTracking()
             .Where(c => c.Participant1Id == userId || c.Participant2Id == userId)
             .Select(c => new
             {
                 c.Id,
+                c.ListingId,
                 c.Participant1Id,
                 c.Participant1LastReadAt,
                 c.Participant2LastReadAt,
                 c.UpdatedAt,
+                ListingTitle = c.Listing.Title,
                 Participant1DisplayName = c.Participant1.DisplayName,
                 Participant2DisplayName = c.Participant2.DisplayName
             })
@@ -128,7 +184,12 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
 
         if (conversations.Count == 0)
         {
-            return new LineMyMessagesSummary(0, 0, Array.Empty<LineUnreadConversationQuickLink>());
+            return new LineMyMessagesSummary(
+                0,
+                0,
+                selfUser?.Id ?? userId,
+                selfUser?.CreatedAt,
+                Array.Empty<LineRecentConversationItem>());
         }
 
         var unreadCounts1 = await (
@@ -161,48 +222,62 @@ public sealed class LineMenuQueryService(NeighborGoodsDbContext dbContext)
             unreadCountByConversationId[kv.Key] = kv.Value;
         }
 
-        var unreadConversationIds = unreadCountByConversationId
-            .Where(x => x.Value > 0)
-            .Select(x => x.Key)
-            .ToList();
-
-        var latestMessageAtByConversationId = unreadConversationIds.Count == 0
-            ? new Dictionary<Guid, DateTime>()
-            : await dbContext.Messages
+        var conversationIds = conversations.Select(x => x.Id).ToList();
+        var latestMessageByConversationId = conversationIds.Count == 0
+            ? new Dictionary<Guid, (string Content, DateTime CreatedAt)>()
+            : (await dbContext.Messages
                 .AsNoTracking()
-                .Where(m => unreadConversationIds.Contains(m.ConversationId))
+                .Where(m => conversationIds.Contains(m.ConversationId))
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => new
+                {
+                    m.ConversationId,
+                    m.Content,
+                    m.CreatedAt
+                })
+                .ToListAsync(cancellationToken))
                 .GroupBy(m => m.ConversationId)
-                .Select(g => new { ConversationId = g.Key, LatestAt = g.Max(x => x.CreatedAt) })
-                .ToDictionaryAsync(x => x.ConversationId, x => x.LatestAt, cancellationToken);
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var latest = g.First();
+                        return (latest.Content, latest.CreatedAt);
+                    });
 
-        var unreadQuickLinks = conversations
+        var recentConversations = conversations
             .Select(c =>
             {
                 unreadCountByConversationId.TryGetValue(c.Id, out var unreadCount);
-                if (unreadCount <= 0)
-                {
-                    return null;
-                }
-
                 var otherDisplayName = c.Participant1Id == userId
                     ? c.Participant2DisplayName ?? "對方"
                     : c.Participant1DisplayName ?? "對方";
+                latestMessageByConversationId.TryGetValue(c.Id, out var latestMessage);
+                var latestMessageContent = string.IsNullOrWhiteSpace(latestMessage.Content)
+                    ? "（無訊息內容）"
+                    : latestMessage.Content;
+                var latestMessageAt = latestMessage.CreatedAt == default ? c.UpdatedAt : latestMessage.CreatedAt;
 
-                latestMessageAtByConversationId.TryGetValue(c.Id, out var latestMessageAt);
-                return new LineUnreadConversationQuickLink(
+                return new LineRecentConversationItem(
                     c.Id,
                     otherDisplayName,
-                    unreadCount,
-                    latestMessageAt == default ? c.UpdatedAt : latestMessageAt);
+                    c.ListingTitle,
+                    latestMessageContent,
+                    latestMessageAt,
+                    unreadCount);
             })
-            .Where(x => x is not null)
-            .Select(x => x!)
-            .OrderByDescending(x => x.LatestMessageAt)
+            .OrderByDescending(x => x.UnreadCount > 0)
+            .ThenByDescending(x => x.LatestMessageAt)
             .Take(3)
             .ToList();
 
         var unreadTotal = unreadCountByConversationId.Values.Sum();
-        return new LineMyMessagesSummary(conversations.Count, unreadTotal, unreadQuickLinks);
+        return new LineMyMessagesSummary(
+            conversations.Count,
+            unreadTotal,
+            selfUser?.Id ?? userId,
+            selfUser?.CreatedAt,
+            recentConversations);
     }
 }
 
@@ -215,22 +290,27 @@ public sealed record LineMyListingsSummary(
 public sealed record LineMyMessagesSummary(
     int ConversationCount,
     int UnreadCount,
-    IReadOnlyList<LineUnreadConversationQuickLink> UnreadQuickLinks);
+    string UserId,
+    DateTime? RegisteredAt,
+    IReadOnlyList<LineRecentConversationItem> RecentConversations);
 
 public sealed record LineMyListingCardItem(
     Guid ListingId,
     string Title,
+    string? ImageUrl,
     int Status,
     bool IsFree,
     decimal Price,
     int FavoriteCount,
     DateTime LastStatusChangedAt,
-    bool HasUnreadMessages,
+    int UnreadCount,
     DateTime UpdatedAt,
     DateTime CreatedAt);
 
-public sealed record LineUnreadConversationQuickLink(
+public sealed record LineRecentConversationItem(
     Guid ConversationId,
     string OtherDisplayName,
-    int UnreadCount,
-    DateTime LatestMessageAt);
+    string ListingTitle,
+    string LatestMessageContent,
+    DateTime LatestMessageAt,
+    int UnreadCount);

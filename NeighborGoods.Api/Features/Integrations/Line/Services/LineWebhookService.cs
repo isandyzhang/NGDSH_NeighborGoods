@@ -111,7 +111,7 @@ public sealed class LineWebhookService(
             }
 
             var summary = await lineMenuQueryService.GetMyListingsSummaryAsync(user.Id, cancellationToken);
-            var items = await lineMenuQueryService.GetMyListingCardItemsAsync(user.Id, 5, cancellationToken);
+            var items = await lineMenuQueryService.GetMyListingCardItemsAsync(user.Id, 3, cancellationToken);
             var card = flexMessageBuilder.BuildMyListingsCarousel(summary, items);
             await lineMessageSender.ReplyFlexAsync(evt.ReplyToken!, card.AltText, card.Contents, cancellationToken);
             return;

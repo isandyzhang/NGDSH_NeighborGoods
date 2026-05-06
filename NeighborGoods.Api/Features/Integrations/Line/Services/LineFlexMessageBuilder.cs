@@ -29,20 +29,17 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         LineMyListingsSummary summary,
         IReadOnlyList<LineMyListingCardItem> items)
     {
-        var bubbles = new List<object>
-        {
-            BuildSummaryBubble(
-                title: "我的商品總覽",
-                message: $"總數 {summary.Total}｜刊登中 {summary.Active}｜保留中 {summary.Reserved}｜已售出 {summary.Sold}",
-                buttonLabel: "前往我的商品",
-                buttonUrl: BuildUrl("/my-listings"))
-        };
+        var bubbles = new List<object>();
 
         foreach (var item in items)
         {
             var priceText = item.IsFree ? "免費" : $"{item.Price:0} 元";
-            var statusText = ToListingStatusText(item.Status);
-            var unreadText = item.HasUnreadMessages ? "有未讀訊息" : "無未讀訊息";
+            var (statusText, statusColor) = GetListingStatusBadge(item.Status);
+            var overlayColor = item.Status == 0 ? "#03303Acc" : "#9C8E7Ecc";
+            var imageUrl = string.IsNullOrWhiteSpace(item.ImageUrl)
+                ? "https://developers-resource.landpress.line.me/fx/img/01_1_cafe.png"
+                : item.ImageUrl;
+            var favoriteText = $"❤ {item.FavoriteCount}";
 
             bubbles.Add(new
             {
@@ -51,73 +48,126 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                 {
                     type = "box",
                     layout = "vertical",
-                    spacing = "md",
                     contents = new object[]
                     {
                         new
                         {
-                            type = "text",
-                            text = item.Title,
-                            weight = "bold",
-                            size = "lg",
-                            wrap = true,
-                            maxLines = 2
+                            type = "image",
+                            url = imageUrl,
+                            size = "full",
+                            aspectMode = "cover",
+                            aspectRatio = "2:3",
+                            gravity = "top"
                         },
                         new
                         {
-                            type = "text",
-                            text = $"狀態：{statusText}",
-                            size = "sm",
-                            color = "#666666",
-                            wrap = true
-                        },
-                        new
-                        {
-                            type = "text",
-                            text = $"被收藏：{item.FavoriteCount}",
-                            size = "sm",
-                            color = "#666666"
-                        },
-                        new
-                        {
-                            type = "text",
-                            text = $"價格：{priceText}",
-                            size = "sm",
-                            color = "#666666"
-                        },
-                        new
-                        {
-                            type = "text",
-                            text = unreadText,
-                            size = "sm",
-                            color = item.HasUnreadMessages ? "#C2185B" : "#666666"
-                        }
-                    }
-                },
-                footer = new
-                {
-                    type = "box",
-                    layout = "vertical",
-                    contents = new object[]
-                    {
-                        new
-                        {
-                            type = "button",
-                            style = "primary",
-                            action = new
+                            type = "box",
+                            layout = "vertical",
+                            position = "absolute",
+                            offsetBottom = "0px",
+                            offsetStart = "0px",
+                            offsetEnd = "0px",
+                            backgroundColor = overlayColor,
+                            paddingAll = "20px",
+                            paddingTop = "18px",
+                            contents = new object[]
                             {
-                                type = "uri",
-                                label = "查看商品",
-                                uri = BuildUrl($"/listings/{item.ListingId}")
+                                new
+                                {
+                                    type = "text",
+                                    text = item.Title,
+                                    size = "xl",
+                                    color = "#ffffff",
+                                    weight = "bold",
+                                    wrap = true,
+                                    maxLines = 2
+                                },
+                                new
+                                {
+                                    type = "text",
+                                    text = priceText,
+                                    color = "#ebebeb",
+                                    size = "sm",
+                                    margin = "md"
+                                },
+                                new
+                                {
+                                    type = "box",
+                                    layout = "horizontal",
+                                    margin = "sm",
+                                    contents = new object[]
+                                    {
+                                        new
+                                        {
+                                            type = "text",
+                                            text = favoriteText,
+                                            color = "#ffffff",
+                                            size = "lg",
+                                            weight = "bold",
+                                            flex = 1
+                                        },
+                                        BuildUnreadBadge(item.UnreadCount, BuildUrl("/messages"))
+                                    }
+                                },
+                                new
+                                {
+                                    type = "box",
+                                    layout = "vertical",
+                                    cornerRadius = "8px",
+                                    margin = "xxl",
+                                    height = "40px",
+                                    contents = new object[]
+                                    {
+                                        new
+                                        {
+                                            type = "button",
+                                            style = "primary",
+                                            color = "#1DB446",
+                                            height = "sm",
+                                            action = new
+                                            {
+                                                type = "uri",
+                                                label = "查看商品詳細",
+                                                uri = BuildUrl($"/listings/{item.ListingId}")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        new
+                        {
+                            type = "box",
+                            layout = "vertical",
+                            position = "absolute",
+                            cornerRadius = "20px",
+                            offsetTop = "18px",
+                            offsetStart = "18px",
+                            height = "25px",
+                            paddingStart = "8px",
+                            paddingEnd = "8px",
+                            backgroundColor = statusColor,
+                            contents = new object[]
+                            {
+                                new
+                                {
+                                    type = "text",
+                                    text = statusText,
+                                    color = "#ffffff",
+                                    align = "center",
+                                    size = "xs",
+                                    offsetTop = "3px"
+                                }
                             }
                         }
-                    }
+                    },
+                    paddingAll = "0px"
                 }
             });
         }
 
         return new LineFlexMessage(
-            AltText: $"我的商品：共 {summary.Total} 筆，顯示最多 5 筆重點商品",
+            AltText: $"我的商品：共 {summary.Total} 筆，顯示最多 3 筆刊登中/保留中商品",
             Contents: new
             {
                 type = "carousel",
@@ -136,19 +186,79 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
 
     public LineFlexMessage BuildMyMessagesQuickLinksCard(LineMyMessagesSummary summary)
     {
-        var quickLinkRows = summary.UnreadQuickLinks
-            .Select(x => new
+        var conversationRows = summary.RecentConversations
+            .Select((x, index) =>
             {
-                type = "button",
-                style = "link",
-                action = new
+                var rowItems = new List<object>
                 {
-                    type = "uri",
-                    label = $"{TrimToLabel(x.OtherDisplayName)}（未讀{x.UnreadCount}）",
-                    uri = BuildUrl($"/messages/{x.ConversationId}")
+                    new
+                    {
+                        type = "box",
+                        layout = "horizontal",
+                        contents = new object[]
+                        {
+                            new
+                            {
+                                type = "text",
+                                text = x.OtherDisplayName,
+                                size = "xl",
+                                weight = "bold",
+                                color = "#111111",
+                                flex = 1
+                            },
+                            BuildUnreadBadge(x.UnreadCount, BuildUrl("/messages"))
+                        }
+                    },
+                    new
+                    {
+                        type = "text",
+                        text = x.ListingTitle,
+                        size = "sm",
+                        color = "#555555",
+                        wrap = true
+                    },
+                    new
+                    {
+                        type = "text",
+                        text = x.LatestMessageContent,
+                        size = "sm",
+                        color = "#111111",
+                        wrap = true,
+                        maxLines = 2
+                    },
+                    new
+                    {
+                        type = "text",
+                        text = x.LatestMessageAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+                        size = "xs",
+                        color = "#aaaaaa"
+                    }
+                };
+
+                var blocks = new List<object>
+                {
+                    new
+                    {
+                        type = "box",
+                        layout = "vertical",
+                        margin = "md",
+                        spacing = "sm",
+                        contents = rowItems.ToArray()
+                    }
+                };
+
+                if (index < summary.RecentConversations.Count - 1)
+                {
+                    blocks.Add(new
+                    {
+                        type = "separator",
+                        margin = "lg"
+                    });
                 }
+
+                return blocks;
             })
-            .Cast<object>()
+            .SelectMany(x => x)
             .ToList();
 
         var bodyContents = new List<object>
@@ -158,34 +268,37 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                 type = "text",
                 text = "我的訊息",
                 weight = "bold",
-                size = "lg",
+                color = "#1DB446",
+                size = "sm",
                 wrap = true
             },
             new
             {
                 type = "text",
-                text = $"目前有 {summary.ConversationCount} 個對話，未讀 {summary.UnreadCount} 則。",
+                text = summary.UserId,
+                weight = "bold",
+                size = "xxl",
+                margin = "md",
                 wrap = true,
-                size = "md"
+            },
+            new
+            {
+                type = "text",
+                text = $"註冊日期：{(summary.RegisteredAt ?? DateTime.UtcNow).ToLocalTime():yyyy-MM-dd}",
+                size = "xs",
+                color = "#aaaaaa",
+                wrap = true
+            },
+            new
+            {
+                type = "separator",
+                margin = "xxl"
             }
         };
 
-        if (quickLinkRows.Count > 0)
+        if (conversationRows.Count > 0)
         {
-            bodyContents.Add(new
-            {
-                type = "separator",
-                margin = "md"
-            });
-
-            bodyContents.Add(new
-            {
-                type = "text",
-                text = "最近未讀對話",
-                size = "sm",
-                color = "#666666",
-                margin = "md"
-            });
+            bodyContents.AddRange(conversationRows);
         }
 
         return new LineFlexMessage(
@@ -205,19 +318,21 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                     type = "box",
                     layout = "vertical",
                     spacing = "sm",
-                    contents = quickLinkRows
-                        .Append(new
+                    contents = new object[]
+                    {
+                        new
                         {
                             type = "button",
                             style = "primary",
+                            height = "sm",
                             action = new
                             {
                                 type = "uri",
-                                label = "查看全部訊息",
+                                label = "前往網站查看全部訊息",
                                 uri = BuildUrl("/messages")
                             }
-                        })
-                        .ToArray()
+                        }
+                    }
                 }
             });
     }
@@ -323,54 +438,14 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             });
     }
 
-    private static object BuildSummaryBubble(string title, string message, string buttonLabel, string buttonUrl)
+    private static (string Text, string Color) GetListingStatusBadge(int status)
     {
-        return new
+        return status switch
         {
-            type = "bubble",
-            body = new
-            {
-                type = "box",
-                layout = "vertical",
-                spacing = "md",
-                contents = new object[]
-                {
-                    new
-                    {
-                        type = "text",
-                        text = title,
-                        weight = "bold",
-                        size = "lg",
-                        wrap = true
-                    },
-                    new
-                    {
-                        type = "text",
-                        text = message,
-                        wrap = true,
-                        size = "md"
-                    }
-                }
-            },
-            footer = new
-            {
-                type = "box",
-                layout = "vertical",
-                contents = new object[]
-                {
-                    new
-                    {
-                        type = "button",
-                        style = "primary",
-                        action = new
-                        {
-                            type = "uri",
-                            label = buttonLabel,
-                            uri = buttonUrl
-                        }
-                    }
-                }
-            }
+            0 => ("刊登中", "#2E7D32"),
+            1 => ("保留中", "#EF6C00"),
+            2 => ("已售出", "#757575"),
+            _ => ("未知", "#607D8B")
         };
     }
 
@@ -394,6 +469,36 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
 
         var trimmed = text.Trim();
         return trimmed.Length <= 12 ? trimmed : trimmed[..12] + "...";
+    }
+
+    private static object BuildUnreadBadge(int unreadCount, string messagesUrl)
+    {
+        if (unreadCount <= 0)
+        {
+            return new
+            {
+                type = "box",
+                layout = "vertical",
+                width = "76px",
+                height = "34px",
+                contents = new object[] { new { type = "filler" } }
+            };
+        }
+
+        var badgeText = unreadCount > 99 ? "未讀 99+" : $"未讀 {unreadCount}";
+        return new
+        {
+            type = "button",
+            style = "primary",
+            color = "#FF334B",
+            height = "sm",
+            action = new
+            {
+                type = "uri",
+                label = badgeText,
+                uri = messagesUrl
+            }
+        };
     }
 
     private string BuildUrl(string path)
