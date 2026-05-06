@@ -162,7 +162,7 @@ public sealed class LineMenuQueryService(
         var selfUser = await dbContext.AspNetUsers
             .AsNoTracking()
             .Where(x => x.Id == userId)
-            .Select(x => new { x.Id, x.CreatedAt })
+            .Select(x => new { x.Id, x.DisplayName, x.CreatedAt })
             .FirstOrDefaultAsync(cancellationToken);
 
         var conversations = await dbContext.Conversations
@@ -187,7 +187,7 @@ public sealed class LineMenuQueryService(
             return new LineMyMessagesSummary(
                 0,
                 0,
-                selfUser?.Id ?? userId,
+                selfUser?.DisplayName ?? selfUser?.Id ?? userId,
                 selfUser?.CreatedAt,
                 Array.Empty<LineRecentConversationItem>());
         }
@@ -275,7 +275,7 @@ public sealed class LineMenuQueryService(
         return new LineMyMessagesSummary(
             conversations.Count,
             unreadTotal,
-            selfUser?.Id ?? userId,
+            selfUser?.DisplayName ?? selfUser?.Id ?? userId,
             selfUser?.CreatedAt,
             recentConversations);
     }
@@ -290,7 +290,7 @@ public sealed record LineMyListingsSummary(
 public sealed record LineMyMessagesSummary(
     int ConversationCount,
     int UnreadCount,
-    string UserId,
+    string UserDisplayName,
     DateTime? RegisteredAt,
     IReadOnlyList<LineRecentConversationItem> RecentConversations);
 

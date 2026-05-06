@@ -52,32 +52,60 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                     {
                         new
                         {
-                            type = "image",
-                            url = imageUrl,
-                            size = "full",
-                            aspectMode = "cover",
-                            aspectRatio = "2:3",
-                            gravity = "top"
+                            type = "box",
+                            layout = "vertical",
+                            contents = new object[]
+                            {
+                                new
+                                {
+                                    type = "image",
+                                    url = imageUrl,
+                                    size = "full",
+                                    aspectMode = "cover",
+                                    aspectRatio = "2:1",
+                                    gravity = "top"
+                                },
+                                new
+                                {
+                                    type = "box",
+                                    layout = "vertical",
+                                    position = "absolute",
+                                    cornerRadius = "20px",
+                                    offsetTop = "12px",
+                                    offsetStart = "12px",
+                                    height = "25px",
+                                    paddingStart = "8px",
+                                    paddingEnd = "8px",
+                                    backgroundColor = statusColor,
+                                    contents = new object[]
+                                    {
+                                        new
+                                        {
+                                            type = "text",
+                                            text = statusText,
+                                            color = "#ffffff",
+                                            align = "center",
+                                            size = "xs",
+                                            offsetTop = "3px"
+                                        }
+                                    }
+                                }
+                            }
                         },
                         new
                         {
                             type = "box",
                             layout = "vertical",
-                            position = "absolute",
-                            offsetBottom = "0px",
-                            offsetStart = "0px",
-                            offsetEnd = "0px",
                             backgroundColor = overlayColor,
-                            paddingAll = "20px",
-                            paddingTop = "18px",
+                            paddingAll = "16px",
                             contents = new object[]
                             {
                                 new
                                 {
                                     type = "text",
                                     text = item.Title,
-                                    size = "xl",
                                     color = "#ffffff",
+                                    size = "xl",
                                     weight = "bold",
                                     wrap = true,
                                     maxLines = 2
@@ -132,31 +160,6 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                                             }
                                         }
                                     }
-                                }
-                            }
-                        },
-                        new
-                        {
-                            type = "box",
-                            layout = "vertical",
-                            position = "absolute",
-                            cornerRadius = "20px",
-                            offsetTop = "18px",
-                            offsetStart = "18px",
-                            height = "25px",
-                            paddingStart = "8px",
-                            paddingEnd = "8px",
-                            backgroundColor = statusColor,
-                            contents = new object[]
-                            {
-                                new
-                                {
-                                    type = "text",
-                                    text = statusText,
-                                    color = "#ffffff",
-                                    align = "center",
-                                    size = "xs",
-                                    offsetTop = "3px"
                                 }
                             }
                         }
@@ -275,7 +278,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             new
             {
                 type = "text",
-                text = summary.UserId,
+                text = summary.UserDisplayName,
                 weight = "bold",
                 size = "xxl",
                 margin = "md",
