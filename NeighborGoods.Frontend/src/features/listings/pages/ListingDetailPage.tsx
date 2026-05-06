@@ -204,7 +204,7 @@ export const ListingDetailPage = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
             >
-            <Card className="space-y-4 !border-[3px] !border-[#6E4F34] !bg-[#F5EBDD] p-4 text-text-main md:p-5">
+            <Card className="space-y-4 border-border !bg-[#F5EBDD] p-4 text-text-main md:p-5">
               <section className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">

@@ -5,6 +5,8 @@ import { accountApi } from '@/features/account/api/accountApi'
 import siteLogo from '@/png/logo.png'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 
+const TOPNAV_DISPLAY_NAME_KEY = 'neighborGoods.topNavDisplayName'
+
 export const TopNav = () => {
   const { pathname } = useLocation()
   const { isAuthenticated, tokens, logout } = useAuth()
@@ -17,7 +19,13 @@ export const TopNav = () => {
   useEffect(() => {
     if (!isAuthenticated) {
       setDisplayName(null)
+      localStorage.removeItem(TOPNAV_DISPLAY_NAME_KEY)
       return
+    }
+
+    const cachedDisplayName = localStorage.getItem(TOPNAV_DISPLAY_NAME_KEY)?.trim()
+    if (cachedDisplayName) {
+      setDisplayName(cachedDisplayName)
     }
 
     let disposed = false
@@ -27,12 +35,15 @@ export const TopNav = () => {
       .then((profile) => {
         if (!disposed) {
           const name = profile.displayName?.trim() || profile.userName?.trim()
-          setDisplayName(name || '用戶')
+          const resolvedName = name || '用戶'
+          setDisplayName(resolvedName)
+          localStorage.setItem(TOPNAV_DISPLAY_NAME_KEY, resolvedName)
         }
       })
       .catch(() => {
         if (!disposed) {
-          setDisplayName('用戶')
+          // 若有快取名稱就沿用，避免刷新時短暫顯示「用戶」。
+          setDisplayName((current) => current ?? '用戶')
         }
       })
 

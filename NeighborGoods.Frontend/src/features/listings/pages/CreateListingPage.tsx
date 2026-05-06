@@ -279,6 +279,8 @@ export const CreateListingPage = () => {
                 options={categories}
                 onChange={(value) => setForm((current) => ({ ...current, categoryCode: value }))}
                 invalid={isSelectInvalid('category')}
+                includeEmptyOption
+                placeholder="-"
               />
             </div>
             <div ref={conditionFieldRef}>
@@ -288,6 +290,8 @@ export const CreateListingPage = () => {
                 options={conditions}
                 onChange={(value) => setForm((current) => ({ ...current, conditionCode: value }))}
                 invalid={isSelectInvalid('condition')}
+                includeEmptyOption
+                placeholder="-"
               />
             </div>
             <div ref={residenceFieldRef}>
@@ -297,6 +301,8 @@ export const CreateListingPage = () => {
                 options={residences}
                 onChange={(value) => setForm((current) => ({ ...current, residenceCode: value }))}
                 invalid={isSelectInvalid('residence')}
+                includeEmptyOption
+                placeholder="-"
               />
             </div>
             <div ref={pickupLocationFieldRef}>
@@ -306,6 +312,8 @@ export const CreateListingPage = () => {
                 options={pickupLocations}
                 onChange={(value) => setForm((current) => ({ ...current, pickupLocationCode: value }))}
                 invalid={isSelectInvalid('pickupLocation')}
+                includeEmptyOption
+                placeholder="-"
               />
             </div>
           </div>

@@ -1383,7 +1383,7 @@ export const ListingHomePage = () => {
                             <p className="text-xs font-medium tracking-wide text-text-muted">{item.conditionName}</p>
                             <Link
                               to={`/listings/${item.id}?from=listings`}
-                              className="block truncate text-lg font-semibold text-text-main underline-offset-2 hover:underline"
+                              className="block truncate text-2xl font-semibold text-text-main underline-offset-2 hover:underline"
                             >
                               {item.title}
                             </Link>
