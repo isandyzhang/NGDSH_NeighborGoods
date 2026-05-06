@@ -48,7 +48,7 @@
     "minReplicas": { "value": 1 },
     "maxReplicas": { "value": 3 },
 
-    "lineMessagingBaseUrl": { "value": "https://api.neighborgoodstw.com" },
+    "lineMessagingBaseUrl": { "value": "https://api.line.me/v2/bot" },
     "lineMessagingWebBaseUrl": { "value": "https://www.neighborgoodstw.com" },
     "lineMessagingLiffId": { "value": "2008745853-Ui8PkOGi" },
     "lineOidcCallbackUrl": { "value": "https://www.neighborgoodstw.com/auth/line/callback" },
