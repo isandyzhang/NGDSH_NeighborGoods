@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/Button'
 type Phase = 'loading' | 'needLineApp' | 'needFriend' | 'submitting' | 'done' | 'error'
 
 const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
 
 export const LineNotifyLiffPage = () => {
   const [searchParams] = useSearchParams()
@@ -35,6 +36,7 @@ export const LineNotifyLiffPage = () => {
 
   const finishAndClose = useCallback(async () => {
     setPhase('done')
+    sessionStorage.setItem(LINE_BINDING_COMPLETED_FLAG, '1')
     const accountUrl = `${window.location.origin}/account?lineBound=1`
     if (liff.isInClient()) {
       try {

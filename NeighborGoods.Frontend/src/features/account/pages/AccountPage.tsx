@@ -7,6 +7,8 @@ import { Card } from '@/shared/ui/Card'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
+const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
+
 export const AccountPage = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -31,6 +33,27 @@ export const AccountPage = () => {
     setSearchParams({}, { replace: true })
     void reloadData().catch(() => undefined)
   }, [reloadData, searchParams, setSearchParams])
+
+  useEffect(() => {
+    const refreshIfLineBindingCompleted = () => {
+      const completed = sessionStorage.getItem(LINE_BINDING_COMPLETED_FLAG)
+      if (completed !== '1') {
+        return
+      }
+
+      sessionStorage.removeItem(LINE_BINDING_COMPLETED_FLAG)
+      // 從 LINE 綁定頁關閉回來時，強制重抓帳號資料，確保 UI 立即反映綁定狀態。
+      void reloadData().catch(() => undefined)
+    }
+
+    refreshIfLineBindingCompleted()
+    window.addEventListener('focus', refreshIfLineBindingCompleted)
+    document.addEventListener('visibilitychange', refreshIfLineBindingCompleted)
+    return () => {
+      window.removeEventListener('focus', refreshIfLineBindingCompleted)
+      document.removeEventListener('visibilitychange', refreshIfLineBindingCompleted)
+    }
+  }, [reloadData])
 
   useEffect(() => {
     let disposed = false

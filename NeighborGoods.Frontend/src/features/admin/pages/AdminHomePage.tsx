@@ -29,12 +29,14 @@ export const AdminHomePage = () => {
   const [operationMessage, setOperationMessage] = useState<string | null>(null)
   const [operationLoading, setOperationLoading] = useState(false)
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (params?: { keyword?: string; statusFilter?: number | 'all' }) => {
+    const appliedKeyword = (params?.keyword ?? '').trim()
+    const appliedStatus = params?.statusFilter ?? 'all'
     const [dashboardData, listings] = await Promise.all([
       adminApi.getDashboard(),
       adminApi.listListings({
-        q: keyword.trim() || undefined,
-        status: statusFilter === 'all' ? undefined : statusFilter,
+        q: appliedKeyword || undefined,
+        status: appliedStatus === 'all' ? undefined : appliedStatus,
         page: 1,
         pageSize: 50,
       }),
@@ -42,14 +44,14 @@ export const AdminHomePage = () => {
     setDashboard(dashboardData)
     setListingData(listings)
     setSelectedIds((current) => current.filter((id) => listings.items.some((item) => item.id === id)))
-  }, [keyword, statusFilter])
+  }, [])
 
   useEffect(() => {
     let disposed = false
     setLoading(true)
     setError(null)
 
-    void loadDashboard()
+    void loadDashboard({ keyword: '', statusFilter: 'all' })
       .catch((err: unknown) => {
         if (!disposed) {
           setError(err instanceof ApiClientError ? err.message : '讀取後台首頁失敗')
@@ -65,6 +67,10 @@ export const AdminHomePage = () => {
       disposed = true
     }
   }, [loadDashboard])
+
+  const handleSearchAndFilter = () => {
+    void loadDashboard({ keyword, statusFilter })
+  }
 
   if (loading) {
     return (
@@ -102,7 +108,7 @@ export const AdminHomePage = () => {
     try {
       const result = await adminApi.batchForceUpdateListingStatus(selectedIds, targetStatus)
       setOperationMessage(`已批次更新 ${result.updatedCount} 筆商品為狀態 ${result.status}`)
-      await loadDashboard()
+      await loadDashboard({ keyword, statusFilter })
       setSelectedIds([])
     } catch (err) {
       setOperationMessage(err instanceof ApiClientError ? err.message : '批次更新狀態失敗')
@@ -126,7 +132,7 @@ export const AdminHomePage = () => {
     try {
       await Promise.all(selectedIds.map((id) => adminApi.hardDeleteListing(id)))
       setOperationMessage(`已硬刪除 ${selectedIds.length} 筆商品`)
-      await loadDashboard()
+      await loadDashboard({ keyword, statusFilter })
       setSelectedIds([])
     } catch (err) {
       setOperationMessage(err instanceof ApiClientError ? err.message : '批次硬刪除失敗')
@@ -154,24 +160,11 @@ export const AdminHomePage = () => {
       </div>
 
       <Card>
-        <p className="text-sm font-semibold uppercase tracking-[0.1em] text-text-subtle">快捷動作</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link to="/my-listings">
-            <Button type="button" variant="secondary">
-              商品管理
-            </Button>
-          </Link>
-          <Link to="/messages">
-            <Button type="button" variant="secondary">
-              訊息管理
-            </Button>
-          </Link>
-          <Link to="/contact-admin">
-            <Button type="button" variant="secondary">
-              聯絡入口
-            </Button>
-          </Link>
-        </div>
+        <Link to="/listings">
+          <Button type="button" variant="secondary">
+            回到商品列表
+          </Button>
+        </Link>
       </Card>
 
       <Card className="border-[#e9b4b4] bg-[#fff4f4]">
@@ -199,7 +192,7 @@ export const AdminHomePage = () => {
             <option value={4}>4 已下架 Inactive</option>
             <option value={5}>5 已易物 GivenOrTraded</option>
           </select>
-          <Button type="button" variant="secondary" onClick={() => void loadDashboard()} disabled={operationLoading}>
+          <Button type="button" variant="secondary" onClick={handleSearchAndFilter} disabled={operationLoading}>
             搜尋/篩選
           </Button>
           <Button type="button" variant="secondary" onClick={() => void handleBatchForceStatus()} disabled={operationLoading || selectedIds.length === 0}>
