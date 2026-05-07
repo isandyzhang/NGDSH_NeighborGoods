@@ -1,6 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Shared.ApiContracts;
-using NeighborGoods.Api.Shared.Persistence;
 
 namespace NeighborGoods.Api.Features.Lookups;
 
@@ -10,21 +8,11 @@ public static class LookupEndpoints
     {
         app.MapGet("/api/v1/lookups/conditions", async (
             HttpContext httpContext,
-            NeighborGoodsDbContext dbContext,
+            LookupReadService lookupReadService,
             CancellationToken ct = default) =>
         {
-            var items = await dbContext.ListingConditions.AsNoTracking()
-                .Where(c => c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .Select(c => new
-                {
-                    id = c.Id,
-                    codeKey = c.CodeKey,
-                    displayName = c.DisplayName,
-                    sortOrder = c.SortOrder
-                })
-                .ToListAsync(ct);
-
+            var rows = await lookupReadService.GetConditionsAsync(ct);
+            var items = ToJsonRows(rows);
             return Results.Ok(ApiResponseFactory.Success(items, httpContext));
         })
         .WithName("GetListingConditionsLookupV1")
@@ -32,21 +20,11 @@ public static class LookupEndpoints
 
         app.MapGet("/api/v1/lookups/residences", async (
             HttpContext httpContext,
-            NeighborGoodsDbContext dbContext,
+            LookupReadService lookupReadService,
             CancellationToken ct = default) =>
         {
-            var items = await dbContext.ListingResidences.AsNoTracking()
-                .Where(c => c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .Select(c => new
-                {
-                    id = c.Id,
-                    codeKey = c.CodeKey,
-                    displayName = c.DisplayName,
-                    sortOrder = c.SortOrder
-                })
-                .ToListAsync(ct);
-
+            var rows = await lookupReadService.GetResidencesAsync(ct);
+            var items = ToJsonRows(rows);
             return Results.Ok(ApiResponseFactory.Success(items, httpContext));
         })
         .WithName("GetListingResidencesLookupV1")
@@ -54,21 +32,11 @@ public static class LookupEndpoints
 
         app.MapGet("/api/v1/lookups/pickup-locations", async (
             HttpContext httpContext,
-            NeighborGoodsDbContext dbContext,
+            LookupReadService lookupReadService,
             CancellationToken ct = default) =>
         {
-            var items = await dbContext.ListingPickupLocations.AsNoTracking()
-                .Where(c => c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .Select(c => new
-                {
-                    id = c.Id,
-                    codeKey = c.CodeKey,
-                    displayName = c.DisplayName,
-                    sortOrder = c.SortOrder
-                })
-                .ToListAsync(ct);
-
+            var rows = await lookupReadService.GetPickupLocationsAsync(ct);
+            var items = ToJsonRows(rows);
             return Results.Ok(ApiResponseFactory.Success(items, httpContext));
         })
         .WithName("GetListingPickupLocationsLookupV1")
@@ -76,26 +44,27 @@ public static class LookupEndpoints
 
         app.MapGet("/api/v1/lookups/categories", async (
             HttpContext httpContext,
-            NeighborGoodsDbContext dbContext,
+            LookupReadService lookupReadService,
             CancellationToken ct = default) =>
         {
-            var items = await dbContext.ListingCategories.AsNoTracking()
-                .Where(c => c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .Select(c => new
-                {
-                    id = c.Id,
-                    codeKey = c.CodeKey,
-                    displayName = c.DisplayName,
-                    sortOrder = c.SortOrder
-                })
-                .ToListAsync(ct);
-
+            var rows = await lookupReadService.GetCategoriesAsync(ct);
+            var items = ToJsonRows(rows);
             return Results.Ok(ApiResponseFactory.Success(items, httpContext));
         })
         .WithName("GetListingCategoriesLookupV1")
         .WithSummary("取得商品分類選單");
 
         return app;
+    }
+
+    private static List<object> ToJsonRows(IReadOnlyList<CachedLookupDto> rows)
+    {
+        var list = new List<object>(rows.Count);
+        foreach (var r in rows)
+        {
+            list.Add(new { id = r.Id, codeKey = r.CodeKey, displayName = r.DisplayName, sortOrder = r.SortOrder });
+        }
+
+        return list;
     }
 }

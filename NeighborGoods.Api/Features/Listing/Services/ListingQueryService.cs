@@ -104,7 +104,10 @@ public sealed class ListingQueryService(
             listing.UpdatedAt);
     }
 
-    public async Task<PagedResult<ListingListItemDto>> QueryAsync(ListingQueryRequest request, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<ListingListItemDto>> QueryAsync(
+        ListingQueryRequest request,
+        string? viewerUserId = null,
+        CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var page = Math.Max(request.Page, 1);
@@ -234,10 +237,18 @@ public sealed class ListingQueryService(
             now,
             cancellationToken);
 
+        var listingIdsList = listings.Select(x => x.Id).ToList();
+        var favoriteCountMap = await GetFavoriteCountMapAsync(listingIdsList, cancellationToken);
+        var viewerFavoritedIds = await GetViewerFavoritedListingIdsAsync(
+            viewerUserId,
+            listingIdsList,
+            cancellationToken);
+
         var items = listings
             .Select(x =>
             {
                 pendingMap.TryGetValue(x.Id, out var pendingSummary);
+                favoriteCountMap.TryGetValue(x.Id, out var favoriteCount);
                 return new ListingListItemDto(
                     x.Id,
                     new ListingListSellerInfoDto(
@@ -265,7 +276,9 @@ public sealed class ListingQueryService(
                     x.PinnedEndDate,
                     pendingSummary?.ExpireAt,
                     pendingSummary?.RemainingSeconds,
-                    x.InterestCount);
+                    x.InterestCount,
+                    favoriteCount,
+                    viewerFavoritedIds.Contains(x.Id));
             })
             .ToList();
 
@@ -650,6 +663,44 @@ public sealed class ListingQueryService(
             x => new PendingPurchaseRequestSummary(
                 x.ExpireAt,
                 ToRemainingSeconds(x.ExpireAt, now)));
+    }
+
+    private async Task<Dictionary<Guid, int>> GetFavoriteCountMapAsync(
+        IReadOnlyCollection<Guid> listingIds,
+        CancellationToken cancellationToken)
+    {
+        if (listingIds.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = await dbContext.ListingFavorites
+            .AsNoTracking()
+            .Where(x => listingIds.Contains(x.ListingId))
+            .GroupBy(x => x.ListingId)
+            .Select(g => new { ListingId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(x => x.ListingId, x => x.Count);
+    }
+
+    private async Task<HashSet<Guid>> GetViewerFavoritedListingIdsAsync(
+        string? viewerUserId,
+        IReadOnlyCollection<Guid> listingIds,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(viewerUserId) || listingIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var ids = await dbContext.ListingFavorites
+            .AsNoTracking()
+            .Where(x => listingIds.Contains(x.ListingId) && x.UserId == viewerUserId)
+            .Select(x => x.ListingId)
+            .ToListAsync(cancellationToken);
+
+        return ids.ToHashSet();
     }
 
     private static int ToRemainingSeconds(DateTime expireAt, DateTime now)

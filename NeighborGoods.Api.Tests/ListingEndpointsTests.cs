@@ -1038,6 +1038,34 @@ public sealed class ListingEndpointsTests
     }
 
     [Fact]
+    public async Task GetListings_IncludesFavoriteCountAndIsFavorited()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var favClient = factory.CreateClient();
+        await AuthenticateAsAsync(favClient, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+        await favClient.PostAsync($"/api/v1/listings/{SeededTesterListingId}/favorite", content: null);
+
+        using var anonymousClient = factory.CreateClient();
+        var listingsResponse = await anonymousClient.GetAsync("/api/v1/listings?page=1&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, listingsResponse.StatusCode);
+        var anonymousBody = await listingsResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var anonymousItem = FindListingItem(anonymousBody.GetProperty("data").GetProperty("items"), SeededTesterListingId);
+        Assert.NotNull(anonymousItem);
+        var anonEl = anonymousItem.Value;
+        Assert.Equal(1, anonEl.GetProperty("favoriteCount").GetInt32());
+        Assert.False(anonEl.GetProperty("isFavorited").GetBoolean());
+
+        var authedResponse = await favClient.GetAsync("/api/v1/listings?page=1&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, authedResponse.StatusCode);
+        var authedBody = await authedResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var authedItem = FindListingItem(authedBody.GetProperty("data").GetProperty("items"), SeededTesterListingId);
+        Assert.NotNull(authedItem);
+        var authEl = authedItem.Value;
+        Assert.Equal(1, authEl.GetProperty("favoriteCount").GetInt32());
+        Assert.True(authEl.GetProperty("isFavorited").GetBoolean());
+    }
+
+    [Fact]
     public async Task GetMyFavorites_ReturnsFavoritedListing()
     {
         using var factory = new ListingApiFactory(_fixture.ConnectionString);
@@ -1310,6 +1338,20 @@ public sealed class ListingEndpointsTests
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var accessToken = body.GetProperty("data").GetProperty("accessToken").GetString();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+    }
+
+    private static JsonElement? FindListingItem(JsonElement itemsArray, Guid listingId)
+    {
+        var idStr = listingId.ToString("D");
+        foreach (var item in itemsArray.EnumerateArray())
+        {
+            if (string.Equals(item.GetProperty("id").GetString(), idStr, StringComparison.OrdinalIgnoreCase))
+            {
+                return item;
+            }
+        }
+
+        return null;
     }
 
     private static HashSet<string> GetListingTitles(JsonElement itemsArray)

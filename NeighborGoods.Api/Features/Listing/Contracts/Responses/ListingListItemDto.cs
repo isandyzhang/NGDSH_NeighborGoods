@@ -20,5 +20,7 @@ public sealed record ListingListItemDto(
     DateTime? PinnedEndDate,
     DateTime? PendingPurchaseRequestExpireAt,
     int? PendingPurchaseRequestRemainingSeconds,
-    int InterestCount
+    int InterestCount,
+    int FavoriteCount,
+    bool IsFavorited
 );

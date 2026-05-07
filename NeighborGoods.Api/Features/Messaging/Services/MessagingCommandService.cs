@@ -8,7 +8,8 @@ namespace NeighborGoods.Api.Features.Messaging.Services;
 
 public sealed class MessagingCommandService(
     NeighborGoodsDbContext dbContext,
-    IHubContext<NeighborGoods.Api.Features.Messaging.MessageHub> hubContext)
+    IHubContext<NeighborGoods.Api.Features.Messaging.MessageHub> hubContext,
+    MessagingQueryService messagingQueryService)
 {
     public async Task<(Guid? ConversationId, string? ErrorCode, string? ErrorMessage)> EnsureConversationAsync(
         string currentUserId,
@@ -138,6 +139,7 @@ public sealed class MessagingCommandService(
         var dto = new MessageItemDto
         {
             Id = message.Id,
+            ConversationId = conversation.Id,
             SenderId = message.SenderId,
             SenderDisplayName = sender.DisplayName,
             Content = message.Content,
@@ -152,6 +154,15 @@ public sealed class MessagingCommandService(
         await hubContext.Clients.Group(MessageHub.ConversationGroupName(conversation.Id)).SendAsync(
             "ReceiveMessage",
             dto,
+            cancellationToken);
+
+        var recipientId = string.Equals(conversation.Participant1Id, currentUserId, StringComparison.Ordinal)
+            ? conversation.Participant2Id
+            : conversation.Participant1Id;
+        var recipientUnread = await messagingQueryService.GetTotalUnreadCountAsync(recipientId, cancellationToken);
+        await hubContext.Clients.User(recipientId).SendAsync(
+            "UnreadTotalUpdated",
+            new { totalUnread = recipientUnread },
             cancellationToken);
 
         return (dto, null, null);
@@ -186,6 +197,13 @@ public sealed class MessagingCommandService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var totalUnread = await messagingQueryService.GetTotalUnreadCountAsync(currentUserId, cancellationToken);
+        await hubContext.Clients.User(currentUserId).SendAsync(
+            "UnreadTotalUpdated",
+            new { totalUnread },
+            cancellationToken);
+
         return (true, null, null);
     }
 }

@@ -37,6 +37,12 @@ html {
   scroll-behavior: smooth;
 }
 
+@media (max-width: 768px) {
+  html {
+    font-size: 93.75%;
+  }
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--color-bg);

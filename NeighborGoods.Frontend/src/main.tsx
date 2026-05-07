@@ -1,7 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from '@/features/auth/components/AuthProvider'
+import { SharedMessageHubProvider } from '@/features/messaging/context/SharedMessageHubProvider'
 import siteLogoUrl from '@/png/logo.png'
 import './index.css'
 import App from './App.tsx'
@@ -27,12 +29,25 @@ const applySiteIcons = (href: string) => {
 
 applySiteIcons(siteLogoUrl)
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <SharedMessageHubProvider>
+            <App />
+          </SharedMessageHubProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 )

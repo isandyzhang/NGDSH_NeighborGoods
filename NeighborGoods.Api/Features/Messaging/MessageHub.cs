@@ -35,4 +35,28 @@ public sealed class MessageHub(
         var groupName = ConversationGroupName(conversationId);
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
     }
+
+    public async Task LeaveConversation(Guid conversationId)
+    {
+        var userId = Context.UserIdentifier
+            ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? Context.User?.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new HubException("UNAUTHORIZED");
+        }
+
+        var canLeave = await dbContext.Conversations
+            .AsNoTracking()
+            .AnyAsync(
+                c => c.Id == conversationId &&
+                     (c.Participant1Id == userId || c.Participant2Id == userId));
+        if (!canLeave)
+        {
+            throw new HubException("CONVERSATION_ACCESS_DENIED");
+        }
+
+        var groupName = ConversationGroupName(conversationId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+    }
 }

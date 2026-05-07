@@ -14,6 +14,7 @@ export type ConversationItem = {
 
 export type MessageItem = {
   id: string
+  conversationId: string
   senderId: string
   senderDisplayName: string
   content: string
@@ -56,6 +57,11 @@ export const messagingApi = {
   async listConversations(): Promise<ConversationItem[]> {
     const response = await http.get<ApiResponse<ConversationsPayload>>('/api/v1/conversations')
     return unwrapApiResponse(response.data).items
+  },
+
+  async getUnreadSummary(): Promise<number> {
+    const response = await http.get<ApiResponse<{ totalUnread: number }>>('/api/v1/conversations/unread-summary')
+    return unwrapApiResponse(response.data).totalUnread
   },
 
   async getMessages(conversationId: string, page = 1, pageSize = 50): Promise<MessagesPage> {

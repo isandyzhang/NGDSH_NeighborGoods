@@ -1,4 +1,14 @@
-import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -26,14 +36,13 @@ import {
   TOP_PIN_SKIP_INTRO_STORAGE_KEY,
 } from '@/features/listings/constants/topPin'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
+import { useSharedMessageHub } from '@/features/messaging/context/SharedMessageHubProvider'
 import { ApiClientError } from '@/shared/types/api'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
 
 const PAGE_SIZE = 12
-const MIN_SKELETON_MS = 180
-const UNREAD_POLL_INTERVAL_MS = 60_000
 
 type ExpandableFilterKey = 'category' | 'condition' | 'residence'
 type QuickFilterKey = 'free' | 'charity' | 'tradeable'
@@ -68,6 +77,13 @@ const formatCountdown = (seconds: number) => {
   const minutes = Math.floor((normalized % 3600) / 60)
   const remainingSeconds = normalized % 60
   return [hours, minutes, remainingSeconds].map((value) => value.toString().padStart(2, '0')).join(':')
+}
+
+const parseApiDateToMs = (value: string) => {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  const normalized = hasTimezone ? value : `${value}Z`
+  const parsed = Date.parse(normalized)
+  return Number.isNaN(parsed) ? null : parsed
 }
 
 const getOptionIcon = (name: string) => {
@@ -114,12 +130,9 @@ const QuickFilterLottieIcon = ({
 export const ListingHomePage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, tokens } = useAuth()
-  const [items, setItems] = useState<ListingItem[]>([])
-  const [categories, setCategories] = useState<LookupItem[]>([])
-  const [conditions, setConditions] = useState<LookupItem[]>([])
-  const [residences, setResidences] = useState<LookupItem[]>([])
+  const { totalUnread: unreadMessageCount } = useSharedMessageHub()
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<number[]>([])
   const [selectedConditionCodes, setSelectedConditionCodes] = useState<number[]>([])
   const [selectedResidenceCodes, setSelectedResidenceCodes] = useState<number[]>([])
@@ -131,8 +144,6 @@ export const ListingHomePage = () => {
   const [quickFilterHover, setQuickFilterHover] = useState<QuickFilterKey | null>(null)
   const [quickFilterPlayNonce, setQuickFilterPlayNonce] = useState(0)
   const [filtersInView, setFiltersInView] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [showLoadingSkeleton, setShowLoadingSkeleton] = useState(false)
   const [favoriteStateById, setFavoriteStateById] = useState<
     Record<ListingItem['id'], { isFavorited: boolean; favoriteCount: number }>
   >({})
@@ -140,7 +151,6 @@ export const ListingHomePage = () => {
   const [conversationBusyIds, setConversationBusyIds] = useState<Set<ListingItem['id']>>(() => new Set())
   const [purchaseBusyIds, setPurchaseBusyIds] = useState<Set<ListingItem['id']>>(() => new Set())
   const [purchaseConfirmTarget, setPurchaseConfirmTarget] = useState<ListingItem | null>(null)
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
   const [topPinTargetId, setTopPinTargetId] = useState<string | null>(null)
   const [topPinSkipIntro, setTopPinSkipIntro] = useState(false)
@@ -152,110 +162,99 @@ export const ListingHomePage = () => {
   const marqueeRef = useRef<HTMLElement | null>(null)
   const marqueePointerXRef = useRef<number | null>(null)
 
+  const listingFiltersPayload = useMemo(
+    () => ({
+      page,
+      categoryCodes: [...selectedCategoryCodes].sort((a, b) => a - b),
+      conditionCodes: [...selectedConditionCodes].sort((a, b) => a - b),
+      residenceCodes: [...selectedResidenceCodes].sort((a, b) => a - b),
+      isFree,
+      isCharity,
+      isTradeable,
+    }),
+    [page, selectedCategoryCodes, selectedConditionCodes, selectedResidenceCodes, isFree, isCharity, isTradeable],
+  )
+
+  const lookupsQuery = useQuery({
+    queryKey: ['lookups', 'listingFilters'],
+    queryFn: async () => {
+      const [categoryResult, conditionResult, residenceResult] = await Promise.all([
+        lookupApi.categories(),
+        lookupApi.conditions(),
+        lookupApi.residences(),
+      ])
+      return { categories: categoryResult, conditions: conditionResult, residences: residenceResult }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const listQuery = useQuery({
+    queryKey: ['listings', 'home', listingFiltersPayload],
+    queryFn: () =>
+      listingApi.list({
+        page: listingFiltersPayload.page,
+        pageSize: PAGE_SIZE,
+        categoryCodes: listingFiltersPayload.categoryCodes,
+        conditionCodes: listingFiltersPayload.conditionCodes,
+        residenceCodes: listingFiltersPayload.residenceCodes,
+        isFree: listingFiltersPayload.isFree || undefined,
+        isCharity: listingFiltersPayload.isCharity || undefined,
+        isTradeable: listingFiltersPayload.isTradeable || undefined,
+      }),
+    placeholderData: (previousData) => previousData,
+    staleTime: 60_000,
+  })
+
+  const categories: LookupItem[] = lookupsQuery.data?.categories ?? []
+  const conditions: LookupItem[] = lookupsQuery.data?.conditions ?? []
+  const residences: LookupItem[] = lookupsQuery.data?.residences ?? []
+  const items: ListingItem[] = listQuery.data?.items ?? []
+  const totalPages = listQuery.data?.pagination.totalPages || 1
+  const loading = listQuery.isFetching
+  const showLoadingSkeleton = listQuery.isPending
+
+  const prefetchListingDetail = useCallback(
+    (id: ListingItem['id']) => {
+      void queryClient.prefetchQuery({
+        queryKey: ['listings', 'detail', id],
+        queryFn: () => listingApi.getById(id),
+        staleTime: 60_000,
+      })
+    },
+    [queryClient],
+  )
+
   useEffect(() => {
     setTopPinSkipIntro(window.localStorage.getItem(TOP_PIN_SKIP_INTRO_STORAGE_KEY) === '1')
   }, [])
 
   useEffect(() => {
-    let disposed = false
-
-    void Promise.all([lookupApi.categories(), lookupApi.conditions(), lookupApi.residences()])
-      .then(([categoryResult, conditionResult, residenceResult]) => {
-        if (disposed) {
-          return
-        }
-
-        setCategories(categoryResult)
-        setConditions(conditionResult)
-        setResidences(residenceResult)
-      })
-      .catch(() => {
-        if (!disposed) {
-          setError('載入篩選條件失敗，請稍後再試')
-        }
-      })
-
-    return () => {
-      disposed = true
+    if (lookupsQuery.isError) {
+      setError('載入篩選條件失敗，請稍後再試')
     }
-  }, [])
+  }, [lookupsQuery.isError])
 
   useEffect(() => {
-    let disposed = false
-    const startedAt = Date.now()
-    let skeletonDelayTimer: number | null = null
-    setLoading(true)
-    setShowLoadingSkeleton(false)
-    setError(null)
-
-    skeletonDelayTimer = window.setTimeout(() => {
-      if (!disposed) {
-        setShowLoadingSkeleton(true)
-      }
-    }, 150)
-
-    void listingApi
-      .list({
-        page,
-        pageSize: PAGE_SIZE,
-        categoryCodes: selectedCategoryCodes,
-        conditionCodes: selectedConditionCodes,
-        residenceCodes: selectedResidenceCodes,
-        isFree: isFree || undefined,
-        isCharity: isCharity || undefined,
-        isTradeable: isTradeable || undefined,
-      })
-      .then((data) => {
-        if (disposed) {
-          return
-        }
-
-        setItems(data.items)
-        setTotalPages(data.pagination.totalPages || 1)
-      })
-      .catch((err: unknown) => {
-        if (disposed) {
-          return
-        }
-
-        const message = err instanceof ApiClientError ? err.message : '讀取商品列表失敗'
-        setError(message)
-      })
-      .finally(() => {
-        const elapsed = Date.now() - startedAt
-        const wait = Math.max(0, MIN_SKELETON_MS - elapsed)
-        window.setTimeout(() => {
-          if (!disposed) {
-            setLoading(false)
-            setShowLoadingSkeleton(false)
-          }
-        }, wait)
-      })
-
-    return () => {
-      disposed = true
-      if (skeletonDelayTimer !== null) {
-        window.clearTimeout(skeletonDelayTimer)
-      }
+    if (listQuery.isFetching) {
+      setError(null)
     }
-  }, [
-    page,
-    selectedCategoryCodes,
-    selectedConditionCodes,
-    selectedResidenceCodes,
-    isFree,
-    isCharity,
-    isTradeable,
-  ])
+  }, [listQuery.isFetching])
 
   useEffect(() => {
-    setFavoriteStateById((current) => {
+    if (!listQuery.isError) {
+      return
+    }
+    const message = listQuery.error instanceof ApiClientError ? listQuery.error.message : '讀取商品列表失敗'
+    setError(message)
+  }, [listQuery.isError, listQuery.error])
+
+  useEffect(() => {
+    setFavoriteStateById(() => {
       const next: Record<ListingItem['id'], { isFavorited: boolean; favoriteCount: number }> = {}
       items.forEach((item) => {
-        const existing = current[item.id]
         next[item.id] = {
-          isFavorited: existing?.isFavorited ?? false,
-          favoriteCount: existing?.favoriteCount ?? item.interestCount,
+          isFavorited: item.isFavorited,
+          favoriteCount: item.favoriteCount,
         }
       })
       return next
@@ -263,102 +262,8 @@ export const ListingHomePage = () => {
   }, [items])
 
   useEffect(() => {
-    if (!isAuthenticated || !items.length) {
-      return
-    }
-
-    let disposed = false
-
-    void Promise.all(
-      items.map(async (item) => {
-        try {
-          const status = await listingApi.getFavoriteStatus(item.id)
-          return { itemId: item.id, status }
-        } catch {
-          return null
-        }
-      }),
-    ).then((result) => {
-      if (disposed) {
-        return
-      }
-
-      setFavoriteStateById((current) => {
-        const next = { ...current }
-        result.forEach((entry) => {
-          if (!entry) {
-            return
-          }
-
-          next[entry.itemId] = {
-            isFavorited: entry.status.isFavorited,
-            favoriteCount: entry.status.favoriteCount,
-          }
-        })
-        return next
-      })
-    })
-
-    return () => {
-      disposed = true
-    }
-  }, [isAuthenticated, items])
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setUnreadMessageCount(0)
-      return
-    }
-
-    let disposed = false
-
-    const loadUnreadTotal = () => {
-      void messagingApi
-        .listConversations()
-        .then((conversations) => {
-          if (disposed) {
-            return
-          }
-          const totalUnread = conversations.reduce((sum, conversation) => sum + Math.max(0, conversation.unreadCount), 0)
-          setUnreadMessageCount(totalUnread)
-        })
-        .catch(() => {
-          if (!disposed) {
-            setUnreadMessageCount(0)
-          }
-        })
-    }
-
-    loadUnreadTotal()
-
-    const pollId = window.setInterval(() => {
-      if (disposed || document.visibilityState !== 'visible') {
-        return
-      }
-      loadUnreadTotal()
-    }, UNREAD_POLL_INTERVAL_MS)
-
-    const handleVisibilityChange = () => {
-      if (disposed || document.visibilityState !== 'visible') {
-        return
-      }
-      loadUnreadTotal()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      disposed = true
-      window.clearInterval(pollId)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [isAuthenticated, tokens?.userId])
-
-  useEffect(() => {
     const hasPendingCountdown = items.some(
-      (item) =>
-        Boolean(item.pendingPurchaseRequestExpireAt) &&
-        (item.pendingPurchaseRequestRemainingSeconds ?? 0) > 0,
+      (item) => Boolean(item.pendingPurchaseRequestExpireAt) || (item.pendingPurchaseRequestRemainingSeconds ?? 0) > 0,
     )
     if (!hasPendingCountdown) {
       return
@@ -1317,16 +1222,17 @@ export const ListingHomePage = () => {
             <AnimatePresence mode="popLayout">
               {items.map((item) => {
                 const favoriteState = favoriteStateById[item.id]
-                const isLiked = favoriteState?.isFavorited ?? false
-                const displayInterestCount = favoriteState?.favoriteCount ?? item.interestCount
+                const isLiked = favoriteState?.isFavorited ?? item.isFavorited
+                const displayInterestCount = favoriteState?.favoriteCount ?? item.favoriteCount
                 const favoriteBusy = favoriteBusyIds.has(item.id)
                 const isOwnListing = tokens?.userId === item.seller.id
                 const conversationBusy = conversationBusyIds.has(item.id)
                 const purchaseBusy = purchaseBusyIds.has(item.id)
                 const pendingExpireAt = item.pendingPurchaseRequestExpireAt
                 const pendingRemainingFromServer = item.pendingPurchaseRequestRemainingSeconds
+                const pendingExpireAtMs = pendingExpireAt === null ? null : parseApiDateToMs(pendingExpireAt)
                 const pendingRemainingFromNow =
-                  pendingExpireAt === null ? null : Math.max(0, Math.floor((new Date(pendingExpireAt).getTime() - countdownNowMs) / 1000))
+                  pendingExpireAtMs == null ? null : Math.max(0, Math.floor((pendingExpireAtMs - countdownNowMs) / 1000))
                 const pendingRemainingSeconds =
                   pendingRemainingFromNow ?? (pendingRemainingFromServer == null ? null : Math.max(0, pendingRemainingFromServer))
                 const hasPendingPurchaseRequest = pendingRemainingSeconds != null && pendingRemainingSeconds > 0
@@ -1363,9 +1269,20 @@ export const ListingHomePage = () => {
                           {item.categoryName}
                         </span>
                       </div>
-                      <Link to={`/listings/${item.id}?from=listings`} className="block h-full w-full" aria-label={`查看商品：${item.title}`}>
+                      <Link
+                        to={`/listings/${item.id}?from=listings`}
+                        className="block h-full w-full"
+                        aria-label={`查看商品：${item.title}`}
+                        onMouseEnter={() => prefetchListingDetail(item.id)}
+                      >
                         {item.mainImageUrl ? (
-                          <img src={item.mainImageUrl} alt={item.title} className="h-full w-full object-cover" />
+                          <img
+                            src={item.mainImageUrl}
+                            alt={item.title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : (
                           <div className="flex h-full items-center justify-center text-sm text-text-muted">無圖片</div>
                         )}
@@ -1384,6 +1301,7 @@ export const ListingHomePage = () => {
                             <Link
                               to={`/listings/${item.id}?from=listings`}
                               className="block truncate text-2xl font-semibold text-text-main underline-offset-2 hover:underline"
+                              onMouseEnter={() => prefetchListingDetail(item.id)}
                             >
                               {item.title}
                             </Link>

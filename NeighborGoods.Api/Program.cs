@@ -33,6 +33,7 @@ const string corsPolicyName = "FrontendCors";
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<LookupReadService>();
 builder.Services.AddScoped<ListingQueryService>();
 builder.Services.AddScoped<ListingCommandService>();
 builder.Services.AddScoped<ListingConversationNotifyService>();

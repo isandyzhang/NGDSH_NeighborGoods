@@ -103,6 +103,29 @@ public sealed class MessagingQueryService(NeighborGoodsDbContext dbContext)
         return items;
     }
 
+    public async Task<int> GetTotalUnreadCountAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var asParticipant1 = await (
+            from c in dbContext.Conversations.AsNoTracking()
+            where c.Participant1Id == userId
+            from m in dbContext.Messages.AsNoTracking()
+            where m.ConversationId == c.Id
+                && m.SenderId != userId
+                && (c.Participant1LastReadAt == null || m.CreatedAt > c.Participant1LastReadAt.Value)
+            select 1).CountAsync(cancellationToken);
+
+        var asParticipant2 = await (
+            from c in dbContext.Conversations.AsNoTracking()
+            where c.Participant2Id == userId
+            from m in dbContext.Messages.AsNoTracking()
+            where m.ConversationId == c.Id
+                && m.SenderId != userId
+                && (c.Participant2LastReadAt == null || m.CreatedAt > c.Participant2LastReadAt.Value)
+            select 1).CountAsync(cancellationToken);
+
+        return asParticipant1 + asParticipant2;
+    }
+
     public async Task<(MessagesPageResponse? Data, string? ErrorCode, string? ErrorMessage)> GetMessagesPageAsync(
         Guid conversationId,
         string userId,
@@ -146,6 +169,7 @@ public sealed class MessagingQueryService(NeighborGoodsDbContext dbContext)
         var dtos = slice.Select(m => new MessageItemDto
         {
             Id = m.Id,
+            ConversationId = conversationId,
             SenderId = m.SenderId,
             SenderDisplayName = m.Sender?.DisplayName ?? "未知用戶",
             Content = m.Content,

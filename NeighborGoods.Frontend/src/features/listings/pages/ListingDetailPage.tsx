@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
@@ -28,56 +29,52 @@ const formatCountdown = (seconds: number) => {
   return [hours, minutes, remainingSeconds].map((value) => value.toString().padStart(2, '0')).join(':')
 }
 
+const parseApiDateToMs = (value: string) => {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  const normalized = hasTimezone ? value : `${value}Z`
+  const parsed = Date.parse(normalized)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
 export const ListingDetailPage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, tokens } = useAuth()
   const { id = '' } = useParams()
   const [searchParams] = useSearchParams()
-  const [item, setItem] = useState<ListingDetail | null>(null)
   const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
-  const [loading, setLoading] = useState(true)
   const [conversationBusy, setConversationBusy] = useState(false)
   const [purchaseBusy, setPurchaseBusy] = useState(false)
   const [purchaseConfirmOpen, setPurchaseConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const detailQuery = useQuery({
+    queryKey: ['listings', 'detail', id],
+    queryFn: () => listingApi.getById(id),
+    enabled: Boolean(id),
+    staleTime: 60_000,
+  })
+
+  const item: ListingDetail | null = detailQuery.data ?? null
+  const loading = detailQuery.isPending
+
   useEffect(() => {
-    if (!id) {
+    if (!detailQuery.isError) {
+      setError(null)
+      return
+    }
+    const message =
+      detailQuery.error instanceof ApiClientError ? detailQuery.error.message : '讀取商品詳情失敗'
+    setError(message)
+  }, [detailQuery.isError, detailQuery.error])
+
+  useEffect(() => {
+    if (!item) {
       return
     }
 
-    let disposed = false
-    setLoading(true)
-    setError(null)
-
-    void listingApi
-      .getById(id)
-      .then((data) => {
-        if (!disposed) {
-          setItem(data)
-        }
-      })
-      .catch((err: unknown) => {
-        if (disposed) {
-          return
-        }
-
-        const message = err instanceof ApiClientError ? err.message : '讀取商品詳情失敗'
-        setError(message)
-      })
-      .finally(() => {
-        if (!disposed) {
-          setLoading(false)
-        }
-      })
-
-    return () => {
-      disposed = true
-    }
-  }, [id])
-
-  useEffect(() => {
-    if (!item?.pendingPurchaseRequestExpireAt) {
+    const hasPendingByExpireAt = Boolean(item.pendingPurchaseRequestExpireAt)
+    const hasPendingByServerRemaining = (item.pendingPurchaseRequestRemainingSeconds ?? 0) > 0
+    if (!hasPendingByExpireAt && !hasPendingByServerRemaining) {
       return
     }
 
@@ -88,11 +85,16 @@ export const ListingDetailPage = () => {
     return () => {
       window.clearInterval(timer)
     }
-  }, [item?.pendingPurchaseRequestExpireAt])
+  }, [item])
 
-  const pendingRemainingSeconds = !item?.pendingPurchaseRequestExpireAt
-    ? null
-    : Math.max(0, Math.floor((new Date(item.pendingPurchaseRequestExpireAt).getTime() - countdownNowMs) / 1000))
+  const pendingExpireAtMs = item?.pendingPurchaseRequestExpireAt
+    ? parseApiDateToMs(item.pendingPurchaseRequestExpireAt)
+    : null
+  const pendingRemainingFromNow =
+    pendingExpireAtMs == null ? null : Math.max(0, Math.floor((pendingExpireAtMs - countdownNowMs) / 1000))
+  const pendingRemainingFromServer = item?.pendingPurchaseRequestRemainingSeconds ?? null
+  const pendingRemainingSeconds =
+    pendingRemainingFromNow ?? (pendingRemainingFromServer == null ? null : Math.max(0, pendingRemainingFromServer))
   const hasPendingPurchaseRequest = pendingRemainingSeconds != null && pendingRemainingSeconds > 0
   const isOwnListing = !!item && tokens?.userId === item.seller.id
   const source = searchParams.get('from')

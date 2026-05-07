@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CircleCheck } from 'lucide-react'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
-import { MessageHubClient } from '@/features/messaging/services/messageHub'
 import { messagingApi, type ConversationPurchaseRequest, type MessageItem } from '@/features/messaging/api/messagingApi'
+import { useSharedMessageHub } from '@/features/messaging/context/SharedMessageHubProvider'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -80,13 +80,7 @@ export const ChatPage = () => {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
-  const accessTokenRef = useRef<string | null>(tokens?.accessToken ?? null)
-
-  const hubClient = useMemo(() => new MessageHubClient(), [])
-
-  useEffect(() => {
-    accessTokenRef.current = tokens?.accessToken ?? null
-  }, [tokens?.accessToken])
+  const { connection, hubReady, joinConversation, leaveConversation } = useSharedMessageHub()
 
   useEffect(() => {
     let disposed = false
@@ -199,25 +193,33 @@ export const ChatPage = () => {
   }, [conversationId])
 
   useEffect(() => {
-    if (!conversationId || !accessTokenRef.current) {
+    if (!conversationId || !hubReady || !connection) {
       return
     }
 
-    void hubClient.connect(() => accessTokenRef.current, conversationId, (message) => {
+    const handler = (message: MessageItem) => {
+      if (message.conversationId !== conversationId) {
+        return
+      }
+
       setMessages((current) => mergeMessages(current, [message]))
       void messagingApi.markRead(conversationId)
-    }).catch((err: unknown) => {
-      // React StrictMode 開發期會觸發 mount/unmount 重跑 effect，連線被中止時忽略這類 AbortError 噪音。
+    }
+
+    connection.on('ReceiveMessage', handler)
+
+    void joinConversation(conversationId).catch((err: unknown) => {
       if (err instanceof Error && /stopped during negotiation|aborterror/i.test(err.message)) {
         return
       }
-      console.warn('SignalR connect failed', err)
+      console.warn('SignalR join failed', err)
     })
 
     return () => {
-      void hubClient.disconnect()
+      connection.off('ReceiveMessage', handler)
+      void leaveConversation(conversationId)
     }
-  }, [conversationId, hubClient])
+  }, [conversationId, hubReady, connection, joinConversation, leaveConversation])
 
   useEffect(() => {
     if (!purchaseRequest || purchaseRequest.status !== PurchaseRequestStatus.Pending) {

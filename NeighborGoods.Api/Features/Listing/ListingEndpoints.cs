@@ -36,6 +36,7 @@ public static class ListingEndpoints
         app.MapGet("/api/v1/listings", async (
             HttpContext httpContext,
             ListingQueryService service,
+            ICurrentUserContext currentUser,
             string? q,
             int page = 1,
             int pageSize = 20,
@@ -72,7 +73,7 @@ public static class ListingEndpoints
                 ExcludeUserId = excludeUserId
             };
 
-            var result = await service.QueryAsync(request, ct);
+            var result = await service.QueryAsync(request, currentUser.UserId, ct);
             var payload = new
             {
                 items = result.Items,

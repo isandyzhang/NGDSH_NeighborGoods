@@ -36,6 +36,19 @@ public static class MessagingEndpoints
         .RequireAuthorization()
         .RequireRateLimiting("MessagingWrite");
 
+        app.MapGet("/api/v1/conversations/unread-summary", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            MessagingQueryService queryService,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var totalUnread = await queryService.GetTotalUnreadCountAsync(userId, ct);
+            return Results.Ok(ApiResponseFactory.Success(new { totalUnread }, httpContext));
+        })
+        .WithName("GetConversationsUnreadSummaryV1")
+        .RequireAuthorization();
+
         app.MapGet("/api/v1/conversations", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,
