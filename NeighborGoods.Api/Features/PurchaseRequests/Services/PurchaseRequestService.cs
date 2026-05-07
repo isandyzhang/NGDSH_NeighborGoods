@@ -374,9 +374,14 @@ public sealed class PurchaseRequestService(
         }
 
         var sellerIds = requests.Select(x => x.SellerId).Distinct().ToList();
+        var listingIds = requests.Select(x => x.ListingId).Distinct().ToList();
         var sellers = await dbContext.AspNetUsers
             .Where(x => sellerIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
+        var listings = await dbContext.Listings
+            .Where(x => listingIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.Title })
+            .ToDictionaryAsync(x => x.Id, x => x.Title, cancellationToken);
 
         foreach (var request in requests)
         {
@@ -400,9 +405,12 @@ public sealed class PurchaseRequestService(
 
             try
             {
-                var card = lineFlexMessageBuilder.BuildNoticeCard(
-                    "交易請求提醒",
-                    "有一筆購買請求即將逾時，請盡快回覆。");
+                var listingTitle = listings.TryGetValue(request.ListingId, out var title)
+                    ? title
+                    : "未命名商品";
+                var card = lineFlexMessageBuilder.BuildPurchaseRequestReminderCard(
+                    listingTitle,
+                    request.ConversationId);
                 await lineMessageSender.PushFlexAsync(seller.LineMessagingApiUserId!, card.AltText, card.Contents, cancellationToken);
                 seller.LineNotificationLastSentAt = now;
             }

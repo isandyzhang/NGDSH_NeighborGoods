@@ -35,7 +35,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         {
             var priceText = item.IsFree ? "免費" : $"{item.Price:0} 元";
             var (statusText, statusColor) = GetListingStatusBadge(item.Status);
-            var overlayColor = item.Status == 0 ? "#03303Acc" : "#9C8E7Ecc";
+            var detailsBackgroundColor = "#FFFFFF";
             var imageUrl = string.IsNullOrWhiteSpace(item.ImageUrl)
                 ? "https://developers-resource.landpress.line.me/fx/img/01_1_cafe.png"
                 : item.ImageUrl;
@@ -96,7 +96,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                         {
                             type = "box",
                             layout = "vertical",
-                            backgroundColor = overlayColor,
+                            backgroundColor = detailsBackgroundColor,
                             paddingAll = "16px",
                             contents = new object[]
                             {
@@ -104,7 +104,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                                 {
                                     type = "text",
                                     text = item.Title,
-                                    color = "#ffffff",
+                                    color = "#111111",
                                     size = "xl",
                                     weight = "bold",
                                     wrap = true,
@@ -114,7 +114,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                                 {
                                     type = "text",
                                     text = priceText,
-                                    color = "#ebebeb",
+                                    color = "#222222",
                                     size = "sm",
                                     margin = "md"
                                 },
@@ -129,7 +129,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                                         {
                                             type = "text",
                                             text = favoriteText,
-                                            color = "#ffffff",
+                                            color = "#111111",
                                             size = "lg",
                                             weight = "bold",
                                             flex = 1
@@ -170,7 +170,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         }
 
         return new LineFlexMessage(
-            AltText: $"我的商品：共 {summary.Total} 筆，顯示最多 3 筆刊登中/保留中商品",
+            AltText: $"我的商品：共 {summary.Total} 筆，顯示最多 5 筆刊登中/保留中商品",
             Contents: new
             {
                 type = "carousel",
@@ -343,6 +343,94 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
     public LineFlexMessage BuildNoticeCard(string title, string message, string? buttonLabel = null, string? buttonUrl = null)
     {
         return BuildCard(title, message, buttonLabel, buttonUrl);
+    }
+
+    public LineFlexMessage BuildPurchaseRequestReminderCard(string listingTitle, Guid conversationId)
+    {
+        var safeListingTitle = string.IsNullOrWhiteSpace(listingTitle) ? "未命名商品" : listingTitle.Trim();
+        var chatUrl = BuildUrl($"/messages/{conversationId}");
+        var altText = $"交易請求提醒｜商品：{safeListingTitle}";
+
+        return new LineFlexMessage(
+            AltText: altText,
+            Contents: new
+            {
+                type = "bubble",
+                body = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "md",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = "交易請求提醒",
+                            weight = "bold",
+                            size = "lg",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = "有一筆購買請求即將逾時，請盡快回覆。",
+                            wrap = true,
+                            size = "md"
+                        },
+                        new
+                        {
+                            type = "separator",
+                            margin = "md"
+                        },
+                        new
+                        {
+                            type = "box",
+                            layout = "baseline",
+                            margin = "md",
+                            contents = new object[]
+                            {
+                                new
+                                {
+                                    type = "text",
+                                    text = "商品",
+                                    size = "sm",
+                                    color = "#888888",
+                                    flex = 2
+                                },
+                                new
+                                {
+                                    type = "text",
+                                    text = safeListingTitle,
+                                    size = "sm",
+                                    weight = "bold",
+                                    wrap = true,
+                                    flex = 5
+                                }
+                            }
+                        }
+                    }
+                },
+                footer = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "button",
+                            style = "primary",
+                            action = new
+                            {
+                                type = "uri",
+                                label = "前往商品聊天室",
+                                uri = chatUrl
+                            }
+                        }
+                    }
+                }
+            });
     }
 
     public LineFlexMessage BuildBindHintCard()

@@ -43,7 +43,7 @@ public sealed class LineMenuQueryService(
         int maxItems = 5,
         CancellationToken cancellationToken = default)
     {
-        maxItems = Math.Clamp(maxItems, 1, 3);
+        maxItems = Math.Clamp(maxItems, 1, 5);
         var soldStatus = (int)ListingStatus.Sold;
 
         var listings = await dbContext.Listings
