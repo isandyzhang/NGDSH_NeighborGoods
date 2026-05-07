@@ -79,6 +79,7 @@ jobs:
             --parameters infra/bicep/deploy.parameters.prod.json \
             --parameters existingSqlConnectionString="${{ secrets.AZURE_SQL_CONNECTION_STRING }}" \
             --parameters existingBlobConnectionString="${{ secrets.AZURE_BLOB_CONNECTION_STRING }}" \
+            --parameters existingEmailConnectionString="${{ secrets.ACS_EMAIL_CONNECTION_STRING }}" \
             --parameters sqlAdminLogin="${{ secrets.AZURE_SQL_ADMIN_LOGIN }}" \
             --parameters sqlAdminPassword="${{ secrets.AZURE_SQL_ADMIN_PASSWORD }}" \
             --parameters lineOidcChannelSecret="${{ secrets.LINE_OIDC_CHANNEL_SECRET }}" \
@@ -87,6 +88,7 @@ jobs:
             --parameters lineMessagingChannelSecret="${{ secrets.LINE_MESSAGING_CHANNEL_SECRET }}" \
             --parameters lineMessagingBotId="${{ secrets.LINE_MESSAGING_BOT_ID }}" \
             --parameters jwtSigningKey="${{ secrets.JWT_SIGNING_KEY }}" \
+            --parameters emailFromAddress="${{ secrets.EMAIL_NOTIFICATION_FROM_ADDRESS }}" \
             --parameters containerImage="ghcr.io/${{ github.repository_owner }}/neighborgoods-api:latest" \
             --parameters repositoryUrl="https://github.com/${{ github.repository }}" \
             --parameters apiCustomDomainBindManagedTls=false \

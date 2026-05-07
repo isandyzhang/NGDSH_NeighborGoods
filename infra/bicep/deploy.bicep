@@ -45,6 +45,10 @@ param existingBlobContainerName string = ''
 @description('Deploy Email resources in this resource group')
 param deployEmailResources bool = false
 
+@secure()
+@description('Existing Email connection string injected to Container App when not provisioning Email resources')
+param existingEmailConnectionString string = ''
+
 @description('Azure SQL admin login')
 param sqlAdminLogin string = 'ngadmin'
 
@@ -342,7 +346,7 @@ module containerapp 'modules/containerapp.bicep' = {
     lineOidcCallbackUrl: lineOidcCallbackUrl
     lineOidcScope: lineOidcScope
     #disable-next-line BCP318
-    emailConnectionString: deployEmailResources ? email.outputs.emailConnectionString : ''
+    emailConnectionString: deployEmailResources ? email.outputs.emailConnectionString : existingEmailConnectionString
     emailFromAddress: emailFromAddress
     emailFromDisplayName: emailFromDisplayName
     emailLogoUrl: emailLogoUrl
