@@ -13,7 +13,10 @@ const formatDateTime = (value: string | null) => {
     return '尚無訊息'
   }
 
-  return new Date(value).toLocaleString('zh-TW', {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  const normalized = hasTimezone ? value : `${value}Z`
+  return new Date(normalized).toLocaleString('zh-TW', {
+    timeZone: 'Asia/Taipei',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',

@@ -162,9 +162,9 @@ public sealed class ReviewService(NeighborGoodsDbContext dbContext)
             return (false, "僅買家或賣家可填寫評價");
         }
 
-        if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Accepted)
+        if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Completed)
         {
-            return (false, "僅已接受的交易請求可評價");
+            return (false, "僅完成交易後可評價");
         }
 
         var listingStatus = await dbContext.Listings

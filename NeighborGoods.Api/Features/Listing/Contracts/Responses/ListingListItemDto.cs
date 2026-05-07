@@ -20,6 +20,8 @@ public sealed record ListingListItemDto(
     DateTime? PinnedEndDate,
     DateTime? PendingPurchaseRequestExpireAt,
     int? PendingPurchaseRequestRemainingSeconds,
+    bool InProgress,
+    int? InProgressStage,
     int InterestCount,
     int FavoriteCount,
     bool IsFavorited

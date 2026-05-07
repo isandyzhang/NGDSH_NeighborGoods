@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/shared/ui/Button'
-import { Card } from '@/shared/ui/Card'
+import { AppModal } from '@/shared/ui/modal/AppModal'
 
 type TopPinIntroModalProps = {
   open: boolean
@@ -28,9 +28,8 @@ export const TopPinIntroModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0" aria-label="關閉置頂說明" onClick={onClose} />
-      <Card className="relative z-10 w-full max-w-xl space-y-4 rounded-2xl p-5">
+    <AppModal open={open} onClose={onClose} closeLabel="關閉置頂說明">
+      <div className="space-y-4">
         <h2 className="text-2xl font-bold text-text-main">讓更多人優先看到你的商品</h2>
         <div className="space-y-2 text-base leading-relaxed text-text-subtle">
           <p>商品置頂後會優先顯示在清單前段，提高曝光與成交機會。</p>
@@ -62,7 +61,7 @@ export const TopPinIntroModal = ({
             我要投稿
           </Button>
         </div>
-      </Card>
-    </div>
+      </div>
+    </AppModal>
   )
 }

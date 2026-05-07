@@ -114,18 +114,7 @@ public static class PurchaseRequestEndpoints
 
     private static IResult ToErrorResult(HttpContext httpContext, string code, string message)
     {
-        var statusCode = code switch
-        {
-            "LISTING_NOT_FOUND" => StatusCodes.Status404NotFound,
-            "PURCHASE_REQUEST_NOT_FOUND" => StatusCodes.Status404NotFound,
-            "PURCHASE_REQUEST_ACCESS_DENIED" => StatusCodes.Status403Forbidden,
-            "PURCHASE_REQUEST_ALREADY_PENDING" => StatusCodes.Status409Conflict,
-            "PURCHASE_REQUEST_NOT_PENDING" => StatusCodes.Status409Conflict,
-            "PURCHASE_REQUEST_EXPIRED" => StatusCodes.Status409Conflict,
-            "LISTING_NOT_AVAILABLE" => StatusCodes.Status409Conflict,
-            "LISTING_INVALID_STATUS_TRANSITION" => StatusCodes.Status409Conflict,
-            _ => StatusCodes.Status400BadRequest
-        };
+        var statusCode = PurchaseRequestErrorHttpMapper.ToStatusCode(code);
 
         return Results.Json(
             ApiResponseFactory.Error(code, message, httpContext),

@@ -1,25 +1,57 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CircleCheck } from 'lucide-react'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
+import { TradeActionConfirmModal } from '@/features/messaging/components/TradeActionConfirmModal'
 import { messagingApi, type ConversationPurchaseRequest, type MessageItem } from '@/features/messaging/api/messagingApi'
 import { useSharedMessageHub } from '@/features/messaging/context/SharedMessageHubProvider'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 
+const parseApiDateToMs = (value: string) => {
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  const normalized = hasTimezone ? value : `${value}Z`
+  const parsed = Date.parse(normalized)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const formatTaipeiTime = (value: string) =>
+  new Date(parseApiDateToMs(value)).toLocaleTimeString('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
 const mergeMessages = (base: MessageItem[], incoming: MessageItem[]) => {
-  const map = new Map<string, MessageItem>()
-  for (const item of base) {
-    map.set(item.id, item)
+  if (incoming.length === 0) {
+    return base
   }
-  for (const item of incoming) {
-    map.set(item.id, item)
+
+  let next = base
+  for (const message of incoming) {
+    if (next.some((item) => item.id === message.id)) {
+      continue
+    }
+
+    const messageTime = parseApiDateToMs(message.createdAt)
+    const last = next.at(-1)
+    if (!last || parseApiDateToMs(last.createdAt) <= messageTime) {
+      next = [...next, message]
+      continue
+    }
+
+    const insertAt = next.findIndex((item) => parseApiDateToMs(item.createdAt) > messageTime)
+    if (insertAt < 0) {
+      next = [...next, message]
+      continue
+    }
+
+    next = [...next.slice(0, insertAt), message, ...next.slice(insertAt)]
   }
-  return [...map.values()].sort(
-    (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
-  )
+
+  return next
 }
 
 const PurchaseRequestStatus = {
@@ -28,6 +60,8 @@ const PurchaseRequestStatus = {
   Rejected: 2,
   Expired: 3,
   Cancelled: 4,
+  SellerMarkedCompleted: 5,
+  Completed: 6,
 } as const
 
 const formatCountdown = (seconds: number) => {
@@ -50,6 +84,10 @@ const getPurchaseRequestStatusText = (status: number) => {
       return '已逾時'
     case PurchaseRequestStatus.Cancelled:
       return '已取消'
+    case PurchaseRequestStatus.SellerMarkedCompleted:
+      return '待買家確認'
+    case PurchaseRequestStatus.Completed:
+      return '已完成'
     default:
       return '未知狀態'
   }
@@ -73,14 +111,60 @@ export const ChatPage = () => {
   const [purchaseRequestFetchedAtMs, setPurchaseRequestFetchedAtMs] = useState(() => Date.now())
   const [purchaseRequestLoading, setPurchaseRequestLoading] = useState(true)
   const [purchaseRequestBusy, setPurchaseRequestBusy] = useState(false)
+  const [confirmModalAction, setConfirmModalAction] = useState<'completeBySeller' | 'confirmReceivedByBuyer' | null>(null)
   const [purchaseRequestError, setPurchaseRequestError] = useState<string | null>(null)
   const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const markReadTimerRef = useRef<number | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const { connection, hubReady, joinConversation, leaveConversation } = useSharedMessageHub()
+  const scheduleMarkRead = useCallback(() => {
+    if (!conversationId || markReadTimerRef.current != null) {
+      return
+    }
+
+    markReadTimerRef.current = window.setTimeout(() => {
+      markReadTimerRef.current = null
+      void messagingApi.markRead(conversationId).catch(() => {
+        // ignore background mark-read failures
+      })
+    }, 1000)
+  }, [conversationId])
+  const refreshPurchaseRequest = useCallback(
+    async (showLoading = false) => {
+      if (!conversationId) {
+        return
+      }
+
+      if (showLoading) {
+        setPurchaseRequestLoading(true)
+      }
+
+      try {
+        const data = await messagingApi.getCurrentPurchaseRequest(conversationId)
+        setPurchaseRequest(data)
+        setPurchaseRequestFetchedAtMs(Date.now())
+        setPurchaseRequestError(null)
+      } catch (err) {
+        if (err instanceof ApiClientError && err.code === 'PURCHASE_REQUEST_NOT_FOUND') {
+          setPurchaseRequest(null)
+          setPurchaseRequestError(null)
+          return
+        }
+
+        const message = err instanceof ApiClientError ? err.message : '讀取交易請求失敗'
+        setPurchaseRequestError(message)
+      } finally {
+        if (showLoading) {
+          setPurchaseRequestLoading(false)
+        }
+      }
+    },
+    [conversationId],
+  )
 
   useEffect(() => {
     let disposed = false
@@ -92,7 +176,7 @@ export const ChatPage = () => {
       .then((data) => {
         if (!disposed) {
           setMessages(data.items)
-          void messagingApi.markRead(conversationId)
+          scheduleMarkRead()
         }
       })
       .catch((err: unknown) => {
@@ -111,7 +195,7 @@ export const ChatPage = () => {
     return () => {
       disposed = true
     }
-  }, [conversationId])
+  }, [conversationId, scheduleMarkRead])
 
   useEffect(() => {
     let disposed = false
@@ -158,39 +242,8 @@ export const ChatPage = () => {
   }, [conversationId])
 
   useEffect(() => {
-    let disposed = false
-    setPurchaseRequestLoading(true)
-    setPurchaseRequestError(null)
-    void messagingApi
-      .getCurrentPurchaseRequest(conversationId)
-      .then((data) => {
-        if (!disposed) {
-          setPurchaseRequest(data)
-          setPurchaseRequestFetchedAtMs(Date.now())
-        }
-      })
-      .catch((err) => {
-        if (disposed) {
-          return
-        }
-        if (err instanceof ApiClientError && err.code === 'PURCHASE_REQUEST_NOT_FOUND') {
-          setPurchaseRequest(null)
-          return
-        }
-
-        const message = err instanceof ApiClientError ? err.message : '讀取交易請求失敗'
-        setPurchaseRequestError(message)
-      })
-      .finally(() => {
-        if (!disposed) {
-          setPurchaseRequestLoading(false)
-        }
-      })
-
-    return () => {
-      disposed = true
-    }
-  }, [conversationId])
+    void refreshPurchaseRequest(true)
+  }, [refreshPurchaseRequest])
 
   useEffect(() => {
     if (!conversationId || !hubReady || !connection) {
@@ -203,7 +256,11 @@ export const ChatPage = () => {
       }
 
       setMessages((current) => mergeMessages(current, [message]))
-      void messagingApi.markRead(conversationId)
+      scheduleMarkRead()
+
+      if (message.content.startsWith('[系統發送]')) {
+        void refreshPurchaseRequest()
+      }
     }
 
     connection.on('ReceiveMessage', handler)
@@ -219,7 +276,15 @@ export const ChatPage = () => {
       connection.off('ReceiveMessage', handler)
       void leaveConversation(conversationId)
     }
-  }, [conversationId, hubReady, connection, joinConversation, leaveConversation])
+  }, [conversationId, hubReady, connection, joinConversation, leaveConversation, refreshPurchaseRequest, scheduleMarkRead])
+
+  useEffect(() => {
+    return () => {
+      if (markReadTimerRef.current != null) {
+        window.clearTimeout(markReadTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!purchaseRequest || purchaseRequest.status !== PurchaseRequestStatus.Pending) {
@@ -261,7 +326,9 @@ export const ChatPage = () => {
     }
   }
 
-  const handlePurchaseRequestAction = async (action: 'accept' | 'reject' | 'cancel') => {
+  const handlePurchaseRequestAction = async (
+    action: 'accept' | 'reject' | 'cancel' | 'completeBySeller' | 'confirmReceivedByBuyer',
+  ) => {
     if (!conversationId || purchaseRequestBusy) {
       return
     }
@@ -278,7 +345,11 @@ export const ChatPage = () => {
                 conversationId,
                 window.prompt('可選：輸入拒絕原因（可留空）') ?? undefined,
               )
-            : await messagingApi.cancelPurchaseRequest(conversationId)
+            : action === 'cancel'
+              ? await messagingApi.cancelPurchaseRequest(conversationId)
+              : action === 'completeBySeller'
+                ? await messagingApi.completeBySeller(conversationId)
+                : await messagingApi.confirmReceivedByBuyer(conversationId)
       setPurchaseRequest(updated)
       setPurchaseRequestFetchedAtMs(Date.now())
     } catch (err) {
@@ -291,12 +362,29 @@ export const ChatPage = () => {
 
   const isPending = purchaseRequest?.status === PurchaseRequestStatus.Pending
   const isAccepted = purchaseRequest?.status === PurchaseRequestStatus.Accepted
+  const isSellerMarkedCompleted = purchaseRequest?.status === PurchaseRequestStatus.SellerMarkedCompleted
+  const isCompleted = purchaseRequest?.status === PurchaseRequestStatus.Completed
   const isSeller = purchaseRequest?.sellerId === tokens?.userId
   const isBuyer = purchaseRequest?.buyerId === tokens?.userId
   const elapsedSinceRequestFetchSeconds = Math.max(0, Math.floor((countdownNowMs - purchaseRequestFetchedAtMs) / 1000))
   const remainingSeconds = !purchaseRequest
     ? null
     : Math.max(0, purchaseRequest.remainingSeconds - elapsedSinceRequestFetchSeconds)
+
+  const confirmModalCopy =
+    confirmModalAction === 'completeBySeller'
+      ? {
+          title: '確認已與買家完成交易？',
+          message: '送出後將把交易狀態更新為「待買家確認收貨」，並通知買家進行下一步。',
+          finalConfirmLabel: '確定完成交易',
+        }
+      : confirmModalAction === 'confirmReceivedByBuyer'
+        ? {
+            title: '確認已與賣家完成交易',
+            message: '送出後交易狀態會更新為「已完成」，你與賣家都可以前往評價。',
+            finalConfirmLabel: '確定已收到商品',
+          }
+        : null
 
   return (
     <main className="mx-auto w-full max-w-6xl px-3 pb-28 pt-4 sm:px-4 md:pb-0 md:py-8">
@@ -402,11 +490,43 @@ export const ChatPage = () => {
                 ) : null}
                 {isAccepted ? (
                   <div className="mt-3">
+                    {isSeller ? (
+                      <Button
+                        type="button"
+                        onClick={() => setConfirmModalAction('completeBySeller')}
+                        disabled={purchaseRequestBusy}
+                        className="min-h-[2.6rem] w-full text-base font-semibold md:w-auto md:text-sm"
+                      >
+                        {purchaseRequestBusy ? '處理中...' : '完成交易'}
+                      </Button>
+                    ) : (
+                      <p className="text-base text-white/90 md:text-sm">等待賣家完成商品交易</p>
+                    )}
+                  </div>
+                ) : null}
+                {isSellerMarkedCompleted ? (
+                  <div className="mt-3">
+                    {isBuyer ? (
+                      <Button
+                        type="button"
+                        onClick={() => setConfirmModalAction('confirmReceivedByBuyer')}
+                        disabled={purchaseRequestBusy}
+                        className="min-h-[2.6rem] w-full text-base font-semibold md:w-auto md:text-sm"
+                      >
+                        {purchaseRequestBusy ? '處理中...' : '已收到商品'}
+                      </Button>
+                    ) : (
+                      <p className="text-base text-white/90 md:text-sm">等待買家確認收貨</p>
+                    )}
+                  </div>
+                ) : null}
+                {isCompleted ? (
+                  <div className="mt-3">
                     <Link
                       to={`/purchase-requests/${purchaseRequest.id}/review`}
                       className="inline-flex min-h-[2.6rem] w-full items-center justify-center rounded-xl border border-white/35 bg-white/12 px-3 py-1.5 text-base font-semibold text-white transition hover:bg-white/18 md:w-auto md:text-sm"
                     >
-                      交易完成後前往評價
+                      前往評價
                     </Link>
                   </div>
                 ) : null}
@@ -436,10 +556,7 @@ export const ChatPage = () => {
                     <p>{message.content}</p>
                     <p className={`mt-1 text-sm md:text-[11px] ${isMine ? 'text-brand-foreground/80' : 'text-text-muted'}`}>
                       {message.senderDisplayName}・
-                      {new Date(message.createdAt).toLocaleTimeString('zh-TW', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatTaipeiTime(message.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -465,6 +582,23 @@ export const ChatPage = () => {
           </div>
         </section>
       </div>
+      {confirmModalCopy ? (
+        <TradeActionConfirmModal
+          open={Boolean(confirmModalCopy)}
+          busy={purchaseRequestBusy}
+          title={confirmModalCopy.title}
+          message={confirmModalCopy.message}
+          finalConfirmLabel={confirmModalCopy.finalConfirmLabel}
+          onClose={() => setConfirmModalAction(null)}
+          onConfirm={() => {
+            const action = confirmModalAction
+            setConfirmModalAction(null)
+            if (action) {
+              void handlePurchaseRequestAction(action)
+            }
+          }}
+        />
+      ) : null}
     </main>
   )
 }

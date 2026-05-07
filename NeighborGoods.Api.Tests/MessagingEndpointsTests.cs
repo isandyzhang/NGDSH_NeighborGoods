@@ -210,6 +210,53 @@ public sealed class MessagingEndpointsTests
         Assert.Equal("A", items[items.GetArrayLength() - 1].GetProperty("content").GetString());
     }
 
+    [Fact]
+    public async Task GetCurrentPurchaseRequest_WhenNotCreated_Returns200WithNullData()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var ensure = await client.PostAsJsonAsync(
+            "/api/v1/conversations",
+            new { listingId = SeededListingId, otherUserId = SellerUserId },
+            CamelCaseJson);
+        ensure.EnsureSuccessStatusCode();
+        var conversationId = (await ensure.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("data").GetProperty("conversationId").GetGuid();
+
+        var response = await client.GetAsync($"/api/v1/conversations/{conversationId}/purchase-request/current");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("success").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task GetCurrentPurchaseRequest_NonParticipant_Returns403()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var ensure = await client.PostAsJsonAsync(
+            "/api/v1/conversations",
+            new { listingId = SeededListingId, otherUserId = SellerUserId },
+            CamelCaseJson);
+        ensure.EnsureSuccessStatusCode();
+        var conversationId = (await ensure.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("data").GetProperty("conversationId").GetGuid();
+
+        client.DefaultRequestHeaders.Authorization = null;
+        await AuthenticateAsAsync(client, "novalid@example.com", UserPassword);
+
+        var response = await client.GetAsync($"/api/v1/conversations/{conversationId}/purchase-request/current");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("CONVERSATION_ACCESS_DENIED", body.GetProperty("error").GetProperty("code").GetString());
+    }
+
     private static async Task AuthenticateAsAsync(HttpClient client, string userNameOrEmail, string password)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new

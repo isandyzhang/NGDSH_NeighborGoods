@@ -83,7 +83,8 @@ export const messagingApi = {
   },
 
   async markRead(conversationId: string): Promise<void> {
-    await http.post(`/api/v1/conversations/${conversationId}/read`)
+    const response = await http.post<ApiResponse<{ read: boolean }>>(`/api/v1/conversations/${conversationId}/read`)
+    unwrapApiResponse(response.data)
   },
 
   async getCurrentPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest | null> {
@@ -111,6 +112,20 @@ export const messagingApi = {
   async cancelPurchaseRequest(conversationId: string): Promise<ConversationPurchaseRequest> {
     const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
       `/api/v1/conversations/${conversationId}/purchase-request/cancel`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async completeBySeller(conversationId: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/complete-by-seller`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async confirmReceivedByBuyer(conversationId: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/confirm-received`,
     )
     return unwrapApiResponse(response.data)
   },

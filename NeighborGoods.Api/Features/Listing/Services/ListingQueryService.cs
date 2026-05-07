@@ -236,6 +236,9 @@ public sealed class ListingQueryService(
             listings.Select(x => x.Id).ToList(),
             now,
             cancellationToken);
+        var inProgressStageMap = await GetInProgressPurchaseRequestStageMapAsync(
+            listings.Select(x => x.Id).ToList(),
+            cancellationToken);
 
         var listingIdsList = listings.Select(x => x.Id).ToList();
         var favoriteCountMap = await GetFavoriteCountMapAsync(listingIdsList, cancellationToken);
@@ -248,6 +251,8 @@ public sealed class ListingQueryService(
             .Select(x =>
             {
                 pendingMap.TryGetValue(x.Id, out var pendingSummary);
+                var hasInProgressStage = inProgressStageMap.TryGetValue(x.Id, out var inProgressStage);
+                int? inProgressStageValue = hasInProgressStage ? inProgressStage : null;
                 favoriteCountMap.TryGetValue(x.Id, out var favoriteCount);
                 return new ListingListItemDto(
                     x.Id,
@@ -276,6 +281,8 @@ public sealed class ListingQueryService(
                     x.PinnedEndDate,
                     pendingSummary?.ExpireAt,
                     pendingSummary?.RemainingSeconds,
+                    hasInProgressStage,
+                    inProgressStageValue,
                     x.InterestCount,
                     favoriteCount,
                     viewerFavoritedIds.Contains(x.Id));
@@ -329,12 +336,17 @@ public sealed class ListingQueryService(
         Dictionary<Guid, TerminalListingExtra> terminalExtras = new();
         if (terminalListingIds.Count > 0)
         {
-            var accepted = (int)PurchaseRequestStatus.Accepted;
+            var completedRelatedStatuses = new[]
+            {
+                (int)PurchaseRequestStatus.Accepted,
+                (int)PurchaseRequestStatus.SellerMarkedCompleted,
+                (int)PurchaseRequestStatus.Completed
+            };
             var prRows = await (
                 from pr in dbContext.PurchaseRequests.AsNoTracking()
                 join buyer in dbContext.AspNetUsers.AsNoTracking() on pr.BuyerId equals buyer.Id
                 where terminalListingIds.Contains(pr.ListingId)
-                      && pr.Status == accepted
+                      && completedRelatedStatuses.Contains(pr.Status)
                       && pr.SellerId == sellerId
                 select new
                 {
@@ -663,6 +675,36 @@ public sealed class ListingQueryService(
             x => new PendingPurchaseRequestSummary(
                 x.ExpireAt,
                 ToRemainingSeconds(x.ExpireAt, now)));
+    }
+
+    private async Task<Dictionary<Guid, int>> GetInProgressPurchaseRequestStageMapAsync(
+        IReadOnlyCollection<Guid> listingIds,
+        CancellationToken cancellationToken)
+    {
+        if (listingIds.Count == 0)
+        {
+            return [];
+        }
+
+        var accepted = (int)PurchaseRequestStatus.Accepted;
+        var sellerMarkedCompleted = (int)PurchaseRequestStatus.SellerMarkedCompleted;
+        var rows = await dbContext.PurchaseRequests
+            .AsNoTracking()
+            .Where(x =>
+                listingIds.Contains(x.ListingId)
+                && (x.Status == accepted || x.Status == sellerMarkedCompleted))
+            .GroupBy(x => x.ListingId)
+            .Select(g => g
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new
+                {
+                    x.ListingId,
+                    x.Status
+                })
+                .First())
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(x => x.ListingId, x => x.Status);
     }
 
     private async Task<Dictionary<Guid, int>> GetFavoriteCountMapAsync(

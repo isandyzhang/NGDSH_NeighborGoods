@@ -1,6 +1,9 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Integrations.Line.Services;
 using NeighborGoods.Api.Features.Listing;
+using NeighborGoods.Api.Features.Messaging;
+using NeighborGoods.Api.Features.Messaging.Contracts.Responses;
 using NeighborGoods.Api.Features.PurchaseRequests.Contracts.Responses;
 using NeighborGoods.Api.Shared.Notifications;
 using NeighborGoods.Api.Shared.Persistence;
@@ -10,6 +13,7 @@ namespace NeighborGoods.Api.Features.PurchaseRequests.Services;
 
 public sealed class PurchaseRequestService(
     NeighborGoodsDbContext dbContext,
+    IHubContext<MessageHub> hubContext,
     ILineMessageSender lineMessageSender,
     LinePushPolicyService linePushPolicyService,
     LineFlexMessageBuilder lineFlexMessageBuilder,
@@ -21,6 +25,8 @@ public sealed class PurchaseRequestService(
     private const string CancelRequestSystemMessage = "[系統發送]買家已取消此交易請求。";
     private const string ExpireRequestSystemMessage = "[系統發送]此交易請求已逾時失效。";
     private const string ReminderRequestSystemMessage = "[系統發送]此交易請求剩餘 1 小時，請盡快回覆。";
+    private const string SellerMarkedCompletedSystemMessage = "[系統發送]賣家已標記完成交易，請買家確認是否已收到商品。";
+    private const string BuyerConfirmedReceivedSystemMessage = "[系統發送]買家已確認收到商品，交易已完成。";
 
     public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> CreateAsync(
         string currentUserId,
@@ -114,11 +120,13 @@ public sealed class PurchaseRequestService(
             request.BuyerId,
             CreateRequestSystemMessage,
             now,
+            null,
             cancellationToken);
 
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            await PublishLatestSystemMessageAsync(conversation.Id, cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -187,8 +195,10 @@ public sealed class PurchaseRequestService(
             request.BuyerId,
             CancelRequestSystemMessage,
             now,
+            null,
             cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
 
         return (ToResponse(request, now), null, null);
     }
@@ -224,8 +234,10 @@ public sealed class PurchaseRequestService(
                 request.SellerId,
                 ExpireRequestSystemMessage,
                 now,
+                null,
                 cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
         }
 
         return (ToResponse(request, DateTime.UtcNow), null, null);
@@ -265,8 +277,10 @@ public sealed class PurchaseRequestService(
                 request.SellerId,
                 ExpireRequestSystemMessage,
                 now,
+                null,
                 cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
         }
 
         return (ToResponse(request, DateTime.UtcNow), null, null);
@@ -324,6 +338,40 @@ public sealed class PurchaseRequestService(
         return await CancelAsync(currentUserId, requestId.Value, cancellationToken);
     }
 
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> CompleteBySellerByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var (request, errorCode, errorMessage) = await GetCurrentRequestByConversationAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (request is null)
+        {
+            return (null, errorCode, errorMessage);
+        }
+
+        return await MarkCompletedBySellerAsync(currentUserId, request.Id, cancellationToken);
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> ConfirmReceivedByBuyerByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var (request, errorCode, errorMessage) = await GetCurrentRequestByConversationAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (request is null)
+        {
+            return (null, errorCode, errorMessage);
+        }
+
+        return await ConfirmReceivedByBuyerAsync(currentUserId, request.Id, cancellationToken);
+    }
+
     public async Task<int> ExpirePendingAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
@@ -337,6 +385,10 @@ public sealed class PurchaseRequestService(
             return 0;
         }
 
+        var conversations = await LoadConversationsByIdsAsync(
+            requests.Select(x => x.ConversationId),
+            cancellationToken);
+
         foreach (var request in requests)
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
@@ -347,10 +399,15 @@ public sealed class PurchaseRequestService(
                 request.SellerId,
                 ExpireRequestSystemMessage,
                 now,
+                conversations,
                 cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        foreach (var request in requests)
+        {
+            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
+        }
         return requests.Count;
     }
 
@@ -373,12 +430,16 @@ public sealed class PurchaseRequestService(
             return 0;
         }
 
+        var conversations = await LoadConversationsByIdsAsync(
+            requests.Select(x => x.ConversationId),
+            cancellationToken);
         var sellerIds = requests.Select(x => x.SellerId).Distinct().ToList();
         var listingIds = requests.Select(x => x.ListingId).Distinct().ToList();
         var sellers = await dbContext.AspNetUsers
             .Where(x => sellerIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
         var listings = await dbContext.Listings
+            .AsNoTracking()
             .Where(x => listingIds.Contains(x.Id))
             .Select(x => new { x.Id, x.Title })
             .ToDictionaryAsync(x => x.Id, x => x.Title, cancellationToken);
@@ -391,6 +452,7 @@ public sealed class PurchaseRequestService(
                 request.BuyerId,
                 ReminderRequestSystemMessage,
                 now,
+                conversations,
                 cancellationToken);
 
             if (!sellers.TryGetValue(request.SellerId, out var seller))
@@ -422,6 +484,104 @@ public sealed class PurchaseRequestService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return requests.Count;
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> MarkCompletedBySellerAsync(
+        string currentUserId,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var request = await dbContext.PurchaseRequests
+            .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
+        }
+
+        if (!string.Equals(request.SellerId, currentUserId, StringComparison.Ordinal))
+        {
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅賣家本人可標記完成交易");
+        }
+
+        if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Accepted)
+        {
+            return (null, "PURCHASE_REQUEST_INVALID_STATE", "目前交易狀態不可標記完成");
+        }
+
+        var listing = await dbContext.Listings
+            .FirstOrDefaultAsync(x => x.Id == request.ListingId, cancellationToken);
+        if (listing is null)
+        {
+            return (null, "LISTING_NOT_FOUND", "找不到商品");
+        }
+
+        if (!string.Equals(listing.SellerId, request.SellerId, StringComparison.Ordinal))
+        {
+            return (null, "PURCHASE_REQUEST_SELLER_MISMATCH", "交易請求與商品賣家不一致");
+        }
+
+        var now = DateTime.UtcNow;
+        var targetStatus = ResolveCompletedListingStatus(listing);
+        if (!ListingStatusRules.CanTransition((ListingStatus)listing.Status, targetStatus))
+        {
+            return (null, "LISTING_INVALID_STATUS_TRANSITION", "目前商品狀態不可標記完成");
+        }
+
+        listing.Status = (int)targetStatus;
+        listing.UpdatedAt = now;
+        request.Status = (int)PurchaseRequestStatus.SellerMarkedCompleted;
+        request.RespondedAt = now;
+        request.ResponseReason = null;
+        await AddSystemMessageAsync(
+            request.ConversationId,
+            request.SellerId,
+            SellerMarkedCompletedSystemMessage,
+            now,
+            null,
+            cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
+        return (ToResponse(request, now), null, null);
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> ConfirmReceivedByBuyerAsync(
+        string currentUserId,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        var request = await dbContext.PurchaseRequests
+            .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
+        }
+
+        if (!string.Equals(request.BuyerId, currentUserId, StringComparison.Ordinal))
+        {
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅買家本人可確認收貨");
+        }
+
+        if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.SellerMarkedCompleted)
+        {
+            return (null, "PURCHASE_REQUEST_INVALID_STATE", "需等待賣家先標記完成交易");
+        }
+
+        var now = DateTime.UtcNow;
+        request.Status = (int)PurchaseRequestStatus.Completed;
+        request.RespondedAt = now;
+        request.ResponseReason = null;
+        await AddSystemMessageAsync(
+            request.ConversationId,
+            request.BuyerId,
+            BuyerConfirmedReceivedSystemMessage,
+            now,
+            null,
+            cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
+        return (ToResponse(request, now), null, null);
     }
 
     private async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> RespondAsync(
@@ -492,10 +652,15 @@ public sealed class PurchaseRequestService(
                 request.SellerId,
                 message,
                 now,
+                null,
                 cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (!string.IsNullOrEmpty(message))
+        {
+            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
+        }
         return (ToResponse(request, now), null, null);
     }
 
@@ -514,6 +679,10 @@ public sealed class PurchaseRequestService(
             return;
         }
 
+        var conversations = await LoadConversationsByIdsAsync(
+            expired.Select(x => x.ConversationId),
+            cancellationToken);
+
         foreach (var request in expired)
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
@@ -524,10 +693,15 @@ public sealed class PurchaseRequestService(
                 request.SellerId,
                 ExpireRequestSystemMessage,
                 now,
+                conversations,
                 cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        foreach (var request in expired)
+        {
+            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
+        }
     }
 
     private async Task<(Guid? RequestId, string? ErrorCode, string? ErrorMessage)> GetPendingRequestIdByConversationAsync(
@@ -567,12 +741,40 @@ public sealed class PurchaseRequestService(
                 pendingRequest.SellerId,
                 ExpireRequestSystemMessage,
                 now,
+                null,
                 cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await PublishLatestSystemMessageAsync(pendingRequest.ConversationId, cancellationToken);
             return (null, "PURCHASE_REQUEST_EXPIRED", "此交易請求已逾時");
         }
 
         return (pendingRequest.Id, null, null);
+    }
+
+    private async Task<(PurchaseRequest? Request, string? ErrorCode, string? ErrorMessage)> GetCurrentRequestByConversationAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var (conversation, conversationErrorCode, conversationErrorMessage) = await EnsureConversationParticipantAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (conversation is null)
+        {
+            return (null, conversationErrorCode, conversationErrorMessage);
+        }
+
+        var request = await dbContext.PurchaseRequests
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
+        if (request is null)
+        {
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
+        }
+
+        return (request, null, null);
     }
 
     private async Task<(Conversation? Conversation, string? ErrorCode, string? ErrorMessage)> EnsureConversationParticipantAsync(
@@ -630,6 +832,7 @@ public sealed class PurchaseRequestService(
         string senderId,
         string content,
         DateTime now,
+        IReadOnlyDictionary<Guid, Conversation>? preloadedConversations,
         CancellationToken cancellationToken)
     {
         dbContext.Messages.Add(new Message
@@ -641,12 +844,36 @@ public sealed class PurchaseRequestService(
             CreatedAt = now
         });
 
-        var conversation = await dbContext.Conversations
-            .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
+        Conversation? conversation = null;
+        if (preloadedConversations is not null)
+        {
+            preloadedConversations.TryGetValue(conversationId, out conversation);
+        }
+        else
+        {
+            conversation = await dbContext.Conversations
+                .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
+        }
+
         if (conversation is not null)
         {
             conversation.UpdatedAt = now;
         }
+    }
+
+    private async Task<Dictionary<Guid, Conversation>> LoadConversationsByIdsAsync(
+        IEnumerable<Guid> conversationIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = conversationIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, Conversation>();
+        }
+
+        return await dbContext.Conversations
+            .Where(x => ids.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
     }
 
     private static PurchaseRequestResponse ToResponse(PurchaseRequest request, DateTime now)
@@ -669,5 +896,65 @@ public sealed class PurchaseRequestService(
             ResponseReason = request.ResponseReason,
             RemainingSeconds = Math.Max(remaining, 0)
         };
+    }
+
+    private static ListingStatus ResolveCompletedListingStatus(global::NeighborGoods.Api.Features.Listing.Listing listing)
+    {
+        if (listing.IsTradeable)
+        {
+            return ListingStatus.GivenOrTraded;
+        }
+
+        if (listing.IsFree || listing.IsCharity)
+        {
+            return ListingStatus.Donated;
+        }
+
+        return ListingStatus.Sold;
+    }
+
+    private async Task PublishLatestSystemMessageAsync(Guid conversationId, CancellationToken cancellationToken)
+    {
+        var message = await dbContext.Messages
+            .AsNoTracking()
+            .Where(x => x.ConversationId == conversationId && x.Content.StartsWith("[系統發送]"))
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (message is null)
+        {
+            return;
+        }
+
+        var participants = await dbContext.Conversations
+            .AsNoTracking()
+            .Where(x => x.Id == conversationId)
+            .Select(x => new { x.Participant1Id, x.Participant2Id })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (participants is null)
+        {
+            return;
+        }
+
+        var senderDisplayName = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .Where(x => x.Id == message.SenderId)
+            .Select(x => x.DisplayName)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? message.SenderId;
+
+        var dto = new MessageItemDto
+        {
+            Id = message.Id,
+            ConversationId = message.ConversationId,
+            SenderId = message.SenderId,
+            SenderDisplayName = senderDisplayName,
+            Content = message.Content,
+            CreatedAt = message.CreatedAt
+        };
+
+        await hubContext.Clients.Users(participants.Participant1Id, participants.Participant2Id)
+            .SendAsync("ReceiveMessage", dto, cancellationToken);
+        await hubContext.Clients.Group(MessageHub.ConversationGroupName(conversationId))
+            .SendAsync("ReceiveMessage", dto, cancellationToken);
     }
 }

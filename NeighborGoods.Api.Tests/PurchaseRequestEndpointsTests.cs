@@ -269,6 +269,85 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
         Assert.Empty(FakeLineMessageSender.PushFlexMessages);
     }
 
+    [Theory]
+    [InlineData(false, false, false, ListingStatus.Sold)]
+    [InlineData(true, true, false, ListingStatus.Donated)]
+    [InlineData(false, false, true, ListingStatus.GivenOrTraded)]
+    public async Task CompleteBySeller_UpdatesListingToExpectedTerminalStatus(
+        bool isFree,
+        bool isCharity,
+        bool isTradeable,
+        ListingStatus expectedStatus)
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        var listingId = await SeedListingAsync(factory, isFree, isCharity, isTradeable);
+
+        using var buyerClient = factory.CreateClient();
+        await AuthenticateAsAsync(buyerClient, "other@example.com", UserPassword);
+        var createResponse = await buyerClient.PostAsync($"/api/v1/listings/{listingId}/purchase-requests", null);
+        createResponse.EnsureSuccessStatusCode();
+        var createData = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        var conversationId = createData.GetProperty("conversationId").GetGuid();
+
+        using var sellerClient = factory.CreateClient();
+        await AuthenticateAsAsync(sellerClient, "tester@example.com", UserPassword);
+        var acceptResponse = await sellerClient.PostAsync($"/api/v1/conversations/{conversationId}/purchase-request/accept", null);
+        acceptResponse.EnsureSuccessStatusCode();
+
+        var completeResponse = await sellerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/complete-by-seller",
+            null);
+        completeResponse.EnsureSuccessStatusCode();
+        var completeBody = await completeResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal((int)PurchaseRequestStatus.SellerMarkedCompleted, completeBody.GetProperty("data").GetProperty("status").GetInt32());
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var listing = await db.Listings.FindAsync(listingId);
+        Assert.NotNull(listing);
+        Assert.Equal((int)expectedStatus, listing!.Status);
+    }
+
+    [Fact]
+    public async Task ConfirmReceivedByBuyer_RequiresSellerCompletionThenTransitionsToCompleted()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        var listingId = await SeedListingAsync(factory, false, false, false);
+
+        using var buyerClient = factory.CreateClient();
+        await AuthenticateAsAsync(buyerClient, "other@example.com", UserPassword);
+        var createResponse = await buyerClient.PostAsync($"/api/v1/listings/{listingId}/purchase-requests", null);
+        createResponse.EnsureSuccessStatusCode();
+        var createData = (await createResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        var conversationId = createData.GetProperty("conversationId").GetGuid();
+
+        using var sellerClient = factory.CreateClient();
+        await AuthenticateAsAsync(sellerClient, "tester@example.com", UserPassword);
+        var acceptResponse = await sellerClient.PostAsync($"/api/v1/conversations/{conversationId}/purchase-request/accept", null);
+        acceptResponse.EnsureSuccessStatusCode();
+
+        var earlyConfirm = await buyerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/confirm-received",
+            null);
+        Assert.Equal(HttpStatusCode.Conflict, earlyConfirm.StatusCode);
+        var earlyError = await earlyConfirm.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            "PURCHASE_REQUEST_INVALID_STATE",
+            earlyError.GetProperty("error").GetProperty("code").GetString());
+
+        var completeResponse = await sellerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/complete-by-seller",
+            null);
+        completeResponse.EnsureSuccessStatusCode();
+
+        var confirmResponse = await buyerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/confirm-received",
+            null);
+        confirmResponse.EnsureSuccessStatusCode();
+        var confirmBody = await confirmResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal((int)PurchaseRequestStatus.Completed, confirmBody.GetProperty("data").GetProperty("status").GetInt32());
+    }
+
     private static async Task AuthenticateAsAsync(HttpClient client, string userNameOrEmail, string password)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
@@ -281,5 +360,40 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var accessToken = body.GetProperty("data").GetProperty("accessToken").GetString();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+    }
+
+    private static async Task<Guid> SeedListingAsync(
+        ListingApiFactory factory,
+        bool isFree,
+        bool isCharity,
+        bool isTradeable)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var listingId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        db.Listings.Add(new Listing
+        {
+            Id = listingId,
+            Title = $"交易流程測試商品-{listingId:N}",
+            Description = "integration-test",
+            Price = isFree ? 0 : 300,
+            IsFree = isFree,
+            IsCharity = isCharity,
+            SellerId = SellerUserId,
+            Category = 1,
+            PickupLocation = 3,
+            Condition = 1,
+            BuyerId = null,
+            Residence = 2,
+            IsTradeable = isTradeable,
+            IsPinned = false,
+            Status = (int)ListingStatus.Active,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await db.SaveChangesAsync();
+        return listingId;
     }
 }

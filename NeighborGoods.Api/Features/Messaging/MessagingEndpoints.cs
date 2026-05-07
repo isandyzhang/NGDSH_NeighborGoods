@@ -1,5 +1,6 @@
 using NeighborGoods.Api.Features.Messaging.Contracts.Requests;
 using NeighborGoods.Api.Features.Messaging.Services;
+using NeighborGoods.Api.Features.PurchaseRequests;
 using NeighborGoods.Api.Features.PurchaseRequests.Contracts.Requests;
 using NeighborGoods.Api.Features.PurchaseRequests.Services;
 using NeighborGoods.Api.Shared.ApiContracts;
@@ -238,21 +239,61 @@ public static class MessagingEndpoints
         .RequireAuthorization()
         .RequireRateLimiting("MessagingWrite");
 
+        app.MapPost("/api/v1/conversations/{conversationId:guid}/purchase-request/complete-by-seller", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            PurchaseRequestService service,
+            Guid conversationId,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await service.CompleteBySellerByConversationAsync(
+                userId,
+                conversationId,
+                ct);
+            if (data is null)
+            {
+                return MessagingError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("CompleteConversationPurchaseRequestBySellerV1")
+        .WithSummary("賣家在對話中標記完成交易")
+        .RequireAuthorization()
+        .RequireRateLimiting("MessagingWrite");
+
+        app.MapPost("/api/v1/conversations/{conversationId:guid}/purchase-request/confirm-received", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            PurchaseRequestService service,
+            Guid conversationId,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await service.ConfirmReceivedByBuyerByConversationAsync(
+                userId,
+                conversationId,
+                ct);
+            if (data is null)
+            {
+                return MessagingError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("ConfirmConversationPurchaseRequestReceivedV1")
+        .WithSummary("買家在對話中確認收貨")
+        .RequireAuthorization()
+        .RequireRateLimiting("MessagingWrite");
+
         return app;
     }
 
     private static IResult MessagingError(HttpContext httpContext, string code, string message)
     {
         var body = ApiResponseFactory.Error(code, message, httpContext);
-        var statusCode = code switch
-        {
-            "CONVERSATION_ACCESS_DENIED" => StatusCodes.Status403Forbidden,
-            "PURCHASE_REQUEST_ACCESS_DENIED" => StatusCodes.Status403Forbidden,
-            "CONVERSATION_NOT_FOUND" or "LISTING_NOT_FOUND" or "PURCHASE_REQUEST_NOT_FOUND" => StatusCodes.Status404NotFound,
-            "PURCHASE_REQUEST_ALREADY_PENDING" or "PURCHASE_REQUEST_NOT_PENDING" or "PURCHASE_REQUEST_EXPIRED"
-                or "LISTING_NOT_AVAILABLE" or "LISTING_INVALID_STATUS_TRANSITION" => StatusCodes.Status409Conflict,
-            _ => StatusCodes.Status400BadRequest
-        };
+        var statusCode = PurchaseRequestErrorHttpMapper.ToStatusCode(code);
 
         return Results.Json(body, statusCode: statusCode);
     }

@@ -70,9 +70,9 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             FakeLineMessageSender.Reset();
             dbContext.Database.Migrate();
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [EmailVerificationChallenges]");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [Reviews]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [PurchaseRequests]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Messages]");
-            dbContext.Database.ExecuteSqlRaw("DELETE FROM [Reviews]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Conversations]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingFavorites]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingImages]");

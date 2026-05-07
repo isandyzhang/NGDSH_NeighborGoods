@@ -29,6 +29,8 @@ export type ListingItem = {
   pinnedEndDate: string | null
   pendingPurchaseRequestExpireAt: string | null
   pendingPurchaseRequestRemainingSeconds: number | null
+  inProgress: boolean
+  inProgressStage: number | null
   /** 同一商品下的對話螺紋數（後端欄位 interestCount） */
   interestCount: number
   favoriteCount: number
