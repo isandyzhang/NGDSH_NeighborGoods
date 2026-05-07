@@ -48,13 +48,13 @@ public sealed class LineMenuQueryService(
         var residenceNameMap = await dbContext.ListingResidences
             .AsNoTracking()
             .Where(x => x.IsActive)
-            .Select(x => new { x.Code, x.Name })
-            .ToDictionaryAsync(x => x.Code, x => x.Name, cancellationToken);
+            .Select(x => new { x.Id, x.DisplayName })
+            .ToDictionaryAsync(x => x.Id, x => x.DisplayName, cancellationToken);
         var pickupLocationNameMap = await dbContext.ListingPickupLocations
             .AsNoTracking()
             .Where(x => x.IsActive)
-            .Select(x => new { x.Code, x.Name })
-            .ToDictionaryAsync(x => x.Code, x => x.Name, cancellationToken);
+            .Select(x => new { x.Id, x.DisplayName })
+            .ToDictionaryAsync(x => x.Id, x => x.DisplayName, cancellationToken);
 
         var listings = await dbContext.Listings
             .AsNoTracking()
