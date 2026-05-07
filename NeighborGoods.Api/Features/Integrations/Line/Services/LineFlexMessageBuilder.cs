@@ -29,6 +29,73 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         LineMyListingsSummary summary,
         IReadOnlyList<LineMyListingCardItem> items)
     {
+        if (items.Count == 0)
+        {
+            return new LineFlexMessage(
+                AltText: "你目前沒有任何商品",
+                Contents: new
+                {
+                    type = "bubble",
+                    body = new
+                    {
+                        type = "box",
+                        layout = "vertical",
+                        spacing = "md",
+                        contents = new object[]
+                        {
+                            new
+                            {
+                                type = "text",
+                                text = "你目前沒有任何商品",
+                                weight = "bold",
+                                size = "lg",
+                                wrap = true
+                            },
+                            new
+                            {
+                                type = "text",
+                                text = "先去刊登一個商品，或前往我的商品頁面查看。",
+                                size = "sm",
+                                color = "#666666",
+                                wrap = true
+                            }
+                        }
+                    },
+                    footer = new
+                    {
+                        type = "box",
+                        layout = "vertical",
+                        spacing = "sm",
+                        contents = new object[]
+                        {
+                            new
+                            {
+                                type = "button",
+                                style = "primary",
+                                color = "#1DB446",
+                                action = new
+                                {
+                                    type = "uri",
+                                    label = "前往刊登",
+                                    uri = BuildUrl("/create-listing")
+                                }
+                            },
+                            new
+                            {
+                                type = "button",
+                                style = "link",
+                                action = new
+                                {
+                                    type = "uri",
+                                    label = "前往我的商品",
+                                    uri = BuildUrl("/my-listings")
+                                }
+                            }
+                        }
+                    }
+                });
+        }
+
         var bubbles = new List<object>();
 
         foreach (var item in items)

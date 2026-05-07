@@ -44,7 +44,8 @@ public sealed class LineMenuQueryService(
         CancellationToken cancellationToken = default)
     {
         maxItems = Math.Clamp(maxItems, 1, 5);
-        var soldStatus = (int)ListingStatus.Sold;
+        var activeStatus = (int)ListingStatus.Active;
+        var reservedStatus = (int)ListingStatus.Reserved;
         var residenceNameMap = await dbContext.ListingResidences
             .AsNoTracking()
             .Where(x => x.IsActive)
@@ -58,7 +59,7 @@ public sealed class LineMenuQueryService(
 
         var listings = await dbContext.Listings
             .AsNoTracking()
-            .Where(x => x.SellerId == userId && x.Status != soldStatus)
+            .Where(x => x.SellerId == userId && (x.Status == activeStatus || x.Status == reservedStatus))
             .Select(x => new
             {
                 x.Id,
