@@ -5,5 +5,6 @@ public sealed record AuthTokenPair(
     DateTime AccessTokenExpiresAt,
     string RefreshToken,
     DateTime RefreshTokenExpiresAt,
-    string UserId
+    string UserId,
+    int Role
 );

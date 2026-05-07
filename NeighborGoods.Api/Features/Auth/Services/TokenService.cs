@@ -134,7 +134,8 @@ public sealed class TokenService(
             accessExpiresAt,
             refreshToken,
             refreshExpiresAt,
-            user.Id);
+            user.Id,
+            user.Role);
     }
 
     private string BuildJwtToken(

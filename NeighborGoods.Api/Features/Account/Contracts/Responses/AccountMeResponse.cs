@@ -4,6 +4,7 @@ public sealed record AccountMeResponse(
     string UserId,
     string UserName,
     string DisplayName,
+    int Role,
     string? Email,
     bool EmailConfirmed,
     bool EmailNotificationEnabled,

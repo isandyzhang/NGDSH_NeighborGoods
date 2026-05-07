@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NeighborGoods.Api.Features.Admin;
 using NeighborGoods.Api.Features.Account;
 using NeighborGoods.Api.Features.Account.Services;
 using NeighborGoods.Api.Features.Auth;
@@ -225,6 +226,7 @@ app.MapListingEndpoints();
 app.MapMessagingEndpoints();
 app.MapPurchaseRequestEndpoints();
 app.MapReviewEndpoints();
+app.MapAdminEndpoints();
 app.MapHub<MessageHub>("/hubs/messages");
 
 app.Run();

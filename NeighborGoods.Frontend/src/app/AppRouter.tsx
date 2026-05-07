@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
+import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
 import { SellerPage } from '@/features/seller/pages/SellerPage'
 import { AppLayout } from '@/app/AppLayout'
@@ -46,6 +47,9 @@ const NotificationCenterPage = lazy(() =>
     default: module.NotificationCenterPage,
   })),
 )
+const AdminHomePage = lazy(() =>
+  import('@/features/admin/pages/AdminHomePage').then((module) => ({ default: module.AdminHomePage })),
+)
 const CreateReviewPage = lazy(() =>
   import('@/features/reviews/pages/CreateReviewPage').then((module) => ({ default: module.CreateReviewPage })),
 )
@@ -75,6 +79,9 @@ export const AppRouter = () => {
           <Route path="/listings/:id" element={<ListingDetailPage />} />
           <Route path="/seller/:sellerId" element={<SellerPage />} />
           <Route element={<RequireAuth />}>
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminHomePage />} />
+            </Route>
             <Route path="/account" element={<AccountPage />} />
             <Route path="/profile" element={<Navigate to="/account" replace />} />
             <Route path="/account/email-verify" element={<AccountEmailVerifyPage />} />

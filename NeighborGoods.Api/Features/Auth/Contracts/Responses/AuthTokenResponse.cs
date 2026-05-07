@@ -5,5 +5,6 @@ public sealed record AuthTokenResponse(
     DateTime AccessTokenExpiresAt,
     string RefreshToken,
     DateTime RefreshTokenExpiresAt,
-    string UserId
+    string UserId,
+    int Role
 );

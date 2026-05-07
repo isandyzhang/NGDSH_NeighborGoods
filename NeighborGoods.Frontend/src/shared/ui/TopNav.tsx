@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth/components/AuthProvider'
+import { ADMIN_ROLE_CODE } from '@/features/admin/constants/adminRole'
 import { accountApi } from '@/features/account/api/accountApi'
 import siteLogo from '@/png/logo.png'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
@@ -15,6 +16,7 @@ export const TopNav = () => {
   const [menuOpen, setMenuOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
+  const logoTarget = tokens?.role === ADMIN_ROLE_CODE ? '/admin' : '/listings'
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -103,17 +105,18 @@ export const TopNav = () => {
     { to: '/favorites', label: '我的收藏' },
     { to: '/my-listings', label: '我的商品' },
     { to: '/listings/create', label: '刊登商品' },
+    ...(tokens?.role === ADMIN_ROLE_CODE ? [{ to: '/admin', label: '管理後台' }] : []),
     { to: '/contact-admin', label: '聯絡管理員' },
     { to: '/terms', label: '使用條款' },
     { to: '/privacy', label: '隱私條款' },
-  ] as const
+  ]
 
   return (
     <header className="sticky top-0 z-[1000] border-b border-border bg-bg/90 backdrop-blur">
       <div ref={menuContainerRef} className="mx-auto w-full max-w-6xl px-4">
         <div className="flex h-20 items-center justify-between">
           <Link
-            to="/listings"
+            to={logoTarget}
             aria-label="NeighborGoods 首頁"
             className="inline-flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-tight text-text-subtle md:gap-3 md:text-[1.75rem]"
           >

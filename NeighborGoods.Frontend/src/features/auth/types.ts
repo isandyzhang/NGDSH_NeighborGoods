@@ -4,6 +4,7 @@ export type AuthTokens = {
   refreshToken: string
   refreshTokenExpiresAt: string
   userId: string
+  role: number
 }
 
 export type LoginPayload = {

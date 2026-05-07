@@ -155,6 +155,7 @@ public static class AuthEndpoints
             pair.AccessTokenExpiresAt,
             pair.RefreshToken,
             pair.RefreshTokenExpiresAt,
-            pair.UserId);
+            pair.UserId,
+            pair.Role);
     }
 }

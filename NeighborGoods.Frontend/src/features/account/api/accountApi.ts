@@ -5,6 +5,7 @@ export type AccountMe = {
   userId: string
   userName: string
   displayName: string
+  role: number
   email: string | null
   emailConfirmed: boolean
   emailNotificationEnabled: boolean
@@ -33,6 +34,7 @@ type AuthTokens = {
   refreshToken: string
   refreshTokenExpiresAt: string
   userId: string
+  role: number
 }
 
 export type LinePreferences = {

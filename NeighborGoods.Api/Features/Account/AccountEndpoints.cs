@@ -47,7 +47,8 @@ public static class AccountEndpoints
                 tokens.AccessTokenExpiresAt,
                 tokens.RefreshToken,
                 tokens.RefreshTokenExpiresAt,
-                tokens.UserId);
+                tokens.UserId,
+                tokens.Role);
             return Results.Ok(ApiResponseFactory.Success(response, httpContext));
         })
         .WithName("AccountRegisterV1")
