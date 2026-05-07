@@ -242,48 +242,8 @@ export const AccountPage = () => {
       {error ? <ErrorState description={error} /> : null}
 
       {!loading && profile ? (
-        <Card className="animate-fade-rise space-y-4" style={{ animationDelay: '120ms' }}>
+        <Card className="animate-fade-rise space-y-5" style={{ animationDelay: '120ms' }}>
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">帳號與綁定</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs text-text-muted">顯示名稱</p>
-              <p className="text-lg font-semibold text-text-main">{profile.displayName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">帳號</p>
-              <p className="break-all text-lg font-semibold text-text-main">{profile.userName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">Email</p>
-              <p className="text-lg font-semibold text-text-main">{profile.email ?? '未設定'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">Email 驗證</p>
-              <p
-                className={`text-lg font-semibold ${profile.emailConfirmed ? 'text-[#1E6B43]' : 'text-text-muted'}`}
-              >
-                {profile.emailConfirmed ? '已驗證' : '未驗證'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">LINE 綁定</p>
-              <p
-                className={`text-lg font-semibold ${profile.lineNotifyBound ? 'text-[#1E6B43]' : 'text-text-muted'}`}
-              >
-                {profile.lineNotifyBound ? '已綁定' : '未綁定'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-text-muted">註冊時間</p>
-              <p className="text-lg font-semibold text-text-main">
-                {new Date(profile.createdAt).toLocaleDateString('zh-TW')}
-              </p>
-            </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 border-t border-border pt-4">
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">通知開關</p>
             <div className="grid gap-3">
             <div className="rounded-xl border border-border bg-surface-2 px-3 py-3">
@@ -303,7 +263,7 @@ export const AccountPage = () => {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="text-sm font-semibold"
+                    className="min-h-[2.6rem] px-4 text-sm font-semibold md:text-xs"
                     onClick={() => navigate('/account/email-verify')}
                   >
                     開始驗證
@@ -312,7 +272,7 @@ export const AccountPage = () => {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="text-sm font-semibold"
+                    className="min-h-[2.6rem] px-4 text-sm font-semibold md:text-xs"
                     disabled={actionLoading}
                     onClick={() => void handleEmailOpenNotifications()}
                   >
@@ -349,8 +309,7 @@ export const AccountPage = () => {
                 {!profile.lineNotifyBound ? (
                   <Button
                     type="button"
-                    variant="secondary"
-                    className="text-sm font-semibold"
+                    className="rounded-xl px-4 py-2 text-base font-semibold md:px-3 md:py-1.5 md:text-sm"
                     disabled={actionLoading}
                     onClick={() => void handleStartLineOfficialBinding()}
                   >
@@ -359,8 +318,7 @@ export const AccountPage = () => {
                 ) : !lineNotifyEnabled ? (
                   <Button
                     type="button"
-                    variant="secondary"
-                    className="text-sm font-semibold"
+                    className="rounded-xl px-4 py-2 text-base font-semibold md:px-3 md:py-1.5 md:text-sm"
                     disabled={actionLoading}
                     onClick={() => void handleLineOpenNotifications()}
                   >
@@ -370,8 +328,7 @@ export const AccountPage = () => {
                   <div className="flex flex-wrap justify-end gap-2">
                     <Button
                       type="button"
-                      variant="secondary"
-                      className="text-sm font-semibold"
+                      className="rounded-xl px-4 py-2 text-base font-semibold md:px-3 md:py-1.5 md:text-sm"
                       disabled={actionLoading}
                       onClick={() => void handleLineCancelNotifications()}
                     >
@@ -379,8 +336,7 @@ export const AccountPage = () => {
                     </Button>
                     <Button
                       type="button"
-                      variant="secondary"
-                      className="text-sm font-semibold"
+                      className="rounded-xl px-4 py-2 text-base font-semibold md:px-3 md:py-1.5 md:text-sm"
                       disabled={actionLoading}
                       onClick={() => void handleLineUnbind()}
                     >
@@ -391,6 +347,46 @@ export const AccountPage = () => {
                 </div>
               </div>
             </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">帳號與綁定</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-text-muted">顯示名稱</p>
+                <p className="text-lg font-semibold text-text-main">{profile.displayName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">帳號</p>
+                <p className="break-all text-lg font-semibold text-text-main">{profile.userName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">Email</p>
+                <p className="text-lg font-semibold text-text-main">{profile.email ?? '未設定'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">Email 驗證</p>
+                <p
+                  className={`text-lg font-semibold ${profile.emailConfirmed ? 'text-[#1E6B43]' : 'text-text-muted'}`}
+                >
+                  {profile.emailConfirmed ? '已驗證' : '未驗證'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">LINE 綁定</p>
+                <p
+                  className={`text-lg font-semibold ${profile.lineNotifyBound ? 'text-[#1E6B43]' : 'text-text-muted'}`}
+                >
+                  {profile.lineNotifyBound ? '已綁定' : '未綁定'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">註冊時間</p>
+                <p className="text-lg font-semibold text-text-main">
+                  {new Date(profile.createdAt).toLocaleDateString('zh-TW')}
+                </p>
+              </div>
             </div>
           </div>
 
