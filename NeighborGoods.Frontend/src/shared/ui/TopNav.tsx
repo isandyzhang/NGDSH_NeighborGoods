@@ -105,7 +105,6 @@ export const TopNav = () => {
     { to: '/favorites', label: '我的收藏' },
     { to: '/my-listings', label: '我的商品' },
     { to: '/listings/create', label: '刊登商品' },
-    ...(tokens?.role === ADMIN_ROLE_CODE ? [{ to: '/admin', label: '管理後台' }] : []),
     { to: '/contact-admin', label: '聯絡管理員' },
     { to: '/terms', label: '使用條款' },
     { to: '/privacy', label: '隱私條款' },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { adminApi, type AdminDashboard } from '@/features/admin/api/adminApi'
+import { adminApi, type AdminDashboard, type AdminListingManagement } from '@/features/admin/api/adminApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -19,13 +19,30 @@ const formatPrice = (price: number, isFree: boolean) => (isFree ? '免費' : `NT
 
 export const AdminHomePage = () => {
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null)
+  const [listingData, setListingData] = useState<AdminListingManagement | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [keyword, setKeyword] = useState('')
+  const [statusFilter, setStatusFilter] = useState<number | 'all'>('all')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [targetStatus, setTargetStatus] = useState(0)
+  const [operationMessage, setOperationMessage] = useState<string | null>(null)
+  const [operationLoading, setOperationLoading] = useState(false)
 
   const loadDashboard = useCallback(async () => {
-    const data = await adminApi.getDashboard()
-    setDashboard(data)
-  }, [])
+    const [dashboardData, listings] = await Promise.all([
+      adminApi.getDashboard(),
+      adminApi.listListings({
+        q: keyword.trim() || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        page: 1,
+        pageSize: 50,
+      }),
+    ])
+    setDashboard(dashboardData)
+    setListingData(listings)
+    setSelectedIds((current) => current.filter((id) => listings.items.some((item) => item.id === id)))
+  }, [keyword, statusFilter])
 
   useEffect(() => {
     let disposed = false
@@ -75,6 +92,49 @@ export const AdminHomePage = () => {
     { label: '待處理事項', value: dashboard.kpi.pendingTopSubmissions + dashboard.kpi.unreadAdminMessages },
   ]
 
+  const handleBatchForceStatus = async () => {
+    if (selectedIds.length === 0 || operationLoading) {
+      return
+    }
+
+    setOperationLoading(true)
+    setOperationMessage(null)
+    try {
+      const result = await adminApi.batchForceUpdateListingStatus(selectedIds, targetStatus)
+      setOperationMessage(`已批次更新 ${result.updatedCount} 筆商品為狀態 ${result.status}`)
+      await loadDashboard()
+      setSelectedIds([])
+    } catch (err) {
+      setOperationMessage(err instanceof ApiClientError ? err.message : '批次更新狀態失敗')
+    } finally {
+      setOperationLoading(false)
+    }
+  }
+
+  const handleHardDeleteSelected = async () => {
+    if (selectedIds.length === 0 || operationLoading) {
+      return
+    }
+
+    const ok = window.confirm(`即將硬刪除 ${selectedIds.length} 筆商品，此操作不可復原，確定執行？`)
+    if (!ok) {
+      return
+    }
+
+    setOperationLoading(true)
+    setOperationMessage(null)
+    try {
+      await Promise.all(selectedIds.map((id) => adminApi.hardDeleteListing(id)))
+      setOperationMessage(`已硬刪除 ${selectedIds.length} 筆商品`)
+      await loadDashboard()
+      setSelectedIds([])
+    } catch (err) {
+      setOperationMessage(err instanceof ApiClientError ? err.message : '批次硬刪除失敗')
+    } finally {
+      setOperationLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card className="border-[#f2d59a] bg-[#fff7e0]">
@@ -114,53 +174,79 @@ export const AdminHomePage = () => {
         </div>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-main">最新商品</h2>
-            <Link to="/listings" className="text-sm text-text-subtle hover:text-text-main">
-              查看全部
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {dashboard.latestListings.length === 0 ? (
-              <p className="text-sm text-text-subtle">暫無資料</p>
-            ) : (
-              dashboard.latestListings.map((item) => (
-                <div key={item.id} className="rounded-xl border border-border bg-surface-2 p-3">
-                  <p className="font-semibold text-text-main">{item.title}</p>
-                  <p className="mt-1 text-sm text-text-subtle">
-                    {item.sellerDisplayName}・{formatPrice(item.price, item.isFree)}・{formatDateTime(item.createdAt)}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+      <Card className="border-[#e9b4b4] bg-[#fff4f4]">
+        <p className="text-sm font-semibold uppercase tracking-[0.1em] text-[#a94442]">管理員強制操作（高風險）</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto_auto]">
+          <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜尋商品標題或賣家" className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main outline-none transition placeholder:text-text-muted focus:border-brand" />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))} className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main outline-none transition focus:border-brand">
+            <option value="all">全部狀態</option>
+            <option value={0}>0 上架中</option>
+            <option value={1}>1 保留</option>
+            <option value={2}>2 售出</option>
+            <option value={3}>3 已捐贈</option>
+            <option value={4}>4 已下架</option>
+            <option value={5}>5 已易物</option>
+          </select>
+          <select
+            value={targetStatus}
+            onChange={(event) => setTargetStatus(Number(event.target.value))}
+            className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main outline-none transition focus:border-brand"
+          >
+            <option value={0}>0 上架中 Active</option>
+            <option value={1}>1 保留 Reserved</option>
+            <option value={2}>2 售出 Sold</option>
+            <option value={3}>3 已捐贈 Donated</option>
+            <option value={4}>4 已下架 Inactive</option>
+            <option value={5}>5 已易物 GivenOrTraded</option>
+          </select>
+          <Button type="button" variant="secondary" onClick={() => void loadDashboard()} disabled={operationLoading}>
+            搜尋/篩選
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => void handleBatchForceStatus()} disabled={operationLoading || selectedIds.length === 0}>
+            批次改狀態
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void handleHardDeleteSelected()}
+            disabled={operationLoading || selectedIds.length === 0}
+            className="border-[#e9b4b4] bg-[#fbe2e2] text-[#b23a3a] hover:bg-[#f6d3d3]"
+          >
+            批次硬刪除
+          </Button>
+        </div>
+        <p className="mt-2 text-sm text-text-subtle">目前已勾選 {selectedIds.length} 筆商品</p>
+        {operationMessage ? <p className="mt-2 text-sm text-text-subtle">{operationMessage}</p> : null}
+      </Card>
 
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-text-main">最新管理訊息</h2>
-            <Link to="/contact-admin" className="text-sm text-text-subtle hover:text-text-main">
-              查看入口
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {dashboard.latestMessages.length === 0 ? (
-              <p className="text-sm text-text-subtle">暫無資料</p>
-            ) : (
-              dashboard.latestMessages.map((item) => (
-                <div key={item.id} className="rounded-xl border border-border bg-surface-2 p-3">
-                  <p className="line-clamp-1 font-semibold text-text-main">{item.content}</p>
-                  <p className="mt-1 text-sm text-text-subtle">
-                    {item.senderDisplayName}・{item.isRead ? '已讀' : '未讀'}・{formatDateTime(item.createdAt)}
+      <Card>
+        <h2 className="mb-3 text-xl font-semibold text-text-main">商品列表</h2>
+        <div className="space-y-2">
+          {listingData?.items.length ? (
+            listingData.items.map((item) => (
+              <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-2 p-3">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(item.id)}
+                  onChange={(event) =>
+                    setSelectedIds((current) =>
+                      event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-text-main">{item.title}</p>
+                  <p className="text-sm text-text-subtle">
+                    {item.sellerDisplayName}・{formatPrice(item.price, item.isFree)}・狀態 {item.status}・{formatDateTime(item.createdAt)}
                   </p>
                 </div>
-              ))
-            )}
-          </div>
-        </Card>
-      </div>
+              </label>
+            ))
+          ) : (
+            <p className="text-sm text-text-subtle">暫無資料</p>
+          )}
+        </div>
+      </Card>
     </div>
   )
 }
