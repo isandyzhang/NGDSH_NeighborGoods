@@ -71,12 +71,12 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                             type = "box",
                             layout = "vertical",
                             position = "absolute",
-                            cornerRadius = "60px",
+                            cornerRadius = "16px",
                             offsetTop = "12px",
                             offsetStart = "12px",
-                            height = "75px",
-                            paddingStart = "24px",
-                            paddingEnd = "24px",
+                            height = "32px",
+                            paddingStart = "10px",
+                            paddingEnd = "10px",
                             backgroundColor = statusColor,
                             justifyContent = "center",
                             contents = new object[]
@@ -87,7 +87,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                                     text = statusText,
                                     color = "#ffffff",
                                     align = "center",
-                                    size = "xl",
+                                    size = "sm",
                                     weight = "bold"
                                 }
                             }
@@ -115,6 +115,20 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                         new
                         {
                             type = "text",
+                            text = descriptionText,
+                            color = "#555555",
+                            size = "sm",
+                            wrap = true,
+                            maxLines = 2
+                        },
+                        new
+                        {
+                            type = "separator",
+                            margin = "md"
+                        },
+                        new
+                        {
+                            type = "text",
                             text = metaText,
                             color = "#111111",
                             size = "sm",
@@ -130,12 +144,8 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                         },
                         new
                         {
-                            type = "text",
-                            text = descriptionText,
-                            color = "#555555",
-                            size = "sm",
-                            wrap = true,
-                            maxLines = 2
+                            type = "separator",
+                            margin = "md"
                         },
                         new
                         {
@@ -196,6 +206,8 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         var conversationRows = summary.RecentConversations
             .Select((x, index) =>
             {
+                var safeListingTitle = string.IsNullOrWhiteSpace(x.ListingTitle) ? "未命名商品" : x.ListingTitle.Trim();
+                var safeDisplayName = string.IsNullOrWhiteSpace(x.OtherDisplayName) ? "對方" : x.OtherDisplayName.Trim();
                 var rowItems = new List<object>
                 {
                     new
@@ -208,8 +220,8 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                             new
                             {
                                 type = "text",
-                                text = x.ListingTitle,
-                                size = "xl",
+                                text = safeListingTitle,
+                                size = "lg",
                                 weight = "bold",
                                 color = "#111111",
                                 flex = 1,
@@ -222,7 +234,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                     new
                     {
                         type = "text",
-                        text = $"訊息者：{x.OtherDisplayName}",
+                        text = $"訊息者：{safeDisplayName}",
                         size = "sm",
                         color = "#555555",
                         wrap = true
@@ -577,16 +589,23 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             {
                 type = "box",
                 layout = "vertical",
-                minWidth = "52px",
-                paddingStart = "8px",
-                paddingEnd = "8px",
-                paddingTop = "4px",
-                paddingBottom = "4px",
+                width = "56px",
+                height = "24px",
                 cornerRadius = "999px",
                 backgroundColor = "#F1F3F5",
                 justifyContent = "center",
                 alignItems = "center",
-                contents = new object[] { new { type = "filler" } }
+                contents = new object[]
+                {
+                    new
+                    {
+                        type = "text",
+                        text = "未讀 0",
+                        size = "xxs",
+                        color = "#9AA0A6",
+                        align = "center"
+                    }
+                }
             };
         }
 
@@ -595,27 +614,19 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         {
             type = "box",
             layout = "vertical",
-            minWidth = "52px",
-            paddingStart = "8px",
-            paddingEnd = "8px",
-            paddingTop = "4px",
-            paddingBottom = "4px",
+            width = "56px",
+            height = "24px",
             cornerRadius = "999px",
             backgroundColor = "#FFE7EB",
             justifyContent = "center",
             alignItems = "center",
-            action = new
-            {
-                type = "uri",
-                uri = messagesUrl
-            },
             contents = new object[]
             {
                 new
                 {
                     type = "text",
                     text = badgeText,
-                    size = "xs",
+                    size = "xxs",
                     weight = "bold",
                     color = "#D90429",
                     align = "center",
