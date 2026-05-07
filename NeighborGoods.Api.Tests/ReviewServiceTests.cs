@@ -253,4 +253,69 @@ public sealed class ReviewServiceTests(SqlServerContainerFixture fixture)
         Assert.Equal("REVIEW_NOT_AVAILABLE", errorCode);
         Assert.Contains("僅完成交易後可評價", errorMessage);
     }
+
+    [Fact]
+    public async Task GetStatusAsync_WhenViewerIsNotParticipant_ReturnsAccessDenied()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var reviewService = scope.ServiceProvider.GetRequiredService<ReviewService>();
+        var now = DateTime.UtcNow;
+
+        var listingId = Guid.NewGuid();
+        var conversationId = Guid.NewGuid();
+        var requestId = Guid.NewGuid();
+
+        db.Listings.Add(new Listing
+        {
+            Id = listingId,
+            Title = "review-status-access-test",
+            Description = "",
+            Price = 100,
+            IsFree = false,
+            IsCharity = false,
+            SellerId = SellerUserId,
+            Category = 0,
+            PickupLocation = 3,
+            Condition = 1,
+            BuyerId = null,
+            Residence = 2,
+            IsTradeable = false,
+            IsPinned = false,
+            Status = (int)ListingStatus.Sold,
+            CreatedAt = now.AddDays(-1),
+            UpdatedAt = now
+        });
+        db.Conversations.Add(new Conversation
+        {
+            Id = conversationId,
+            ListingId = listingId,
+            Participant1Id = BuyerUserId,
+            Participant2Id = SellerUserId,
+            CreatedAt = now.AddHours(-3),
+            UpdatedAt = now.AddHours(-2)
+        });
+        db.PurchaseRequests.Add(new PurchaseRequest
+        {
+            Id = requestId,
+            ListingId = listingId,
+            ConversationId = conversationId,
+            BuyerId = BuyerUserId,
+            SellerId = SellerUserId,
+            Status = (int)PurchaseRequestStatus.Completed,
+            CreatedAt = now.AddHours(-2),
+            ExpireAt = now.AddHours(10),
+            RespondedAt = now.AddHours(-1)
+        });
+        await db.SaveChangesAsync();
+
+        var (data, errorCode, _) = await reviewService.GetStatusAsync(
+            ThirdUserId,
+            requestId,
+            CancellationToken.None);
+
+        Assert.Null(data);
+        Assert.Equal("PURCHASE_REQUEST_ACCESS_DENIED", errorCode);
+    }
 }

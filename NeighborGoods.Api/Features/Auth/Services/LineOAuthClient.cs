@@ -138,7 +138,7 @@ public sealed class LineOAuthClient(
             string.IsNullOrWhiteSpace(_options.ChannelSecret) ||
             string.IsNullOrWhiteSpace(_options.CallbackUrl))
         {
-            throw new InvalidOperationException("Line OAuth settings are incomplete.");
+            throw new LineOAuthMisconfiguredException();
         }
     }
 

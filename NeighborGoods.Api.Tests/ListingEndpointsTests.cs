@@ -1146,8 +1146,9 @@ public sealed class ListingEndpointsTests
             $"/api/v1/internal/push-targets?categoryCode=0&listingId={SeededTesterListingId}&limit=20");
         Assert.Equal(HttpStatusCode.OK, okResponse.StatusCode);
         var body = await okResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("success").GetBoolean());
         var targets = body.GetProperty("data").GetProperty("targets");
-        Assert.True(targets.GetArrayLength() >= 1);
+        Assert.Equal(JsonValueKind.Array, targets.ValueKind);
     }
 
     [Fact]

@@ -22,7 +22,9 @@ public static class AuthEndpoints
             var user = await passwordAuthService.ValidateCredentialsAsync(request.UserNameOrEmail, request.Password, ct);
             if (user is null)
             {
-                return Results.Unauthorized();
+                return Results.Json(
+                    ApiResponseFactory.Error("UNAUTHORIZED", "帳號或密碼錯誤", httpContext),
+                    statusCode: StatusCodes.Status401Unauthorized);
             }
 
             var tokens = await tokenService.IssueAsync(user, ct);
@@ -41,7 +43,9 @@ public static class AuthEndpoints
             var tokens = await tokenService.RefreshAsync(request.RefreshToken, ct);
             if (tokens is null)
             {
-                return Results.Unauthorized();
+                return Results.Json(
+                    ApiResponseFactory.Error("UNAUTHORIZED", "Refresh token 無效或已失效", httpContext),
+                    statusCode: StatusCodes.Status401Unauthorized);
             }
 
             var response = ToTokenResponse(tokens);

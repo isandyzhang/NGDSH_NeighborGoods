@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using NeighborGoods.Api.Features.Auth.Services;
 using NeighborGoods.Api.Features.Listing;
 
 namespace NeighborGoods.Api.Shared.ApiContracts;
@@ -56,8 +57,7 @@ public sealed class GlobalExceptionHandler(
                 string.IsNullOrWhiteSpace(unauthorizedAccessException.Message)
                     ? "需要登入"
                     : unauthorizedAccessException.Message),
-            InvalidOperationException { Message: var msg }
-                when msg.Contains("Line OAuth settings are incomplete", StringComparison.Ordinal) => (
+            LineOAuthMisconfiguredException => (
                 StatusCodes.Status503ServiceUnavailable,
                 "LINE_OAUTH_MISCONFIGURED",
                 "LINE 登入尚未正確設定（ChannelId／ChannelSecret／CallbackUrl）。請確認 Container App 環境變數 Line__* 或對應的 Secret。"),

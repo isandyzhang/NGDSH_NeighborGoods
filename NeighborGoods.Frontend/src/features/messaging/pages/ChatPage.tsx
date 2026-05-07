@@ -24,16 +24,17 @@ const formatTaipeiTime = (value: string) =>
     minute: '2-digit',
   })
 
-const mergeMessages = (base: MessageItem[], incoming: MessageItem[]) => {
+const mergeMessages = (base: MessageItem[], incoming: MessageItem[], knownMessageIds: Set<string>) => {
   if (incoming.length === 0) {
     return base
   }
 
   let next = base
   for (const message of incoming) {
-    if (next.some((item) => item.id === message.id)) {
+    if (knownMessageIds.has(message.id)) {
       continue
     }
+    knownMessageIds.add(message.id)
 
     const messageTime = parseApiDateToMs(message.createdAt)
     const last = next.at(-1)
@@ -119,6 +120,7 @@ export const ChatPage = () => {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const markReadTimerRef = useRef<number | null>(null)
+  const knownMessageIdsRef = useRef<Set<string>>(new Set())
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const { connection, hubReady, joinConversation, leaveConversation } = useSharedMessageHub()
   const scheduleMarkRead = useCallback(() => {
@@ -170,11 +172,13 @@ export const ChatPage = () => {
     let disposed = false
     setLoading(true)
     setError(null)
+    knownMessageIdsRef.current = new Set()
 
     void messagingApi
       .getMessages(conversationId)
       .then((data) => {
         if (!disposed) {
+          knownMessageIdsRef.current = new Set(data.items.map((item) => item.id))
           setMessages(data.items)
           scheduleMarkRead()
         }
@@ -255,7 +259,7 @@ export const ChatPage = () => {
         return
       }
 
-      setMessages((current) => mergeMessages(current, [message]))
+      setMessages((current) => mergeMessages(current, [message], knownMessageIdsRef.current))
       scheduleMarkRead()
 
       if (message.content.startsWith('[系統發送]')) {
@@ -316,7 +320,7 @@ export const ChatPage = () => {
 
     try {
       const message = await messagingApi.sendMessage(conversationId, content)
-      setMessages((current) => mergeMessages(current, [message]))
+      setMessages((current) => mergeMessages(current, [message], knownMessageIdsRef.current))
       setDraft('')
     } catch (err) {
       const message = err instanceof ApiClientError ? err.message : '送出訊息失敗'

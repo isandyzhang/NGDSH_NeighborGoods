@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Rocket } from 'lucide-react'
@@ -40,13 +41,13 @@ type Props = {
   emailNotifyIcon: string
   quickResponderIcon: string
   onPrefetchListingDetail: (id: string) => void
-  onToggleFavorite: (item: ListingItem) => void
+  onToggleFavorite: (item: ListingItem) => void | Promise<void>
   onOpenTopPinFlow: (item: ListingItem) => void
-  onStartConversation: (item: ListingItem) => void
+  onStartConversation: (item: ListingItem) => void | Promise<void>
   onOpenPurchaseConfirm: (item: ListingItem) => void
 }
 
-export const ListingGridCard = ({
+export const ListingGridCard = memo(({
   item,
   countdownNowMs,
   isOwnListing,
@@ -147,7 +148,9 @@ export const ListingGridCard = ({
               {!isOwnListing ? (
                 <button
                   type="button"
-                  onClick={() => onToggleFavorite(item)}
+                  onClick={() => {
+                    void onToggleFavorite(item)
+                  }}
                   disabled={favoriteBusy}
                   className="inline-flex items-center gap-1 rounded-full px-1 py-0.5 text-text-muted transition hover:text-[#B45B4D] focus-visible:outline-none"
                   aria-label={isLiked ? '取消收藏' : '加入收藏'}
@@ -208,7 +211,9 @@ export const ListingGridCard = ({
         <div className={`grid gap-2 ${isOwnListing || hidePurchaseButton ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <Button
             type="button"
-            onClick={() => onStartConversation(item)}
+            onClick={() => {
+              void onStartConversation(item)
+            }}
             disabled={isOwnListing || conversationBusy}
             variant="secondary"
             className="rounded-lg px-2.5 py-1.5 text-lg font-semibold"
@@ -229,4 +234,6 @@ export const ListingGridCard = ({
       </div>
     </motion.div>
   )
-}
+})
+
+ListingGridCard.displayName = 'ListingGridCard'

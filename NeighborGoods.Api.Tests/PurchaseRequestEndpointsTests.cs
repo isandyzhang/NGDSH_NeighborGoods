@@ -348,6 +348,30 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
         Assert.Equal((int)PurchaseRequestStatus.Completed, confirmBody.GetProperty("data").GetProperty("status").GetInt32());
     }
 
+    [Fact]
+    public async Task RejectPurchaseRequest_ByNonSeller_ReturnsForbidden()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var buyerClient = factory.CreateClient();
+        await AuthenticateAsAsync(buyerClient, "other@example.com", UserPassword);
+
+        var create = await buyerClient.PostAsync($"/api/v1/listings/{SeededListingId}/purchase-requests", null);
+        create.EnsureSuccessStatusCode();
+        var requestId = (await create.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("data")
+            .GetProperty("id")
+            .GetGuid();
+
+        var reject = await buyerClient.PostAsJsonAsync($"/api/v1/purchase-requests/{requestId}/reject", new
+        {
+            reason = "non-seller reject"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, reject.StatusCode);
+        var body = await reject.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("PURCHASE_REQUEST_ACCESS_DENIED", body.GetProperty("error").GetProperty("code").GetString());
+    }
+
     private static async Task AuthenticateAsAsync(HttpClient client, string userNameOrEmail, string password)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new

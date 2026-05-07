@@ -257,6 +257,28 @@ public sealed class MessagingEndpointsTests
         Assert.Equal("CONVERSATION_ACCESS_DENIED", body.GetProperty("error").GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task AcceptConversationPurchaseRequest_WhenNoPendingRequest_Returns404()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var ensure = await client.PostAsJsonAsync(
+            "/api/v1/conversations",
+            new { listingId = SeededListingId, otherUserId = SellerUserId },
+            CamelCaseJson);
+        ensure.EnsureSuccessStatusCode();
+        var conversationId = (await ensure.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("data").GetProperty("conversationId").GetGuid();
+
+        var response = await client.PostAsync($"/api/v1/conversations/{conversationId}/purchase-request/accept", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("PURCHASE_REQUEST_NOT_FOUND", body.GetProperty("error").GetProperty("code").GetString());
+    }
+
     private static async Task AuthenticateAsAsync(HttpClient client, string userNameOrEmail, string password)
     {
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new

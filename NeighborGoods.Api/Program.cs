@@ -67,6 +67,7 @@ builder.Services.AddScoped<AccountLinePreferenceService>();
 builder.Services.AddScoped<LineWebhookService>();
 builder.Services.AddScoped<LineMenuQueryService>();
 builder.Services.AddScoped<LineFlexMessageBuilder>();
+builder.Services.AddHostedService<LinePreferencePushWorker>();
 builder.Services.AddScoped<PasswordAuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ICurrentUserContext, HttpCurrentUserContext>();

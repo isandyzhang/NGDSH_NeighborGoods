@@ -404,10 +404,9 @@ public sealed class PurchaseRequestService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        foreach (var request in requests)
-        {
-            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
-        }
+        await PublishLatestSystemMessagesAsync(
+            requests.Select(x => x.ConversationId),
+            cancellationToken);
         return requests.Count;
     }
 
@@ -698,10 +697,9 @@ public sealed class PurchaseRequestService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        foreach (var request in expired)
-        {
-            await PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
-        }
+        await PublishLatestSystemMessagesAsync(
+            expired.Select(x => x.ConversationId),
+            cancellationToken);
     }
 
     private async Task<(Guid? RequestId, string? ErrorCode, string? ErrorMessage)> GetPendingRequestIdByConversationAsync(
@@ -956,5 +954,77 @@ public sealed class PurchaseRequestService(
             .SendAsync("ReceiveMessage", dto, cancellationToken);
         await hubContext.Clients.Group(MessageHub.ConversationGroupName(conversationId))
             .SendAsync("ReceiveMessage", dto, cancellationToken);
+    }
+
+    private async Task PublishLatestSystemMessagesAsync(
+        IEnumerable<Guid> conversationIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = conversationIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        var messages = await dbContext.Messages
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.ConversationId) && x.Content.StartsWith("[系統發送]"))
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+        var latestByConversationId = new Dictionary<Guid, Message>();
+        foreach (var message in messages)
+        {
+            if (!latestByConversationId.ContainsKey(message.ConversationId))
+            {
+                latestByConversationId.Add(message.ConversationId, message);
+            }
+        }
+
+        if (latestByConversationId.Count == 0)
+        {
+            return;
+        }
+
+        var participantsByConversationId = await dbContext.Conversations
+            .AsNoTracking()
+            .Where(x => latestByConversationId.Keys.Contains(x.Id))
+            .Select(x => new { x.Id, x.Participant1Id, x.Participant2Id })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var senderIds = latestByConversationId.Values
+            .Select(x => x.SenderId)
+            .Distinct()
+            .ToList();
+        var senderNamesById = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .Where(x => senderIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.DisplayName })
+            .ToDictionaryAsync(x => x.Id, x => x.DisplayName, cancellationToken);
+
+        foreach (var (conversationId, message) in latestByConversationId)
+        {
+            if (!participantsByConversationId.TryGetValue(conversationId, out var participants))
+            {
+                continue;
+            }
+
+            var senderDisplayName = senderNamesById.TryGetValue(message.SenderId, out var displayName)
+                ? displayName
+                : message.SenderId;
+            var dto = new MessageItemDto
+            {
+                Id = message.Id,
+                ConversationId = message.ConversationId,
+                SenderId = message.SenderId,
+                SenderDisplayName = senderDisplayName ?? message.SenderId,
+                Content = message.Content,
+                CreatedAt = message.CreatedAt
+            };
+
+            await hubContext.Clients.Users(participants.Participant1Id, participants.Participant2Id)
+                .SendAsync("ReceiveMessage", dto, cancellationToken);
+            await hubContext.Clients.Group(MessageHub.ConversationGroupName(conversationId))
+                .SendAsync("ReceiveMessage", dto, cancellationToken);
+        }
     }
 }

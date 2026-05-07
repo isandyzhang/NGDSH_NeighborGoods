@@ -62,6 +62,9 @@ public sealed class AuthEndpointsTests
             refreshToken
         });
         Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
+        var refreshBody = await refreshResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(refreshBody.GetProperty("success").GetBoolean());
+        Assert.Equal("UNAUTHORIZED", refreshBody.GetProperty("error").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -93,6 +96,27 @@ public sealed class AuthEndpointsTests
             refreshToken
         });
         Assert.Equal(HttpStatusCode.Unauthorized, oldRefreshResponse.StatusCode);
+        var oldRefreshBody = await oldRefreshResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(oldRefreshBody.GetProperty("success").GetBoolean());
+        Assert.Equal("UNAUTHORIZED", oldRefreshBody.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidPassword_ReturnsUnauthorizedEnvelope()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            userNameOrEmail = ConfirmedUserName,
+            password = "wrong-password"
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(body.GetProperty("success").GetBoolean());
+        Assert.Equal("UNAUTHORIZED", body.GetProperty("error").GetProperty("code").GetString());
     }
 
     [Fact]

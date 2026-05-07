@@ -398,7 +398,7 @@ export const ListingHomePage = () => {
     })
   }
 
-  const toggleFavorite = async (item: ListingItem) => {
+  const toggleFavorite = useCallback(async (item: ListingItem) => {
     if (!isAuthenticated) {
       navigate('/login')
       return
@@ -430,9 +430,9 @@ export const ListingHomePage = () => {
     } finally {
       updateBusySet(item.id, false, setFavoriteBusyIds)
     }
-  }
+  }, [favoriteBusyIds, favoriteStateById, isAuthenticated, navigate])
 
-  const startConversation = async (item: ListingItem) => {
+  const startConversation = useCallback(async (item: ListingItem) => {
     if (!isAuthenticated) {
       navigate('/login')
       return
@@ -459,7 +459,7 @@ export const ListingHomePage = () => {
     } finally {
       updateBusySet(item.id, false, setConversationBusyIds)
     }
-  }
+  }, [conversationBusyIds, isAuthenticated, navigate, tokens?.userId])
 
   const handlePurchase = async (item: ListingItem) => {
     if (!isAuthenticated) {
@@ -490,7 +490,7 @@ export const ListingHomePage = () => {
     }
   }
 
-  const openPurchaseConfirm = (item: ListingItem) => {
+  const openPurchaseConfirm = useCallback((item: ListingItem) => {
     if (!isAuthenticated) {
       navigate('/login')
       return
@@ -502,7 +502,7 @@ export const ListingHomePage = () => {
     }
 
     setPurchaseConfirmTarget(item)
-  }
+  }, [isAuthenticated, navigate, tokens?.userId])
 
   const confirmPurchase = () => {
     if (!purchaseConfirmTarget) {
@@ -518,7 +518,7 @@ export const ListingHomePage = () => {
     navigate(`/listings/${itemId}/edit?focus=${TOP_PIN_FOCUS_QUERY}${TOP_PIN_SECTION_HASH}`)
   }
 
-  const openTopPinFlow = (item: ListingItem) => {
+  const openTopPinFlow = useCallback((item: ListingItem) => {
     if (!isAuthenticated) {
       navigate('/login')
       return
@@ -530,7 +530,7 @@ export const ListingHomePage = () => {
     }
 
     navigateToTopPinSection(item.id)
-  }
+  }, [isAuthenticated, navigate, topPinSkipIntro])
 
   const handleTopPinConfirm = (skipNextReminder: boolean) => {
     if (!topPinTargetId) {
@@ -1221,13 +1221,9 @@ export const ListingHomePage = () => {
                     emailNotifyIcon={EMAIL_NOTIFY_ICON}
                     quickResponderIcon={QUICK_RESPONDER_ICON}
                     onPrefetchListingDetail={prefetchListingDetail}
-                    onToggleFavorite={(target) => {
-                      void toggleFavorite(target)
-                    }}
+                    onToggleFavorite={toggleFavorite}
                     onOpenTopPinFlow={openTopPinFlow}
-                    onStartConversation={(target) => {
-                      void startConversation(target)
-                    }}
+                    onStartConversation={startConversation}
                     onOpenPurchaseConfirm={openPurchaseConfirm}
                   />
                 )
