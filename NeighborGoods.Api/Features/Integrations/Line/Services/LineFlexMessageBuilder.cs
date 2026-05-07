@@ -35,16 +35,19 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         {
             var priceText = item.IsFree ? "免費" : $"{item.Price:0} 元";
             var (statusText, statusColor) = GetListingStatusBadge(item.Status);
-            var detailsBackgroundColor = "#FFFFFF";
             var imageUrl = string.IsNullOrWhiteSpace(item.ImageUrl)
                 ? "https://developers-resource.landpress.line.me/fx/img/01_1_cafe.png"
                 : item.ImageUrl;
-            var favoriteText = $"❤ {item.FavoriteCount}";
+            var metaText = $"{priceText}｜收藏 {item.FavoriteCount}｜未讀 {item.UnreadCount}";
+            var listingMetaText = $"{item.ResidenceName}｜{item.PickupLocationName}";
+            var descriptionText = string.IsNullOrWhiteSpace(item.Description) ? "無詳細說明" : item.Description.Trim();
+            var createdAtText = $"刊登日期 {item.CreatedAt.ToLocalTime():yyyy-MM-dd}";
+            var listingUrl = BuildUrl($"/listings/{item.ListingId}");
 
             bubbles.Add(new
             {
                 type = "bubble",
-                body = new
+                hero = new
                 {
                     type = "box",
                     layout = "vertical",
@@ -52,119 +55,120 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                     {
                         new
                         {
-                            type = "box",
-                            layout = "vertical",
-                            contents = new object[]
+                            type = "image",
+                            url = imageUrl,
+                            size = "full",
+                            aspectRatio = "20:13",
+                            aspectMode = "cover",
+                            action = new
                             {
-                                new
-                                {
-                                    type = "image",
-                                    url = imageUrl,
-                                    size = "full",
-                                    aspectMode = "cover",
-                                    aspectRatio = "2:1",
-                                    gravity = "top"
-                                },
-                                new
-                                {
-                                    type = "box",
-                                    layout = "vertical",
-                                    position = "absolute",
-                                    cornerRadius = "20px",
-                                    offsetTop = "12px",
-                                    offsetStart = "12px",
-                                    height = "25px",
-                                    paddingStart = "8px",
-                                    paddingEnd = "8px",
-                                    backgroundColor = statusColor,
-                                    contents = new object[]
-                                    {
-                                        new
-                                        {
-                                            type = "text",
-                                            text = statusText,
-                                            color = "#ffffff",
-                                            align = "center",
-                                            size = "xs",
-                                            offsetTop = "3px"
-                                        }
-                                    }
-                                }
+                                type = "uri",
+                                uri = listingUrl
                             }
                         },
                         new
                         {
                             type = "box",
                             layout = "vertical",
-                            backgroundColor = detailsBackgroundColor,
-                            paddingAll = "16px",
+                            position = "absolute",
+                            cornerRadius = "60px",
+                            offsetTop = "12px",
+                            offsetStart = "12px",
+                            height = "75px",
+                            paddingStart = "24px",
+                            paddingEnd = "24px",
+                            backgroundColor = statusColor,
+                            justifyContent = "center",
                             contents = new object[]
                             {
                                 new
                                 {
                                     type = "text",
-                                    text = item.Title,
-                                    color = "#111111",
+                                    text = statusText,
+                                    color = "#ffffff",
+                                    align = "center",
                                     size = "xl",
-                                    weight = "bold",
-                                    wrap = true,
-                                    maxLines = 2
-                                },
-                                new
-                                {
-                                    type = "text",
-                                    text = priceText,
-                                    color = "#222222",
-                                    size = "sm",
-                                    margin = "md"
-                                },
-                                new
-                                {
-                                    type = "box",
-                                    layout = "horizontal",
-                                    margin = "sm",
-                                    contents = new object[]
-                                    {
-                                        new
-                                        {
-                                            type = "text",
-                                            text = favoriteText,
-                                            color = "#111111",
-                                            size = "lg",
-                                            weight = "bold",
-                                            flex = 1
-                                        },
-                                        BuildUnreadBadge(item.UnreadCount, BuildUrl("/messages"))
-                                    }
-                                },
-                                new
-                                {
-                                    type = "box",
-                                    layout = "vertical",
-                                    cornerRadius = "8px",
-                                    margin = "xxl",
-                                    height = "40px",
-                                    contents = new object[]
-                                    {
-                                        new
-                                        {
-                                            type = "button",
-                                            style = "primary",
-                                            color = "#1DB446",
-                                            height = "sm",
-                                            action = new
-                                            {
-                                                type = "uri",
-                                                label = "查看商品詳細",
-                                                uri = BuildUrl($"/listings/{item.ListingId}")
-                                            }
-                                        }
-                                    }
+                                    weight = "bold"
                                 }
                             }
                         }
+                    }
+                },
+                body = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "sm",
+                    paddingAll = "16px",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = item.Title,
+                            color = "#111111",
+                            size = "xl",
+                            weight = "bold",
+                            wrap = true,
+                            maxLines = 2
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = metaText,
+                            color = "#111111",
+                            size = "sm",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = listingMetaText,
+                            color = "#111111",
+                            size = "sm",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = descriptionText,
+                            color = "#555555",
+                            size = "sm",
+                            wrap = true,
+                            maxLines = 2
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = createdAtText,
+                            color = "#888888",
+                            size = "xs",
+                            wrap = true
+                        }
+                    }
+                },
+                footer = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "sm",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "button",
+                            style = "primary",
+                            color = "#1DB446",
+                            height = "sm",
+                            action = new
+                            {
+                                type = "uri",
+                                label = "查看商品詳細",
+                                uri = listingUrl
+                            }
+                        }
                     },
-                    paddingAll = "0px"
+                    flex = 0
                 }
             });
         }
@@ -198,16 +202,19 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                     {
                         type = "box",
                         layout = "horizontal",
+                        alignItems = "center",
                         contents = new object[]
                         {
                             new
                             {
                                 type = "text",
-                                text = x.OtherDisplayName,
+                                text = x.ListingTitle,
                                 size = "xl",
                                 weight = "bold",
                                 color = "#111111",
-                                flex = 1
+                                flex = 1,
+                                wrap = true,
+                                maxLines = 2
                             },
                             BuildUnreadBadge(x.UnreadCount, BuildUrl("/messages"))
                         }
@@ -215,7 +222,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                     new
                     {
                         type = "text",
-                        text = x.ListingTitle,
+                        text = $"訊息者：{x.OtherDisplayName}",
                         size = "sm",
                         color = "#555555",
                         wrap = true
@@ -570,8 +577,15 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             {
                 type = "box",
                 layout = "vertical",
-                width = "76px",
-                height = "34px",
+                minWidth = "52px",
+                paddingStart = "8px",
+                paddingEnd = "8px",
+                paddingTop = "4px",
+                paddingBottom = "4px",
+                cornerRadius = "999px",
+                backgroundColor = "#F1F3F5",
+                justifyContent = "center",
+                alignItems = "center",
                 contents = new object[] { new { type = "filler" } }
             };
         }
@@ -579,15 +593,34 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         var badgeText = unreadCount > 99 ? "未讀 99+" : $"未讀 {unreadCount}";
         return new
         {
-            type = "button",
-            style = "primary",
-            color = "#FF334B",
-            height = "sm",
+            type = "box",
+            layout = "vertical",
+            minWidth = "52px",
+            paddingStart = "8px",
+            paddingEnd = "8px",
+            paddingTop = "4px",
+            paddingBottom = "4px",
+            cornerRadius = "999px",
+            backgroundColor = "#FFE7EB",
+            justifyContent = "center",
+            alignItems = "center",
             action = new
             {
                 type = "uri",
-                label = badgeText,
                 uri = messagesUrl
+            },
+            contents = new object[]
+            {
+                new
+                {
+                    type = "text",
+                    text = badgeText,
+                    size = "xs",
+                    weight = "bold",
+                    color = "#D90429",
+                    align = "center",
+                    wrap = false
+                }
             }
         };
     }

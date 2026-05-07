@@ -16,7 +16,7 @@ public sealed class LineWebhookService(
     IMemoryCache memoryCache,
     IOptions<LineMessagingOptions> lineMessagingOptions)
 {
-    private static readonly TimeSpan MenuActionCooldown = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MenuActionCooldown = TimeSpan.FromSeconds(3);
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
 
     public async Task<(bool Ok, string? ErrorCode, string? ErrorMessage)> ProcessAsync(

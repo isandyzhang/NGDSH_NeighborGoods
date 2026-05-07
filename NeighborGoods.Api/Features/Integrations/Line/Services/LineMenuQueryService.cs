@@ -45,6 +45,16 @@ public sealed class LineMenuQueryService(
     {
         maxItems = Math.Clamp(maxItems, 1, 5);
         var soldStatus = (int)ListingStatus.Sold;
+        var residenceNameMap = await dbContext.ListingResidences
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Code, x.Name })
+            .ToDictionaryAsync(x => x.Code, x => x.Name, cancellationToken);
+        var pickupLocationNameMap = await dbContext.ListingPickupLocations
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Code, x.Name })
+            .ToDictionaryAsync(x => x.Code, x => x.Name, cancellationToken);
 
         var listings = await dbContext.Listings
             .AsNoTracking()
@@ -53,7 +63,10 @@ public sealed class LineMenuQueryService(
             {
                 x.Id,
                 x.Title,
+                x.Description,
                 x.Status,
+                x.Residence,
+                x.PickupLocation,
                 x.IsFree,
                 x.Price,
                 x.CreatedAt,
@@ -98,8 +111,11 @@ public sealed class LineMenuQueryService(
                 return new LineMyListingCardItem(
                     x.Id,
                     x.Title,
+                    x.Description,
                     imageUrl,
                     x.Status,
+                    residenceNameMap.GetValueOrDefault(x.Residence, "未指定"),
+                    pickupLocationNameMap.GetValueOrDefault(x.PickupLocation, "私訊"),
                     x.IsFree,
                     x.Price,
                     favoriteCount,
@@ -297,8 +313,11 @@ public sealed record LineMyMessagesSummary(
 public sealed record LineMyListingCardItem(
     Guid ListingId,
     string Title,
+    string Description,
     string? ImageUrl,
     int Status,
+    string ResidenceName,
+    string PickupLocationName,
     bool IsFree,
     decimal Price,
     int FavoriteCount,
