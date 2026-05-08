@@ -45,6 +45,7 @@ builder.Services.AddScoped<MessagingQueryService>();
 builder.Services.AddScoped<MessagingCommandService>();
 builder.Services.AddScoped<QuickResponderEvaluationService>();
 builder.Services.AddHostedService<QuickResponderBadgeWorker>();
+builder.Services.AddHostedService<UnreadMessageEmailNotificationWorker>();
 builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<ReviewService>();
 builder.Services.AddHostedService<PurchaseRequestExpirationWorker>();
