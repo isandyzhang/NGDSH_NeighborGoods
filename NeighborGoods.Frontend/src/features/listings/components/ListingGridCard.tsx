@@ -131,6 +131,10 @@ export const ListingGridCard = memo(({
                 <p className="text-sm font-semibold tracking-wide">交易進行中</p>
                 <p className="text-sm text-white/90">{item.inProgressStage === 5 ? '待買家確認收貨' : '已同意，等待完成交易'}</p>
               </div>
+            ) : isReservedListing ? (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 bg-black/55 px-3 text-center text-white">
+                <p className="text-sm font-semibold tracking-wide">已保留</p>
+              </div>
             ) : null}
           </div>
 
