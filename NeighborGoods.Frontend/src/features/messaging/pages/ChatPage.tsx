@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { CircleCheck } from 'lucide-react'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
+import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import { TradeActionConfirmModal } from '@/features/messaging/components/TradeActionConfirmModal'
 import { messagingApi, type ConversationPurchaseRequest, type MessageItem } from '@/features/messaging/api/messagingApi'
 import { useSharedMessageHub } from '@/features/messaging/context/SharedMessageHubProvider'
@@ -112,6 +113,8 @@ export const ChatPage = () => {
   const [purchaseRequestFetchedAtMs, setPurchaseRequestFetchedAtMs] = useState(() => Date.now())
   const [purchaseRequestLoading, setPurchaseRequestLoading] = useState(true)
   const [purchaseRequestBusy, setPurchaseRequestBusy] = useState(false)
+  const [purchaseRequestCreating, setPurchaseRequestCreating] = useState(false)
+  const [purchaseConfirmOpen, setPurchaseConfirmOpen] = useState(false)
   const [confirmModalAction, setConfirmModalAction] = useState<'completeBySeller' | 'confirmReceivedByBuyer' | null>(null)
   const [purchaseRequestError, setPurchaseRequestError] = useState<string | null>(null)
   const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
@@ -364,12 +367,49 @@ export const ChatPage = () => {
     }
   }
 
+  const openPurchaseConfirm = () => {
+    if (!listingDetail) {
+      return
+    }
+    setPurchaseConfirmOpen(true)
+  }
+
+  const handleCreatePurchaseRequest = async () => {
+    if (!listingDetail || purchaseRequestCreating) {
+      return
+    }
+
+    setPurchaseRequestCreating(true)
+    setPurchaseRequestError(null)
+
+    try {
+      const created = await listingApi.createPurchaseRequest(listingDetail.id)
+      setPurchaseConfirmOpen(false)
+      setPurchaseRequest(created)
+      setPurchaseRequestFetchedAtMs(Date.now())
+    } catch (err) {
+      const message = err instanceof ApiClientError ? err.message : '送出購買請求失敗'
+      setPurchaseRequestError(message)
+    } finally {
+      setPurchaseRequestCreating(false)
+    }
+  }
+
   const isPending = purchaseRequest?.status === PurchaseRequestStatus.Pending
   const isAccepted = purchaseRequest?.status === PurchaseRequestStatus.Accepted
   const isSellerMarkedCompleted = purchaseRequest?.status === PurchaseRequestStatus.SellerMarkedCompleted
   const isCompleted = purchaseRequest?.status === PurchaseRequestStatus.Completed
   const isSeller = purchaseRequest?.sellerId === tokens?.userId
   const isBuyer = purchaseRequest?.buyerId === tokens?.userId
+  const listingSellerId = listingDetail?.seller.id ?? null
+  const isListingSeller = listingSellerId != null && listingSellerId === tokens?.userId
+  const showQuickPurchaseButton =
+    Boolean(listingDetail) &&
+    !isListingSeller &&
+    (!purchaseRequest ||
+      purchaseRequest.status === PurchaseRequestStatus.Rejected ||
+      purchaseRequest.status === PurchaseRequestStatus.Expired ||
+      purchaseRequest.status === PurchaseRequestStatus.Cancelled)
   const elapsedSinceRequestFetchSeconds = Math.max(0, Math.floor((countdownNowMs - purchaseRequestFetchedAtMs) / 1000))
   const remainingSeconds = !purchaseRequest
     ? null
@@ -389,6 +429,12 @@ export const ChatPage = () => {
             finalConfirmLabel: '確定已收到商品',
           }
         : null
+
+  const actionButtonClassName = 'min-h-[2.8rem] px-4 !text-[1.7rem] font-semibold md:!text-[1.125rem]'
+  const purchaseButtonClassName = actionButtonClassName
+  const primaryActionClassName = `${actionButtonClassName} bg-[#2F7D4E] text-white hover:bg-[#25633f]`
+  const dangerActionClassName = `${actionButtonClassName} bg-[#B42318] text-white hover:bg-[#8f1c13]`
+  const neutralActionClassName = `${actionButtonClassName} border border-white/35 bg-white/12 text-white hover:bg-white/18`
 
   return (
     <main className="mx-auto w-full max-w-6xl px-3 pb-28 pt-4 sm:px-4 md:pb-0 md:py-8">
@@ -445,98 +491,127 @@ export const ChatPage = () => {
 
             {purchaseRequest ? (
               <div className="mt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="inline-flex items-center gap-1.5 text-3xl font-semibold text-white md:text-xl">
-                    交易狀態：{getPurchaseRequestStatusText(purchaseRequest.status)}
-                    {isAccepted ? <CircleCheck className="h-5 w-5 text-[#D5F2DE] md:h-4 md:w-4" aria-hidden="true" /> : null}
-                  </p>
-                  {isPending && remainingSeconds != null ? (
-                    <span className="rounded-full bg-black/70 px-2.5 py-1 text-base font-semibold text-white tabular-nums md:px-2 md:py-0.5 md:text-xs">
-                      {formatCountdown(remainingSeconds)}
-                    </span>
-                  ) : null}
-                </div>
-                {isPending ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {isSeller ? (
-                      <>
-                        <Button
-                          type="button"
-                          onClick={() => void handlePurchaseRequestAction('accept')}
-                          disabled={purchaseRequestBusy}
-                          className="text-lg md:text-sm"
-                        >
-                          {purchaseRequestBusy ? '處理中...' : '同意交易'}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => void handlePurchaseRequestAction('reject')}
-                          disabled={purchaseRequestBusy}
-                          className="text-lg md:text-sm"
-                        >
-                          {purchaseRequestBusy ? '處理中...' : '拒絕交易'}
-                        </Button>
-                      </>
-                    ) : null}
-                    {isBuyer ? (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="inline-flex items-center gap-1.5 text-[1.7rem] font-semibold text-white md:text-[1.125rem]">
+                      交易狀態：{getPurchaseRequestStatusText(purchaseRequest.status)}
+                      {isAccepted ? <CircleCheck className="h-5 w-5 text-[#D5F2DE] md:h-4 md:w-4" aria-hidden="true" /> : null}
+                    </p>
+                  </div>
+                  <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-2">
+                    {showQuickPurchaseButton ? (
                       <Button
                         type="button"
+                        onClick={openPurchaseConfirm}
+                        disabled={purchaseRequestCreating}
                         variant="secondary"
+                        className={purchaseButtonClassName}
+                      >
+                        {purchaseRequestCreating ? <span className="font-extrabold">送出中...</span> : '購買'}
+                      </Button>
+                    ) : null}
+                    {isPending && isBuyer ? (
+                      <Button
+                        type="button"
                         onClick={() => void handlePurchaseRequestAction('cancel')}
                         disabled={purchaseRequestBusy}
-                        className="text-lg md:text-sm"
+                        className={dangerActionClassName}
                       >
                         {purchaseRequestBusy ? '處理中...' : '取消請求'}
                       </Button>
+                    ) : null}
+                    {isAccepted && isSeller ? (
+                      <Button
+                        type="button"
+                        onClick={() => setConfirmModalAction('completeBySeller')}
+                        disabled={purchaseRequestBusy}
+                        className={primaryActionClassName}
+                      >
+                        {purchaseRequestBusy ? '處理中...' : '完成交易'}
+                      </Button>
+                    ) : null}
+                    {isSellerMarkedCompleted && isBuyer ? (
+                      <Button
+                        type="button"
+                        onClick={() => setConfirmModalAction('confirmReceivedByBuyer')}
+                        disabled={purchaseRequestBusy}
+                        className={primaryActionClassName}
+                      >
+                        {purchaseRequestBusy ? '處理中...' : '已收到商品'}
+                      </Button>
+                    ) : null}
+                    {isCompleted ? (
+                      <Link
+                        to={`/purchase-requests/${purchaseRequest.id}/review`}
+                        className={`inline-flex items-center justify-center rounded-xl ${neutralActionClassName}`}
+                      >
+                        前往評價
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+                {isPending && isSeller ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => void handlePurchaseRequestAction('accept')}
+                      disabled={purchaseRequestBusy}
+                      className={`${primaryActionClassName} w-full`}
+                    >
+                      {purchaseRequestBusy ? '處理中...' : '同意交易'}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handlePurchaseRequestAction('reject')}
+                      disabled={purchaseRequestBusy}
+                      className={`${dangerActionClassName} w-full`}
+                    >
+                      {purchaseRequestBusy ? '處理中...' : '拒絕交易'}
+                    </Button>
+                  </div>
+                ) : null}
+                {isPending && remainingSeconds != null ? (
+                  <div className="mt-2 space-y-2">
+                    {isSeller ? (
+                      <p className="text-base leading-relaxed text-white/90 md:text-sm">
+                        請在時限內回覆買家；逾時會記 1 次「回覆失敗」，累積 3 次將暫停刊登。
+                        （剩餘時間：{formatCountdown(remainingSeconds)}）
+                      </p>
+                    ) : null}
+                    {isBuyer ? (
+                      <p className="text-base leading-relaxed text-white/90 md:text-sm">
+                        賣家需在時限內回覆；逾時會記 1 次「回覆失敗」，累積 3 次將暫停刊登。（剩餘時間：
+                        {formatCountdown(remainingSeconds)}）
+                      </p>
                     ) : null}
                   </div>
                 ) : null}
                 {isAccepted ? (
                   <div className="mt-3">
-                    {isSeller ? (
-                      <Button
-                        type="button"
-                        onClick={() => setConfirmModalAction('completeBySeller')}
-                        disabled={purchaseRequestBusy}
-                        className="min-h-[2.6rem] w-full text-base font-semibold md:w-auto md:text-sm"
-                      >
-                        {purchaseRequestBusy ? '處理中...' : '完成交易'}
-                      </Button>
-                    ) : (
-                      <p className="text-base text-white/90 md:text-sm">等待賣家完成商品交易</p>
-                    )}
+                    {!isSeller ? <p className="text-base text-white/90 md:text-sm">等待賣家完成商品交易</p> : null}
                   </div>
                 ) : null}
                 {isSellerMarkedCompleted ? (
                   <div className="mt-3">
-                    {isBuyer ? (
-                      <Button
-                        type="button"
-                        onClick={() => setConfirmModalAction('confirmReceivedByBuyer')}
-                        disabled={purchaseRequestBusy}
-                        className="min-h-[2.6rem] w-full text-base font-semibold md:w-auto md:text-sm"
-                      >
-                        {purchaseRequestBusy ? '處理中...' : '已收到商品'}
-                      </Button>
-                    ) : (
-                      <p className="text-base text-white/90 md:text-sm">等待買家確認收貨</p>
-                    )}
-                  </div>
-                ) : null}
-                {isCompleted ? (
-                  <div className="mt-3">
-                    <Link
-                      to={`/purchase-requests/${purchaseRequest.id}/review`}
-                      className="inline-flex min-h-[2.6rem] w-full items-center justify-center rounded-xl border border-white/35 bg-white/12 px-3 py-1.5 text-base font-semibold text-white transition hover:bg-white/18 md:w-auto md:text-sm"
-                    >
-                      前往評價
-                    </Link>
+                    {!isBuyer ? <p className="text-base text-white/90 md:text-sm">等待買家確認收貨</p> : null}
                   </div>
                 ) : null}
               </div>
             ) : (
-              <p className="mt-3 text-lg text-white/85 md:text-sm">目前尚未建立交易請求，可先透過聊天與對方溝通。</p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-lg text-white/85 md:text-sm">目前尚未建立交易請求，可先透過聊天與對方溝通。</p>
+                {showQuickPurchaseButton ? (
+                  <Button
+                    type="button"
+                    onClick={openPurchaseConfirm}
+                    disabled={purchaseRequestCreating}
+                    variant="secondary"
+                    className={purchaseButtonClassName}
+                  >
+                    {purchaseRequestCreating ? <span className="font-extrabold">送出中...</span> : '購買'}
+                  </Button>
+                ) : null}
+              </div>
             )}
             {purchaseRequestError ? <p className="mt-2 text-base text-[#FFD3D3] md:text-xs">{purchaseRequestError}</p> : null}
           </div>
@@ -603,6 +678,13 @@ export const ChatPage = () => {
           }}
         />
       ) : null}
+      <PurchaseConfirmModal
+        open={purchaseConfirmOpen}
+        listingTitle={listingDetail?.title ?? listingTitle ?? ''}
+        busy={purchaseRequestCreating}
+        onClose={() => setPurchaseConfirmOpen(false)}
+        onConfirm={() => void handleCreatePurchaseRequest()}
+      />
     </main>
   )
 }

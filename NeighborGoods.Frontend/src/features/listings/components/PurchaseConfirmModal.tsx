@@ -18,6 +18,8 @@ export const PurchaseConfirmModal = ({ open, listingTitle, busy, onClose, onConf
       cancelLabel="先等等"
       confirmLabel="確認購買"
       busyLabel="送出中..."
+      cancelButtonClassName="!text-2xl md:!text-xl"
+      confirmButtonClassName="!text-2xl md:!text-xl"
       onClose={onClose}
       onConfirm={onConfirm}
     />

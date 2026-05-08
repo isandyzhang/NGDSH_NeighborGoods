@@ -9,6 +9,8 @@ type ConfirmModalProps = {
   cancelLabel: string
   confirmLabel: string
   busyLabel?: string
+  cancelButtonClassName?: string
+  confirmButtonClassName?: string
   onClose: () => void
   onConfirm: () => void
 }
@@ -21,6 +23,8 @@ export const ConfirmModal = ({
   cancelLabel,
   confirmLabel,
   busyLabel = '處理中...',
+  cancelButtonClassName,
+  confirmButtonClassName,
   onClose,
   onConfirm,
 }: ConfirmModalProps) => {
@@ -31,10 +35,21 @@ export const ConfirmModal = ({
         <p className="text-base leading-relaxed text-text-subtle">{message}</p>
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Button type="button" variant="secondary" onClick={onClose} disabled={busy} className="min-h-[2.9rem] font-semibold">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          disabled={busy}
+          className={`min-h-[2.9rem] font-semibold ${cancelButtonClassName ?? ''}`}
+        >
           {cancelLabel}
         </Button>
-        <Button type="button" onClick={onConfirm} disabled={busy} className="min-h-[2.9rem] font-semibold">
+        <Button
+          type="button"
+          onClick={onConfirm}
+          disabled={busy}
+          className={`min-h-[2.9rem] font-semibold ${confirmButtonClassName ?? ''}`}
+        >
           {busy ? busyLabel : confirmLabel}
         </Button>
       </div>
