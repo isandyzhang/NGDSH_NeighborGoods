@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { accountApi } from '@/features/account/api/accountApi'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
+import { ConfirmModal } from '@/shared/ui/modal/ConfirmModal'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
@@ -45,6 +47,8 @@ export const ListingDetailPage = () => {
   const [conversationBusy, setConversationBusy] = useState(false)
   const [purchaseBusy, setPurchaseBusy] = useState(false)
   const [purchaseConfirmOpen, setPurchaseConfirmOpen] = useState(false)
+  const [lineBindPromptOpen, setLineBindPromptOpen] = useState(false)
+  const [lineBindBusy, setLineBindBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const detailQuery = useQuery({
@@ -120,6 +124,32 @@ export const ListingDetailPage = () => {
     }
   }, [source, sourceConversationId])
 
+  useEffect(() => {
+    if (!isAuthenticated || source !== 'create') {
+      return
+    }
+
+    let disposed = false
+    void accountApi
+      .me()
+      .then((profile) => {
+        if (disposed) {
+          return
+        }
+        const isLineBound = Boolean(profile.lineNotifyBound || profile.lineUserId)
+        setLineBindPromptOpen(!isLineBound)
+      })
+      .catch(() => {
+        if (!disposed) {
+          setLineBindPromptOpen(false)
+        }
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [isAuthenticated, source])
+
   const handleChat = async () => {
     if (!item || conversationBusy) {
       return
@@ -175,6 +205,28 @@ export const ListingDetailPage = () => {
       setError(err instanceof ApiClientError ? err.message : '送出購買請求失敗')
     } finally {
       setPurchaseBusy(false)
+    }
+  }
+
+  const handleStartLineBinding = async () => {
+    if (lineBindBusy) {
+      return
+    }
+
+    setLineBindBusy(true)
+    setError(null)
+    try {
+      const binding = await accountApi.startLineBinding()
+      const targetUrl = binding.liffUrl || binding.botLink
+      if (!targetUrl) {
+        setError('目前無法啟動 LINE 綁定，請稍後再試')
+        return
+      }
+      window.location.assign(targetUrl)
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '啟動 LINE 綁定失敗')
+    } finally {
+      setLineBindBusy(false)
     }
   }
 
@@ -324,6 +376,17 @@ export const ListingDetailPage = () => {
         busy={purchaseBusy}
         onClose={() => setPurchaseConfirmOpen(false)}
         onConfirm={() => void handlePurchase()}
+      />
+      <ConfirmModal
+        open={lineBindPromptOpen}
+        busy={lineBindBusy}
+        title="不漏接交易最後提醒"
+        message="綁定 LINE 後，商品交易等待同意進入最後 1 小時時會通知你。平時不會頻繁打擾。"
+        cancelLabel="稍後再說"
+        confirmLabel="前往綁定 LINE"
+        busyLabel="前往中..."
+        onClose={() => setLineBindPromptOpen(false)}
+        onConfirm={() => void handleStartLineBinding()}
       />
     </main>
   )
