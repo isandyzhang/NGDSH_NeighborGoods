@@ -136,6 +136,7 @@ export const ListingGridCard = memo(({
 
           <div className="space-y-1 px-4 pb-4 pt-4">
             <p className="text-xs font-medium tracking-wide text-text-muted">{item.conditionName}</p>
+            <p className="text-xs font-medium tracking-wide text-text-muted">社宅：{item.residenceName}</p>
             <Link
               to={`/listings/${item.id}?from=listings`}
               className="block truncate text-2xl font-semibold text-text-main underline-offset-2 hover:underline"

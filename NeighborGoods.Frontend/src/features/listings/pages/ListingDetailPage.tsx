@@ -323,9 +323,13 @@ export const ListingDetailPage = () => {
                         <span className="text-3xl font-bold text-text-main md:text-4xl lg:text-3xl">{formatPrice(item)}</span>
                       )}
                     </div>
-                    <p className="text-xl font-medium text-text-subtle md:text-2xl lg:text-xl">
-                      {item.categoryName}・{item.conditionName}・{item.residenceName}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xl font-medium text-text-subtle md:text-2xl lg:text-xl">
+                      <span>分類：{item.categoryName}</span>
+                      <span>・</span>
+                      <span>品況：{item.conditionName}</span>
+                      <span>・</span>
+                      <span>社宅：{item.residenceName}</span>
+                    </div>
                     <p className="text-xl font-medium text-text-subtle md:text-2xl lg:text-xl">面交地點：{item.pickupLocationName}</p>
                     <p className="whitespace-pre-wrap text-lg leading-8 text-text-main md:text-2xl md:leading-9 lg:text-lg lg:leading-7">
                       {item.description || '賣家尚未提供描述。'}
