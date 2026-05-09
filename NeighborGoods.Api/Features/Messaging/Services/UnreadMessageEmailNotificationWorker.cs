@@ -40,7 +40,7 @@ public sealed class UnreadMessageEmailNotificationWorker(
         }
     }
 
-    private async Task ProcessOnceAsync(CancellationToken cancellationToken)
+    internal async Task ProcessOnceAsync(CancellationToken cancellationToken)
     {
         await using var scope = serviceProvider.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
@@ -49,103 +49,63 @@ public sealed class UnreadMessageEmailNotificationWorker(
         var now = DateTime.UtcNow;
         var thresholdTime = now.AddMinutes(-UnreadDelayMinutes);
 
-        var users = await dbContext.AspNetUsers
-            .Where(x => x.EmailNotificationEnabled && x.EmailConfirmed && x.Email != null && x.Email != string.Empty)
+        var participant1UnreadMessages =
+            from message in dbContext.Messages
+            join conversation in dbContext.Conversations on message.ConversationId equals conversation.Id
+            join user in dbContext.AspNetUsers on conversation.Participant1Id equals user.Id
+            where conversation.Participant1Id != message.SenderId &&
+                  message.CreatedAt <= thresholdTime &&
+                  (!conversation.Participant1LastReadAt.HasValue ||
+                   message.CreatedAt > conversation.Participant1LastReadAt.Value) &&
+                  user.EmailNotificationEnabled &&
+                  user.EmailConfirmed &&
+                  user.Email != null &&
+                  user.Email != string.Empty &&
+                  (!user.EmailNotificationLastSentAt.HasValue ||
+                   message.CreatedAt > user.EmailNotificationLastSentAt.Value)
+            select new
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                ConversationId = conversation.Id,
+                message.CreatedAt
+            };
+
+        var participant2UnreadMessages =
+            from message in dbContext.Messages
+            join conversation in dbContext.Conversations on message.ConversationId equals conversation.Id
+            join user in dbContext.AspNetUsers on conversation.Participant2Id equals user.Id
+            where conversation.Participant2Id != message.SenderId &&
+                  message.CreatedAt <= thresholdTime &&
+                  (!conversation.Participant2LastReadAt.HasValue ||
+                   message.CreatedAt > conversation.Participant2LastReadAt.Value) &&
+                  user.EmailNotificationEnabled &&
+                  user.EmailConfirmed &&
+                  user.Email != null &&
+                  user.Email != string.Empty &&
+                  (!user.EmailNotificationLastSentAt.HasValue ||
+                   message.CreatedAt > user.EmailNotificationLastSentAt.Value)
+            select new
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                ConversationId = conversation.Id,
+                message.CreatedAt
+            };
+
+        var usersToNotify = await participant1UnreadMessages
+            .Concat(participant2UnreadMessages)
+            .GroupBy(x => new { x.UserId, x.Email })
             .Select(x => new
             {
-                x.Id,
-                x.Email,
-                x.EmailNotificationLastSentAt
+                x.Key.UserId,
+                Email = x.Key.Email!,
+                ConversationId = x
+                    .OrderByDescending(message => message.CreatedAt)
+                    .Select(message => message.ConversationId)
+                    .First()
             })
             .ToListAsync(cancellationToken);
-
-        if (users.Count == 0)
-        {
-            return;
-        }
-
-        var userIds = users.Select(x => x.Id).ToHashSet();
-        var userEmailDict = users.ToDictionary(x => x.Id, x => x.Email!);
-        var userEmailLastSentAtDict = users.ToDictionary(x => x.Id, x => x.EmailNotificationLastSentAt);
-
-        var conversations = await dbContext.Conversations
-            .Where(x => userIds.Contains(x.Participant1Id) || userIds.Contains(x.Participant2Id))
-            .Select(x => new
-            {
-                x.Id,
-                x.Participant1Id,
-                x.Participant2Id,
-                x.Participant1LastReadAt,
-                x.Participant2LastReadAt
-            })
-            .ToListAsync(cancellationToken);
-
-        if (conversations.Count == 0)
-        {
-            return;
-        }
-
-        var conversationDict = conversations.ToDictionary(x => x.Id);
-        var conversationIds = conversations.Select(x => x.Id).ToList();
-
-        var candidateMessages = await dbContext.Messages
-            .Where(x => conversationIds.Contains(x.ConversationId) && x.CreatedAt <= thresholdTime)
-            .Select(x => new
-            {
-                x.ConversationId,
-                x.SenderId,
-                x.CreatedAt
-            })
-            .ToListAsync(cancellationToken);
-
-        if (candidateMessages.Count == 0)
-        {
-            return;
-        }
-
-        var usersToNotify = new Dictionary<string, Guid>();
-        foreach (var message in candidateMessages)
-        {
-            if (!conversationDict.TryGetValue(message.ConversationId, out var conversation))
-            {
-                continue;
-            }
-
-            string? targetUserId = null;
-            DateTime? lastReadAt = null;
-
-            if (conversation.Participant1Id != message.SenderId)
-            {
-                targetUserId = conversation.Participant1Id;
-                lastReadAt = conversation.Participant1LastReadAt;
-            }
-            else if (conversation.Participant2Id != message.SenderId)
-            {
-                targetUserId = conversation.Participant2Id;
-                lastReadAt = conversation.Participant2LastReadAt;
-            }
-
-            if (string.IsNullOrWhiteSpace(targetUserId))
-            {
-                continue;
-            }
-
-            if (lastReadAt.HasValue && message.CreatedAt <= lastReadAt.Value)
-            {
-                continue;
-            }
-
-            if (!userEmailLastSentAtDict.TryGetValue(targetUserId, out var emailLastSentAt) ||
-                (emailLastSentAt.HasValue && message.CreatedAt <= emailLastSentAt.Value))
-            {
-                continue;
-            }
-
-            if (!usersToNotify.ContainsKey(targetUserId))
-            {
-                usersToNotify[targetUserId] = message.ConversationId;
-            }
-        }
 
         if (usersToNotify.Count == 0)
         {
@@ -153,23 +113,19 @@ public sealed class UnreadMessageEmailNotificationWorker(
         }
 
         var successCount = 0;
-        foreach (var (userId, conversationId) in usersToNotify)
+        foreach (var notification in usersToNotify)
         {
-            if (!userEmailDict.TryGetValue(userId, out var userEmail))
-            {
-                continue;
-            }
-
             try
             {
-                var chatUrl = $"{_webBaseUrl}/messages/{conversationId}";
+                var chatUrl = $"{_webBaseUrl}/messages/{notification.ConversationId}";
                 await emailSender.SendAsync(
-                    userEmail,
+                    notification.Email,
                     "你有未讀訊息",
                     $"你有尚未讀取的新訊息。\n\n請點擊此連結查看：{chatUrl}",
                     cancellationToken);
 
-                var user = await dbContext.AspNetUsers.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+                var user = await dbContext.AspNetUsers
+                    .FirstOrDefaultAsync(x => x.Id == notification.UserId, cancellationToken);
                 if (user != null)
                 {
                     user.EmailNotificationLastSentAt = now;
@@ -178,7 +134,10 @@ public sealed class UnreadMessageEmailNotificationWorker(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to send unread message email notification. UserId={UserId}", userId);
+                logger.LogError(
+                    ex,
+                    "Failed to send unread message email notification. UserId={UserId}",
+                    notification.UserId);
             }
         }
 

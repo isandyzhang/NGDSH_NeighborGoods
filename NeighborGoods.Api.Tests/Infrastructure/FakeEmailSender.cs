@@ -7,6 +7,7 @@ internal sealed class FakeEmailSender : IEmailSender
 {
     private static readonly Regex SixDigitsRegex = new(@"\b\d{6}\b", RegexOptions.Compiled);
     private static readonly Dictionary<string, string> CodesByEmail = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly List<SentEmail> SentEmails = [];
     private static readonly object SyncRoot = new();
 
     public Task SendAsync(
@@ -15,6 +16,11 @@ internal sealed class FakeEmailSender : IEmailSender
         string plainTextContent,
         CancellationToken cancellationToken = default)
     {
+        lock (SyncRoot)
+        {
+            SentEmails.Add(new SentEmail(toEmail.Trim(), subject, plainTextContent));
+        }
+
         var code = ExtractCode(plainTextContent);
         if (!string.IsNullOrWhiteSpace(code))
         {
@@ -25,6 +31,14 @@ internal sealed class FakeEmailSender : IEmailSender
         }
 
         return Task.CompletedTask;
+    }
+
+    public static IReadOnlyList<SentEmail> GetSentEmails()
+    {
+        lock (SyncRoot)
+        {
+            return SentEmails.ToList();
+        }
     }
 
     public static string? GetCode(string email)
@@ -40,6 +54,7 @@ internal sealed class FakeEmailSender : IEmailSender
         lock (SyncRoot)
         {
             CodesByEmail.Clear();
+            SentEmails.Clear();
         }
     }
 
@@ -48,4 +63,6 @@ internal sealed class FakeEmailSender : IEmailSender
         var match = SixDigitsRegex.Match(content);
         return match.Success ? match.Value : null;
     }
+
+    public sealed record SentEmail(string ToEmail, string Subject, string PlainTextContent);
 }
