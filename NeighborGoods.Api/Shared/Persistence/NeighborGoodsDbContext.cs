@@ -70,6 +70,7 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
 
             entity.Property(e => e.DisplayName).HasMaxLength(50);
             entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.LineContactId).HasMaxLength(32);
             entity.Property(e => e.LineUserId).HasMaxLength(100);
             entity.Property(e => e.NormalizedEmail).HasMaxLength(256);
             entity.Property(e => e.NormalizedUserName).HasMaxLength(256);

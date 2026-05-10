@@ -202,9 +202,10 @@ public static class AccountEndpoints
             CancellationToken ct = default) =>
         {
             var userId = currentUser.GetRequiredUserId();
-            var (ok, errorCode, errorMessage) = await profileService.UpdateDisplayNameAsync(
+            var (ok, errorCode, errorMessage) = await profileService.UpdateProfileAsync(
                 userId,
                 request.DisplayName,
+                request.LineContactId,
                 ct);
             if (!ok)
             {

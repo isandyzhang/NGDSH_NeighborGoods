@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
+import { buildLineShareUrl } from '@/features/listings/utils/lineShare'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
@@ -230,6 +231,15 @@ export const ListingDetailPage = () => {
     }
   }
 
+  const handleShareToLine = () => {
+    if (!item) {
+      return
+    }
+
+    const shareUrl = buildLineShareUrl(item.id, item.title)
+    window.open(shareUrl, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 md:py-8">
       <Link to={backTarget.to} className="text-lg font-medium text-text-subtle hover:text-text-main">
@@ -336,7 +346,8 @@ export const ListingDetailPage = () => {
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
                   {isOwnListing ? (
                     <Link
                       to={`/listings/${item.id}/edit`}
@@ -367,6 +378,15 @@ export const ListingDetailPage = () => {
                       </Button>
                     </>
                   )}
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleShareToLine}
+                    variant="secondary"
+                    className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
+                  >
+                    分享到 LINE
+                  </Button>
                 </div>
               </section>
             </Card>

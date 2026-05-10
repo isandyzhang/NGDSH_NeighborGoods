@@ -8,6 +8,7 @@ public sealed record AccountMeResponse(
     string? Email,
     bool EmailConfirmed,
     bool EmailNotificationEnabled,
+    string? LineContactId,
     string? LineUserId,
     bool LineNotifyBound,
     DateTime CreatedAt,

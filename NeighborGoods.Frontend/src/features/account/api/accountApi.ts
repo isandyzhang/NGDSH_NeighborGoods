@@ -9,6 +9,7 @@ export type AccountMe = {
   email: string | null
   emailConfirmed: boolean
   emailNotificationEnabled: boolean
+  lineContactId: string | null
   lineUserId: string | null
   lineNotifyBound: boolean
   createdAt: string
@@ -18,6 +19,11 @@ export type AccountMe = {
     completedListings: number
     topPinCredits: number
   }
+}
+
+type UpdateProfilePayload = {
+  displayName?: string
+  lineContactId?: string
 }
 
 type RegisterPayload = {
@@ -65,6 +71,11 @@ export type StartLineBindingResponse = {
 export const accountApi = {
   async me(): Promise<AccountMe> {
     const response = await http.get<ApiResponse<AccountMe>>('/api/v1/account/me')
+    return unwrapApiResponse(response.data)
+  },
+
+  async updateProfile(payload: UpdateProfilePayload): Promise<{ updated: boolean }> {
+    const response = await http.patch<ApiResponse<{ updated: boolean }>>('/api/v1/account/me', payload)
     return unwrapApiResponse(response.data)
   },
 

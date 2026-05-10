@@ -11,6 +11,8 @@ public partial class AspNetUser
 
     public string? LineUserId { get; set; }
 
+    public string? LineContactId { get; set; }
+
     public int Role { get; set; }
 
     public DateTime CreatedAt { get; set; }

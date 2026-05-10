@@ -11,6 +11,8 @@ public sealed class MessagingCommandService(
     IHubContext<NeighborGoods.Api.Features.Messaging.MessageHub> hubContext,
     MessagingQueryService messagingQueryService)
 {
+    private const string LineContactShareTemplate = "[系統發送] 這是我的 LINE 聯絡方式\nLINE ID: {0}\n加好友連結: https://line.me/R/ti/p/~{0}";
+
     public async Task<(Guid? ConversationId, string? ErrorCode, string? ErrorMessage)> EnsureConversationAsync(
         string currentUserId,
         Guid listingId,
@@ -205,5 +207,27 @@ public sealed class MessagingCommandService(
             cancellationToken);
 
         return (true, null, null);
+    }
+
+    public async Task<(MessageItemDto? Message, string? ErrorCode, string? ErrorMessage)> ShareLineContactAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var sender = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == currentUserId, cancellationToken);
+        if (sender is null)
+        {
+            return (null, "USER_NOT_FOUND", "找不到使用者。");
+        }
+
+        if (string.IsNullOrWhiteSpace(sender.LineContactId))
+        {
+            return (null, "LINE_CONTACT_NOT_SET", "尚未設定 LINE ID，請先到帳號頁設定。");
+        }
+
+        var content = string.Format(LineContactShareTemplate, sender.LineContactId.Trim());
+        return await SendMessageAsync(currentUserId, conversationId, content, cancellationToken);
     }
 }

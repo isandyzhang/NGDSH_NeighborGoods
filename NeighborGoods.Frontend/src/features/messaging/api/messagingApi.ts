@@ -82,6 +82,13 @@ export const messagingApi = {
     return unwrapApiResponse(response.data)
   },
 
+  async shareLineContact(conversationId: string): Promise<MessageItem> {
+    const response = await http.post<ApiResponse<MessageItem>>(
+      `/api/v1/conversations/${conversationId}/messages/share-line-contact`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
   async markRead(conversationId: string): Promise<void> {
     const response = await http.post<ApiResponse<{ read: boolean }>>(`/api/v1/conversations/${conversationId}/read`)
     unwrapApiResponse(response.data)

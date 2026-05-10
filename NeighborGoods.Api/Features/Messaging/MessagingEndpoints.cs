@@ -116,6 +116,30 @@ public static class MessagingEndpoints
         .RequireAuthorization()
         .RequireRateLimiting("MessagingWrite");
 
+        app.MapPost("/api/v1/conversations/{conversationId:guid}/messages/share-line-contact", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            MessagingCommandService commandService,
+            Guid conversationId,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (message, errorCode, errorMessage) = await commandService.ShareLineContactAsync(
+                userId,
+                conversationId,
+                ct);
+
+            if (errorCode is not null)
+            {
+                return MessagingError(httpContext, errorCode, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(message, httpContext));
+        })
+        .WithName("ShareLineContactMessageV1")
+        .RequireAuthorization()
+        .RequireRateLimiting("MessagingWrite");
+
         app.MapPost("/api/v1/conversations/{conversationId:guid}/read", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,

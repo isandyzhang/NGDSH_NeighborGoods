@@ -12,7 +12,7 @@ public sealed class UnreadMessageEmailNotificationWorker(
 {
     private const int CheckIntervalMinutes = 1;
     private const int UnreadDelayMinutes = 5;
-    private const string DefaultWebBaseUrl = "https://neighborgoodstw.com";
+    private const string DefaultWebBaseUrl = "https://www.neighborgoodstw.com";
 
     private readonly string _webBaseUrl = string.IsNullOrWhiteSpace(lineMessagingOptions.Value.WebBaseUrl)
         ? DefaultWebBaseUrl

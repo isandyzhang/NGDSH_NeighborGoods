@@ -15,6 +15,7 @@ export const AccountPage = () => {
   const [profile, setProfile] = useState<AccountMe | null>(null)
   const [linePreferences, setLinePreferences] = useState<LinePreferences | null>(null)
   const [bindingStart, setBindingStart] = useState<StartLineBindingResponse | null>(null)
+  const [lineContactDraft, setLineContactDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,6 +55,10 @@ export const AccountPage = () => {
       document.removeEventListener('visibilitychange', refreshIfLineBindingCompleted)
     }
   }, [reloadData])
+
+  useEffect(() => {
+    setLineContactDraft(profile?.lineContactId ?? '')
+  }, [profile?.lineContactId])
 
   useEffect(() => {
     let disposed = false
@@ -226,6 +231,23 @@ export const AccountPage = () => {
     }
   }
 
+  const handleSaveLineContact = async () => {
+    if (actionLoading) {
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    try {
+      await accountApi.updateProfile({ lineContactId: lineContactDraft })
+      await reloadData()
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : '儲存 LINE ID 失敗')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const emailNotifyStatusLine = useMemo(() => {
     if (!profile) {
       return ''
@@ -375,6 +397,28 @@ export const AccountPage = () => {
 
           <div className="space-y-3 border-t border-border pt-4">
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">帳號與綁定</p>
+            <div className="rounded-xl border border-border bg-surface-2 px-3 py-3">
+              <p className="text-sm text-text-subtle">聊天分享用 LINE ID</p>
+              <p className="mt-1 text-xs text-text-muted">僅允許英數與 . - _，留空可清除。</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  className="min-h-[2.6rem] flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-brand"
+                  placeholder="例如 andy123"
+                  value={lineContactDraft}
+                  onChange={(event) => setLineContactDraft(event.target.value)}
+                  maxLength={32}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-[2.6rem] px-4 text-sm font-semibold"
+                  disabled={actionLoading}
+                  onClick={() => void handleSaveLineContact()}
+                >
+                  {actionLoading ? '儲存中...' : '儲存 LINE ID'}
+                </Button>
+              </div>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-text-muted">顯示名稱</p>

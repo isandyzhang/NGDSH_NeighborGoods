@@ -121,6 +121,7 @@ export const ChatPage = () => {
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [sharingLineContact, setSharingLineContact] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const markReadTimerRef = useRef<number | null>(null)
   const knownMessageIdsRef = useRef<Set<string>>(new Set())
@@ -330,6 +331,24 @@ export const ChatPage = () => {
       setError(message)
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleShareLineContact = async () => {
+    if (!conversationId || sharingLineContact) {
+      return
+    }
+
+    setSharingLineContact(true)
+    setError(null)
+    try {
+      const message = await messagingApi.shareLineContact(conversationId)
+      setMessages((current) => mergeMessages(current, [message], knownMessageIdsRef.current))
+    } catch (err) {
+      const message = err instanceof ApiClientError ? err.message : '分享 LINE ID 失敗'
+      setError(message)
+    } finally {
+      setSharingLineContact(false)
     }
   }
 
@@ -647,6 +666,15 @@ export const ChatPage = () => {
 
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface p-3 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] sm:p-4 md:static md:rounded-2xl md:border md:shadow-soft">
             <form onSubmit={handleSend} className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="shrink-0 text-base md:text-sm"
+                disabled={sharingLineContact}
+                onClick={() => void handleShareLineContact()}
+              >
+                {sharingLineContact ? '分享中' : '分享我的 LINE'}
+              </Button>
               <input
                 className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-xl outline-none focus:border-brand md:text-sm"
                 placeholder="輸入訊息..."
