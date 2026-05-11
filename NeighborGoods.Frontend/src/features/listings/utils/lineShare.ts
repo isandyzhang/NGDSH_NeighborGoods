@@ -1,5 +1,6 @@
 const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
+const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
 const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
 const FLEX_HERO_IMAGE_URL = `${window.location.origin}/logo.png`
 const FLEX_ALT_TEXT_PREFIX = '我在NeighborGoods-社宅二手交易平台看到一個好物：'
@@ -35,6 +36,12 @@ export const buildLineShareUrl = (listingId: string, listingTitle: string, origi
   const encodedText = encodeURIComponent(shareText)
 
   return `${LINE_SHARE_BASE_URL}?url=${encodedUrl}&text=${encodedText}`
+}
+
+export const buildLineTextShareUrl = (listingId: string, listingTitle: string, origin?: string) => {
+  const listingUrl = buildListingUrl(listingId, origin)
+  const shareText = `${LINE_SHARE_PREFIX}${listingTitle} ${listingUrl}`.trim()
+  return `${LINE_TEXT_SHARE_BASE_URL}${encodeURIComponent(shareText)}`
 }
 
 const trimText = (value: string | undefined, maxLength: number, fallback: string) => {
@@ -149,7 +156,7 @@ const openLineUrlShareWindow = (shareUrl: string) => {
 }
 
 export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> => {
-  const fallbackUrl = buildLineShareUrl(options.listingId, options.listingTitle, options.origin)
+  const fallbackUrl = buildLineTextShareUrl(options.listingId, options.listingTitle, options.origin)
 
   try {
     const liff = await ensureLiffReady()
