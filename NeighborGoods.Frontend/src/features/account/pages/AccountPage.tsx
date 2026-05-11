@@ -8,7 +8,6 @@ import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
 const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
-const HARDCODED_LIFF_ID = '2008745853-Ui8PkOGi'
 
 export const AccountPage = () => {
   const navigate = useNavigate()
@@ -111,9 +110,9 @@ export const AccountPage = () => {
     try {
       const liffMod = await import('@line/liff')
       const liff = liffMod.default
-      const liffId = ((import.meta.env.VITE_LINE_LIFF_ID as string | undefined)?.trim() || HARDCODED_LIFF_ID).trim()
-      if (liffId && liff.isInClient()) {
-        await liff.init({ liffId })
+      const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+      if (liffId?.trim() && liff.isInClient()) {
+        await liff.init({ liffId: liffId.trim() })
         await liff.openWindow({ url: result.liffUrl, external: false })
       } else {
         window.open(result.liffUrl, '_blank', 'noopener,noreferrer')

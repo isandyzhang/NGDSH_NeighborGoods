@@ -7,8 +7,7 @@ import { Button } from '@/shared/ui/Button'
 
 type Phase = 'loading' | 'needLineApp' | 'needFriend' | 'submitting' | 'done' | 'error'
 
-const HARDCODED_LIFF_ID = '2008745853-Ui8PkOGi'
-const liffId = ((import.meta.env.VITE_LINE_LIFF_ID as string | undefined)?.trim() || HARDCODED_LIFF_ID).trim()
+const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
 const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
 
 export const LineNotifyLiffPage = () => {
@@ -85,9 +84,9 @@ export const LineNotifyLiffPage = () => {
     let disposed = false
 
     void (async () => {
-      if (!liffId) {
+      if (!liffId?.trim()) {
         setPhase('error')
-        setErrorText('LIFF_ID 未設定，無法完成 LIFF 綁定。')
+        setErrorText('VITE_LINE_LIFF_ID 未設定，無法完成 LIFF 綁定。')
         return
       }
 
@@ -98,7 +97,7 @@ export const LineNotifyLiffPage = () => {
       }
 
       try {
-        await liff.init({ liffId })
+        await liff.init({ liffId: liffId.trim() })
         if (disposed) {
           return
         }

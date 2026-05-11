@@ -1,8 +1,7 @@
 const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
 const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
-const HARDCODED_LIFF_ID = '2008745853-Ui8PkOGi'
-const LIFF_ID = ((import.meta.env.VITE_LINE_LIFF_ID as string | undefined)?.trim() || HARDCODED_LIFF_ID).trim()
+const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
 const FLEX_HERO_IMAGE_URL = `${window.location.origin}/logo.png`
 const FLEX_ALT_TEXT_PREFIX = '我在NeighborGoods-社宅二手交易平台看到一個好物：'
 const MAX_TITLE_LENGTH = 40
@@ -191,14 +190,14 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
 }
 
 export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> => {
-  if (!LIFF_ID) {
+  if (!LIFF_ID?.trim()) {
     return {
       liffIdConfigured: false,
       liffReady: false,
       isInClient: false,
       shareTargetPickerAvailable: false,
       errorCode: 'LIFF_ID_MISSING',
-      errorMessage: 'LIFF_ID 未設定',
+      errorMessage: 'VITE_LINE_LIFF_ID 未設定',
     }
   }
 
