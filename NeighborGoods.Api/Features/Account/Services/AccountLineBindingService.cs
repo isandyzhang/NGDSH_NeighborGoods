@@ -111,10 +111,16 @@ public sealed class AccountLineBindingService(
     }
 
     public async Task<(bool Ok, string? ErrorCode, string? ErrorMessage)> CompleteLiffBindingAsync(
+        string userId,
         string bindingToken,
         string idToken,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return (false, "AUTHENTICATION_REQUIRED", "請先登入後再完成 LINE 綁定。");
+        }
+
         if (string.IsNullOrWhiteSpace(bindingToken))
         {
             return (false, "LINE_BIND_TOKEN_MISSING", "缺少綁定憑證。");
@@ -135,13 +141,18 @@ public sealed class AccountLineBindingService(
             return (false, "LINE_BIND_TOKEN_EXPIRED", "綁定連結已過期，請回網站重新開始。");
         }
 
+        if (!string.Equals(pending.UserId, userId, StringComparison.Ordinal))
+        {
+            return (false, "LINE_BIND_TOKEN_USER_MISMATCH", "此綁定連結不屬於目前登入帳號，請回網站重新開始。");
+        }
+
         var (sub, verifyCode, verifyMessage) = await liffIdTokenVerifier.VerifyAsync(idToken, cancellationToken);
         if (sub is null)
         {
             return (false, verifyCode!, verifyMessage!);
         }
 
-        var user = await dbContext.AspNetUsers.FirstOrDefaultAsync(x => x.Id == pending.UserId, cancellationToken);
+        var user = await dbContext.AspNetUsers.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
         if (user is null)
         {
             return (false, "USER_NOT_FOUND", "找不到使用者。");

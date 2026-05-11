@@ -69,7 +69,6 @@ export const AppRouter = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
-          <Route path="/liff/line-notify" element={<LineNotifyLiffPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/error" element={<ErrorPage />} />
@@ -85,6 +84,7 @@ export const AppRouter = () => {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/profile" element={<Navigate to="/account" replace />} />
             <Route path="/account/email-verify" element={<AccountEmailVerifyPage />} />
+            <Route path="/liff/line-notify" element={<LineNotifyLiffPage />} />
             <Route path="/notifications" element={<NotificationCenterPage />} />
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/my-favorites" element={<Navigate to="/favorites" replace />} />
