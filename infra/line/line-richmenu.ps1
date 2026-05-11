@@ -167,11 +167,12 @@ function Get-CurrentDefaultRichMenuId {
 }
 
 Write-Host "[1/4] Creating rich menu..."
+$listingsUrl = "https://www.neighborgoodstw.com/listings"
 $definition = Build-RichMenuDefinition `
   -Name $RichMenuName `
   -BarText $ChatBarText `
   -BaseUrl $normalizedBaseUrl `
-  -OpenListingsUrl $(if ([string]::IsNullOrWhiteSpace($LiffUrl)) { "$normalizedBaseUrl/listings" } else { $LiffUrl.Trim() })
+  -OpenListingsUrl $listingsUrl
 $createResponse = Invoke-LineApiJson -Method "POST" -Uri "$apiBase/richmenu" -Body $definition
 $newRichMenuId = [string]$createResponse.richMenuId
 $newRichMenuId = $newRichMenuId.Trim()
