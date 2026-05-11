@@ -1,0 +1,129 @@
+@{
+    ViewData["Title"] = "NeighborGoods 搬家囉！服務已全面升級";
+    const string lineOfficialUrl = "https://lin.ee/6ZqrGei";
+    const string newSiteUrl = "https://www.neighborgoodstw.com";
+}
+
+<section class="migration-page py-4 py-md-5">
+    <div class="container">
+        <div class="mx-auto text-center migration-card">
+            <p class="badge rounded-pill text-bg-warning fw-semibold mb-3">服務遷移通知</p>
+            <h1 class="fw-bold mb-3">NeighborGoods 搬家囉！服務已全面升級</h1>
+            <p class="lead mb-2 fw-semibold">
+                請盡快加入並綁定 LINE 官方帳號，才能獲得最佳使用體驗。
+            </p>
+            <p class="mb-4">加入 LINE 官方帳號，即時獲取最新鄰里交易訊息與通知。</p>
+
+            <img
+                src="~/L_gainfriends_2dbarcodes_BW.png"
+                alt="NeighborGoods LINE 官方帳號 QR Code"
+                class="img-fluid rounded shadow-sm migration-qr mb-3" />
+            <p class="text-muted mb-4">LINE ID: @@559fslxw</p>
+
+            <div class="d-grid gap-3 col-md-8 mx-auto">
+                <a class="btn btn-success btn-lg fw-semibold" href="@lineOfficialUrl" target="_blank" rel="noopener noreferrer">
+                    加入新官方帳號
+                </a>
+                <a class="btn btn-primary btn-lg fw-semibold" href="@newSiteUrl" target="_blank" rel="noopener noreferrer">
+                    前往新網站
+                </a>
+            </div>
+
+            <div class="text-start mt-5 migration-notice">
+                <h2 class="h5 fw-bold mb-3">新版調整與社群公告</h2>
+                <ul class="mb-0 ps-3">
+                    <li class="mb-2"><strong>升級重點：</strong>改善賣家不活躍、買家收不到通知，讓交易更順暢。</li>
+                    <li class="mb-2"><strong>新規則：</strong>賣家未回覆購買訊息會註記，累積 3 次將暫停刊登權限。</li>
+                    <li class="mb-2"><strong>資料轉移說明：</strong>資料會全面移轉到新網站，但轉移過程中可能有少量資料流失，敬請見諒。</li>
+                    <li class="mb-2"><strong>LINE 綁定建議：</strong>立即加入並綁定 LINE 官方帳號，查資料更快、不用記網址，LINE 就能直接進站。</li>
+                    <li class="mb-2"><strong>收藏新功能：</strong>平台已新增收藏系統，未來會依個人喜好透過 LINE 推送商品推薦。</li>
+                    <li class="mb-2"><strong>社區推廣：</strong>近期會把新網址張貼至公布欄，並於 6/14 活動宣傳，讓更多好厝邊物品流動起來。</li>
+                    <li class="mb-2"><strong>近況：</strong>目前刊登與成交都很踴躍，謝謝大家支持！</li>
+                    <li class="mb-0">
+                        <strong>聯絡方式：</strong>有任何問題請聯絡 ANDY：
+                        <a href="mailto:isandyzhang@gmail.com">isandyzhang@gmail.com</a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="mt-4 text-start">
+                <h2 class="h5 fw-bold mb-3 text-center text-md-start">使用示意圖</h2>
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <img src="~/S__36864129_0.jpg" alt="系統示意圖 1" class="img-fluid rounded shadow-sm w-100 migration-gallery-image" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <img src="~/S__36864130_0.jpg" alt="系統示意圖 2" class="img-fluid rounded shadow-sm w-100 migration-gallery-image" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <img src="~/S__36864133.jpg" alt="系統示意圖 3" class="img-fluid rounded shadow-sm w-100 migration-gallery-image" />
+                    </div>
+                </div>
+            </div>
+
+            <p class="mt-4 mb-1 text-muted">
+                系統將在 <span id="redirectCountdown" class="fw-bold text-dark">30</span> 秒後自動前往新網站
+            </p>
+            <small class="text-muted">若未自動跳轉，請點擊「前往新網站」。</small>
+        </div>
+    </div>
+</section>
+
+<style>
+    .migration-page {
+        min-height: calc(100vh - 90px);
+        background-color: #f8f9fa;
+    }
+
+    .migration-card {
+        max-width: 720px;
+        padding: 2rem 1.25rem;
+    }
+
+    .migration-qr {
+        width: min(100%, 260px);
+    }
+
+    .migration-notice {
+        border-radius: 0.75rem;
+        background-color: #f8f9fa;
+        padding: 1rem;
+    }
+
+    .migration-gallery-image {
+        object-fit: cover;
+        aspect-ratio: 3 / 4;
+    }
+
+    @@media (min-width: 768px) {
+        .migration-card {
+            padding: 2.5rem 2rem;
+        }
+
+        .migration-notice {
+            padding: 1.25rem;
+        }
+    }
+</style>
+
+<script>
+    (function () {
+        var secondsLeft = 30;
+        var countdownElement = document.getElementById("redirectCountdown");
+
+        var timer = window.setInterval(function () {
+            secondsLeft -= 1;
+            if (countdownElement && secondsLeft >= 0) {
+                countdownElement.textContent = secondsLeft.toString();
+            }
+
+            if (secondsLeft <= 0) {
+                window.clearInterval(timer);
+            }
+        }, 1000);
+
+        window.setTimeout(function () {
+            window.location.href = "@newSiteUrl";
+        }, 30000);
+    })();
+</script>

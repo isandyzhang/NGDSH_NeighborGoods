@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
-import { buildLineShareUrl } from '@/features/listings/utils/lineShare'
+import { shareListingToLine } from '@/features/listings/utils/lineShare'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
@@ -231,13 +231,23 @@ export const ListingDetailPage = () => {
     }
   }
 
-  const handleShareToLine = () => {
+  const handleShareToLine = async () => {
     if (!item) {
       return
     }
 
-    const shareUrl = buildLineShareUrl(item.id, item.title)
-    window.open(shareUrl, '_blank', 'noopener,noreferrer')
+    setError(null)
+    const result = await shareListingToLine({
+      listingId: item.id,
+      listingTitle: item.title,
+      priceLabel: formatPrice(item),
+      categoryName: item.categoryName,
+      conditionName: item.conditionName,
+    })
+
+    if (result.usedFallbackUrlShare) {
+      setError('目前已改用一般 LINE 連結分享；若要分享 Flex 訊息，請在 LINE App 內開啟。')
+    }
   }
 
   return (
@@ -381,7 +391,7 @@ export const ListingDetailPage = () => {
                   </div>
                   <Button
                     type="button"
-                    onClick={handleShareToLine}
+                    onClick={() => void handleShareToLine()}
                     variant="secondary"
                     className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
                   >

@@ -261,6 +261,37 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+const string migrationPath = "/home/migration";
+app.Use(async (context, next) =>
+{
+    var requestPath = context.Request.Path.Value;
+    if (string.IsNullOrEmpty(requestPath))
+    {
+        await next();
+        return;
+    }
+
+    var normalizedPath = requestPath.ToLowerInvariant();
+    var isMigrationPage = normalizedPath == migrationPath || normalizedPath == $"{migrationPath}/";
+    var isStaticAssetRequest = Path.HasExtension(normalizedPath);
+    var isSafePath =
+        isMigrationPage ||
+        isStaticAssetRequest ||
+        normalizedPath.StartsWith("/lib/") ||
+        normalizedPath.StartsWith("/css/") ||
+        normalizedPath.StartsWith("/js/") ||
+        normalizedPath.StartsWith("/images/") ||
+        normalizedPath.StartsWith("/favicon");
+
+    if (isSafePath)
+    {
+        await next();
+        return;
+    }
+
+    context.Response.Redirect(migrationPath, permanent: false);
+});
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

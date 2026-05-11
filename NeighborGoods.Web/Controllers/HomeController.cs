@@ -125,6 +125,13 @@ public class HomeController : BaseController
         return View();
     }
 
+    public IActionResult Migration()
+    {
+        ViewData["Title"] = "NeighborGoods 搬家公告";
+        ViewData["HideFooter"] = true;
+        return View();
+    }
+
     public async Task<IActionResult> LogoEntry()
     {
         var currentUser = await GetCurrentUserAsync();
