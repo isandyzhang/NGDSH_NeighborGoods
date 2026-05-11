@@ -167,9 +167,10 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
 
     const flexMessage = buildListingFlexMessage(options)
     const result = await liff.shareTargetPicker([flexMessage])
-    if (!result) {
-      openLineUrlShareWindow(fallbackUrl)
-      return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
+    // LIFF may return null/undefined depending on version and user action.
+    // Treat an in-client call as handled and avoid forcing fallback text share.
+    if (result === null) {
+      return { usedLiffFlex: false, usedFallbackUrlShare: false }
     }
 
     return { usedLiffFlex: true, usedFallbackUrlShare: false }
