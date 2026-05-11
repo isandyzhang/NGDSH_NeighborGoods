@@ -109,6 +109,14 @@ export const accountApi = {
     return unwrapApiResponse(response.data)
   },
 
+  async completeLineBinding(bindingToken: string, idToken: string | null): Promise<{ bound: boolean }> {
+    const response = await http.post<ApiResponse<{ bound: boolean }>>('/api/v1/account/line/bind/liff-complete', {
+      bindingToken,
+      idToken,
+    })
+    return unwrapApiResponse(response.data)
+  },
+
   async unbindLineBinding(): Promise<{ unbound: boolean }> {
     const response = await http.post<ApiResponse<{ unbound: boolean }>>('/api/v1/account/line/bind/unbind')
     return unwrapApiResponse(response.data)

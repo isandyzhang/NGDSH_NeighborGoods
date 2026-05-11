@@ -284,8 +284,13 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         Assert.Contains("bindToken=", liffUrl!, StringComparison.Ordinal);
         Assert.Contains(bindingToken!, liffUrl!, StringComparison.Ordinal);
 
-        using var anon = factory.CreateClient();
-        var completeResponse = await anon.PostAsJsonAsync(
+        var anonymousClient = factory.CreateClient();
+        var anonymousCompleteResponse = await anonymousClient.PostAsJsonAsync(
+            "/api/v1/account/line/bind/liff-complete",
+            new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousCompleteResponse.StatusCode);
+
+        var completeResponse = await client.PostAsJsonAsync(
             "/api/v1/account/line/bind/liff-complete",
             new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
         completeResponse.EnsureSuccessStatusCode();
@@ -307,6 +312,38 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
             Assert.Null(user.LineMessagingApiUserId);
             Assert.Null(user.LineMessagingApiAuthorizedAt);
         }
+    }
+
+    [Fact]
+    public async Task LineBinding_LiffCompleteWithDifferentAuthenticatedUser_IsRejected()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var ownerClient = factory.CreateClient();
+        await AuthenticateAsAsync(ownerClient, "other@example.com", UserPassword);
+
+        var startResponse = await ownerClient.PostAsync("/api/v1/account/line/bind/start", null);
+        startResponse.EnsureSuccessStatusCode();
+        var startBody = await startResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var bindingToken = startBody.GetProperty("data").GetProperty("bindingToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(bindingToken));
+
+        using var differentUserClient = factory.CreateClient();
+        await AuthenticateAsAsync(differentUserClient, "tester@example.com", UserPassword);
+
+        var completeResponse = await differentUserClient.PostAsJsonAsync(
+            "/api/v1/account/line/bind/liff-complete",
+            new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
+
+        Assert.Equal(HttpStatusCode.Forbidden, completeResponse.StatusCode);
+        var completeBody = await completeResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("LINE_BIND_TOKEN_USER_MISMATCH", completeBody.GetProperty("error").GetProperty("code").GetString());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var owner = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
+        var differentUser = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "TESTER");
+        Assert.Null(owner.LineMessagingApiUserId);
+        Assert.Null(differentUser.LineMessagingApiUserId);
     }
 
     [Fact]

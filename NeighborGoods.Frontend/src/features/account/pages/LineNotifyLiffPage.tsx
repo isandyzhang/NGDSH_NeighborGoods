@@ -1,8 +1,7 @@
 import liff from '@line/liff'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { env } from '@/shared/config/env'
-import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
+import { accountApi } from '@/features/account/api/accountApi'
 import { Button } from '@/shared/ui/Button'
 
 type Phase = 'loading' | 'needLineApp' | 'needFriend' | 'submitting' | 'done' | 'error'
@@ -25,13 +24,7 @@ export const LineNotifyLiffPage = () => {
 
   const postComplete = useCallback(async () => {
     const idToken = await liff.getIDToken()
-    const res = await fetch(`${env.apiBaseUrl}/api/v1/account/line/bind/liff-complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bindingToken: bindToken, idToken }),
-    })
-    const json = (await res.json()) as ApiResponse<{ bound: boolean }>
-    unwrapApiResponse(json)
+    await accountApi.completeLineBinding(bindToken, idToken)
   }, [bindToken])
 
   const finishAndClose = useCallback(async () => {
