@@ -25,6 +25,15 @@ export type ShareListingResult = {
   fallbackUrl?: string
 }
 
+export type LiffShareDiagnostics = {
+  liffIdConfigured: boolean
+  liffReady: boolean
+  isInClient: boolean
+  shareTargetPickerAvailable: boolean
+  errorCode: string | null
+  errorMessage: string | null
+}
+
 export const buildListingUrl = (listingId: string, origin: string = window.location.origin) =>
   `${origin}/listings/${listingId}`
 
@@ -177,5 +186,53 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
   } catch {
     openLineUrlShareWindow(fallbackUrl)
     return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
+  }
+}
+
+export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> => {
+  if (!LIFF_ID?.trim()) {
+    return {
+      liffIdConfigured: false,
+      liffReady: false,
+      isInClient: false,
+      shareTargetPickerAvailable: false,
+      errorCode: 'LIFF_ID_MISSING',
+      errorMessage: 'VITE_LINE_LIFF_ID 未設定',
+    }
+  }
+
+  try {
+    const liff = await ensureLiffReady()
+    if (!liff) {
+      return {
+        liffIdConfigured: true,
+        liffReady: false,
+        isInClient: false,
+        shareTargetPickerAvailable: false,
+        errorCode: 'LIFF_INIT_FAILED',
+        errorMessage: 'LIFF 初始化失敗',
+      }
+    }
+
+    const isInClient = liff.isInClient()
+    const shareTargetPickerAvailable = liff.isApiAvailable('shareTargetPicker')
+    return {
+      liffIdConfigured: true,
+      liffReady: true,
+      isInClient,
+      shareTargetPickerAvailable,
+      errorCode: null,
+      errorMessage: null,
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'LIFF 診斷發生未知錯誤'
+    return {
+      liffIdConfigured: true,
+      liffReady: false,
+      isInClient: false,
+      shareTargetPickerAvailable: false,
+      errorCode: 'LIFF_DIAGNOSTIC_EXCEPTION',
+      errorMessage,
+    }
   }
 }

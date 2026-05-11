@@ -5,7 +5,12 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
-import { shareListingToLine } from '@/features/listings/utils/lineShare'
+import {
+  getLiffShareDiagnostics,
+  shareListingToLine,
+  type LiffShareDiagnostics,
+  type ShareListingResult,
+} from '@/features/listings/utils/lineShare'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
@@ -13,6 +18,7 @@ import { ConfirmModal } from '@/shared/ui/modal/ConfirmModal'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
+import { AppModal } from '@/shared/ui/modal/AppModal'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
@@ -51,6 +57,10 @@ export const ListingDetailPage = () => {
   const [lineBindPromptOpen, setLineBindPromptOpen] = useState(false)
   const [lineBindBusy, setLineBindBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [shareDebugOpen, setShareDebugOpen] = useState(false)
+  const [shareDebugBusy, setShareDebugBusy] = useState(false)
+  const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
+  const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -104,6 +114,7 @@ export const ListingDetailPage = () => {
   const isOwnListing = !!item && tokens?.userId === item.seller.id
   const source = searchParams.get('from')
   const sourceConversationId = searchParams.get('conversationId')
+  const shareDebugEnabled = searchParams.get('liffDebug') === '1'
   const backTarget = useMemo(() => {
     if (source === 'chat' && sourceConversationId) {
       return {
@@ -231,23 +242,50 @@ export const ListingDetailPage = () => {
     }
   }
 
+  const getShareOptions = (targetItem: ListingDetail) => ({
+    listingId: targetItem.id,
+    listingTitle: targetItem.title,
+    priceLabel: formatPrice(targetItem),
+    categoryName: targetItem.categoryName,
+    conditionName: targetItem.conditionName,
+  })
+
+  const executeShare = async (targetItem: ListingDetail) => {
+    const result = await shareListingToLine(getShareOptions(targetItem))
+    if (shareDebugEnabled) {
+      setShareDebugResult(result)
+    }
+    if (result.usedFallbackUrlShare) {
+      setError('目前已改用一般 LINE 連結分享；若要分享 Flex 訊息，請在 LINE App 內開啟。')
+    }
+  }
+
   const handleShareToLine = async () => {
     if (!item) {
       return
     }
 
     setError(null)
-    const result = await shareListingToLine({
-      listingId: item.id,
-      listingTitle: item.title,
-      priceLabel: formatPrice(item),
-      categoryName: item.categoryName,
-      conditionName: item.conditionName,
-    })
-
-    if (result.usedFallbackUrlShare) {
-      setError('目前已改用一般 LINE 連結分享；若要分享 Flex 訊息，請在 LINE App 內開啟。')
+    if (!shareDebugEnabled) {
+      await executeShare(item)
+      return
     }
+
+    setShareDebugBusy(true)
+    setShareDebugResult(null)
+    const diagnostics = await getLiffShareDiagnostics()
+    setShareDebugInfo(diagnostics)
+    setShareDebugBusy(false)
+    setShareDebugOpen(true)
+  }
+
+  const handleShareDebugConfirm = async () => {
+    if (!item) {
+      return
+    }
+    setShareDebugBusy(true)
+    await executeShare(item)
+    setShareDebugBusy(false)
   }
 
   return (
@@ -422,6 +460,47 @@ export const ListingDetailPage = () => {
         onClose={() => setLineBindPromptOpen(false)}
         onConfirm={() => void handleStartLineBinding()}
       />
+      <AppModal
+        open={shareDebugOpen}
+        onClose={() => {
+          if (!shareDebugBusy) {
+            setShareDebugOpen(false)
+          }
+        }}
+        closeLabel="關閉 LINE 分享診斷視窗"
+      >
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-text-main">LINE 分享診斷</h2>
+          <p className="text-sm text-text-subtle">僅在網址帶 `liffDebug=1` 時顯示。</p>
+        </div>
+        <div className="space-y-1 rounded-xl bg-surface-2 p-3 text-sm text-text-main">
+          <p>liffReady: {String(shareDebugInfo?.liffReady ?? false)}</p>
+          <p>isInClient: {String(shareDebugInfo?.isInClient ?? false)}</p>
+          <p>shareTargetPickerAvailable: {String(shareDebugInfo?.shareTargetPickerAvailable ?? false)}</p>
+          <p>errorCode: {shareDebugInfo?.errorCode ?? '-'}</p>
+          <p>errorMessage: {shareDebugInfo?.errorMessage ?? '-'}</p>
+          <p>usedFallbackUrlShare: {shareDebugResult ? String(shareDebugResult.usedFallbackUrlShare) : '-'}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={shareDebugBusy}
+            onClick={() => setShareDebugOpen(false)}
+            className="min-h-[2.9rem] font-semibold"
+          >
+            關閉
+          </Button>
+          <Button
+            type="button"
+            disabled={shareDebugBusy}
+            onClick={() => void handleShareDebugConfirm()}
+            className="min-h-[2.9rem] font-semibold"
+          >
+            {shareDebugBusy ? '分享中...' : '繼續分享'}
+          </Button>
+        </div>
+      </AppModal>
     </main>
   )
 }
