@@ -114,7 +114,6 @@ export const ListingDetailPage = () => {
   const isOwnListing = !!item && tokens?.userId === item.seller.id
   const source = searchParams.get('from')
   const sourceConversationId = searchParams.get('conversationId')
-  const shareDebugEnabled = searchParams.get('liffDebug') === '1'
   const backTarget = useMemo(() => {
     if (source === 'chat' && sourceConversationId) {
       return {
@@ -252,9 +251,7 @@ export const ListingDetailPage = () => {
 
   const executeShare = async (targetItem: ListingDetail) => {
     const result = await shareListingToLine(getShareOptions(targetItem))
-    if (shareDebugEnabled) {
-      setShareDebugResult(result)
-    }
+    setShareDebugResult(result)
     if (result.usedFallbackUrlShare) {
       setError('目前已改用一般 LINE 連結分享；若要分享 Flex 訊息，請在 LINE App 內開啟。')
     }
@@ -266,13 +263,11 @@ export const ListingDetailPage = () => {
     }
 
     setError(null)
-    if (!shareDebugEnabled) {
-      await executeShare(item)
-      return
-    }
+    await executeShare(item)
+  }
 
+  const handleOpenShareDebug = async () => {
     setShareDebugBusy(true)
-    setShareDebugResult(null)
     const diagnostics = await getLiffShareDiagnostics()
     setShareDebugInfo(diagnostics)
     setShareDebugBusy(false)
@@ -435,6 +430,13 @@ export const ListingDetailPage = () => {
                   >
                     分享到 LINE
                   </Button>
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenShareDebug()}
+                    className="w-full text-center text-xs text-text-muted/60 transition hover:text-text-subtle"
+                  >
+                    分享診斷
+                  </button>
                 </div>
               </section>
             </Card>
@@ -471,7 +473,7 @@ export const ListingDetailPage = () => {
       >
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-text-main">LINE 分享診斷</h2>
-          <p className="text-sm text-text-subtle">僅在網址帶 `liffDebug=1` 時顯示。</p>
+          <p className="text-sm text-text-subtle">檢查目前裝置是否可用 LIFF Flex 分享。</p>
         </div>
         <div className="space-y-1 rounded-xl bg-surface-2 p-3 text-sm text-text-main">
           <p>liffReady: {String(shareDebugInfo?.liffReady ?? false)}</p>
