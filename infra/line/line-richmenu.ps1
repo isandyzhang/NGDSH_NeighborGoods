@@ -8,6 +8,8 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$WebBaseUrl,
 
+  [string]$LiffUrl = "",
+
   [ValidateSet("image/png", "image/jpeg")]
   [string]$ImageContentType = "image/png",
 
@@ -27,6 +29,10 @@ if (-not (Test-Path -LiteralPath $RichMenuImagePath)) {
 
 if (-not $WebBaseUrl.StartsWith("http://") -and -not $WebBaseUrl.StartsWith("https://")) {
   throw "WebBaseUrl must start with http:// or https://"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($LiffUrl) -and -not $LiffUrl.StartsWith("https://liff.line.me/")) {
+  throw "LiffUrl must start with https://liff.line.me/ when provided."
 }
 
 $normalizedBaseUrl = $WebBaseUrl.TrimEnd("/")
@@ -87,7 +93,8 @@ function Build-RichMenuDefinition {
   param(
     [string]$Name,
     [string]$BarText,
-    [string]$BaseUrl
+    [string]$BaseUrl,
+    [string]$OpenListingsUrl
   )
 
   return @{
@@ -104,7 +111,7 @@ function Build-RichMenuDefinition {
         bounds = @{ x = 0; y = 0; width = 833; height = 843 }
         action = @{
           type = "uri"
-          uri = "$BaseUrl/"
+          uri = $OpenListingsUrl
         }
       },
       @{
@@ -163,7 +170,8 @@ Write-Host "[1/4] Creating rich menu..."
 $definition = Build-RichMenuDefinition `
   -Name $RichMenuName `
   -BarText $ChatBarText `
-  -BaseUrl $normalizedBaseUrl
+  -BaseUrl $normalizedBaseUrl `
+  -OpenListingsUrl $(if ([string]::IsNullOrWhiteSpace($LiffUrl)) { "$normalizedBaseUrl/listings" } else { $LiffUrl.Trim() })
 $createResponse = Invoke-LineApiJson -Method "POST" -Uri "$apiBase/richmenu" -Body $definition
 $newRichMenuId = [string]$createResponse.richMenuId
 $newRichMenuId = $newRichMenuId.Trim()

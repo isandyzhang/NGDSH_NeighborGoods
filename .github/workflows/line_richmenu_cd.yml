@@ -24,6 +24,7 @@ jobs:
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_WEB_BASE_URL: ${{ secrets.LINE_WEB_BASE_URL }}
+          LINE_LIFF_URL: ${{ secrets.LINE_LIFF_URL }}
           LINE_RICHMENU_NAME: ${{ vars.LINE_RICHMENU_NAME }}
           LINE_CHAT_BAR_TEXT: ${{ vars.LINE_CHAT_BAR_TEXT }}
         run: |
@@ -34,6 +35,7 @@ jobs:
             -ChannelAccessToken "$env:LINE_CHANNEL_ACCESS_TOKEN" `
             -RichMenuImagePath "./infra/line/menu.jpg" `
             -WebBaseUrl "$env:LINE_WEB_BASE_URL" `
+            -LiffUrl "$env:LINE_LIFF_URL" `
             -ImageContentType "image/jpeg" `
             -RichMenuName "$richMenuName" `
             -ChatBarText "$chatBarText" `

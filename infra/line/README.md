@@ -18,7 +18,9 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 
 ## Actions configured in this script
 
-- Row 1, Area 1: open website home (`uri`)
+- Row 1, Area 1: open listings entry (`uri`)
+  - If `LiffUrl` is provided, use LIFF URL (recommended for in-LINE experience)
+  - Otherwise fallback to `$WebBaseUrl/listings`
 - Row 1, Area 2: postback `action=myListings`
 - Row 1, Area 3: postback `action=myMessages`
 - Row 2, Area 1: open `$WebBaseUrl/listings/create` (`uri`)
@@ -105,6 +107,7 @@ Required GitHub Actions secrets (set in `production` Environment):
 
 - `LINE_CHANNEL_ACCESS_TOKEN`
 - `LINE_WEB_BASE_URL`
+- `LINE_LIFF_URL` (optional but recommended, e.g. `https://liff.line.me/2008745853-Ui8PkOGi`)
 
 Optional GitHub Actions variables (set in `production` Environment):
 
