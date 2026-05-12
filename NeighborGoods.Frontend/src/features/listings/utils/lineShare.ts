@@ -4,6 +4,7 @@ const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
 const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
 const FLEX_HERO_IMAGE_URL = `${window.location.origin}/logo.png`
 const FLEX_ALT_TEXT_PREFIX = '我在NeighborGoods-社宅二手交易平台看到一個好物：'
+const LINE_IN_APP_BROWSER_PATTERN = /\bLine\//i
 const MAX_TITLE_LENGTH = 40
 const MAX_META_LENGTH = 24
 
@@ -164,8 +165,21 @@ const openLineUrlShareWindow = (shareUrl: string) => {
   window.open(shareUrl, '_blank', 'noopener,noreferrer')
 }
 
+const shouldAttemptLiffShare = () => {
+  if (!LIFF_ID?.trim()) {
+    return false
+  }
+
+  return LINE_IN_APP_BROWSER_PATTERN.test(window.navigator.userAgent)
+}
+
 export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> => {
   const fallbackUrl = buildLineTextShareUrl(options.listingId, options.listingTitle, options.origin)
+
+  if (!shouldAttemptLiffShare()) {
+    openLineUrlShareWindow(fallbackUrl)
+    return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
+  }
 
   try {
     const liff = await ensureLiffReady()
