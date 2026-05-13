@@ -44,6 +44,17 @@ jobs:
         working-directory: NeighborGoods.Frontend
         run: npm run test --if-present
 
+      - name: Validate LIFF ID input
+        env:
+          VITE_LINE_LIFF_ID: ${{ secrets.VITE_LINE_LIFF_ID }}
+        run: |
+          if [ -z "${VITE_LINE_LIFF_ID}" ]; then
+            echo "::error::VITE_LINE_LIFF_ID is empty. Please set secrets.VITE_LINE_LIFF_ID."
+            exit 1
+          fi
+          echo "::add-mask::${VITE_LINE_LIFF_ID}"
+          echo "VITE_LINE_LIFF_ID detected: ${VITE_LINE_LIFF_ID}"
+
       - name: Build frontend
         working-directory: NeighborGoods.Frontend
         env:
