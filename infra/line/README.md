@@ -124,3 +124,14 @@ Optional GitHub Actions variables (set in `production` Environment):
 - **擴充建議**：採用單一 LIFF App + 多路徑（`/liff/...`）模式，可依功能擴充不同頁面，不需每個功能額外建立新 LIFF App。
 
 `NeighborGoods.Web`（舊 MVC）仍含依 follow 寫入 pending 的綁定流程；若正式環境已僅使用 SPA + API，該路徑可視為遺留，之後再移除或改為導向新站即可。
+
+## LINE 登入 state 為何不再隨容器重啟失效
+
+LINE 登入走 OAuth Authorization Code Flow，後端在 `/api/v1/auth/line/login` 會用 ASP.NET Core Data Protection 簽出一張 `state` 給 LINE，回程在 `/api/v1/auth/line/callback` 用同一把 key 解開驗證。簽 / 驗用的「key ring」預設寫在容器本機 `~/.aspnet/DataProtection-Keys/`，容器重啟或被換到別的 replica 後就會解不開上一刻發出去的 state，前端會收到 `INVALID_LINE_STATE`。
+
+為了讓 key ring 跨重啟與跨 replica 都活著，做法是：
+
+- Bicep 在既有 Storage Account 多開一個私有容器 `dp-keys`（`publicAccess: 'None'`），同時定義在 `infra/bicep/modules/legacy/storage.bicep` 與 `infra/bicep/modules/storage-manage-existing.bicep`，新建 / 沿用既有 storage 兩條路徑都覆蓋到。
+- `NeighborGoods.Api/Program.cs` 在偵測到環境變數 `AzureBlob__ConnectionString` 時，會把 key ring 寫到 `dp-keys/keys.xml`；沒設則 fallback 回本機檔，本機開發不受影響。
+- 不需要 Managed Identity / Key Vault；沿用既有 `AzureBlob__ConnectionString`（已注入容器 secret）即可存取。
+- Blob 只在 API 啟動時讀一次載入記憶體，後續驗 state 不會額外打 Blob，登入 latency 不受影響。

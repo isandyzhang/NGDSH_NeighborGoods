@@ -26,5 +26,14 @@ resource blobContainer 'Microsoft.Storage/storageAccounts/blobServices/container
   }
 }
 
+// ASP.NET Core Data Protection key ring 容器；保持私有，與圖片容器分離。
+resource dpKeysContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobSvc
+  name: 'dp-keys'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 output storageAccountName string = stg.name
 output blobContainerName string = blobContainer.name

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -83,7 +84,19 @@ builder.Services.AddSingleton<LinePushPolicyService>();
 builder.Services.AddSingleton<IBlobStorage, AzureBlobStorage>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
-builder.Services.AddDataProtection();
+var dataProtection = builder.Services.AddDataProtection()
+    .SetApplicationName("NeighborGoods.Api");
+
+var dpBlobConnection = builder.Configuration["AzureBlob:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(dpBlobConnection))
+{
+    // key ring 寫到 Blob，容器重啟 / 多 replica 都能延續，
+    // 解決 LINE OAuth state 在重啟瞬間驗不過的問題。
+    var dpContainer = new Azure.Storage.Blobs.BlobContainerClient(dpBlobConnection, "dp-keys");
+    dpContainer.CreateIfNotExists();
+    dataProtection.PersistKeysToAzureBlobStorage(dpContainer.GetBlobClient("keys.xml"));
+}
+
 builder.Services.AddSingleton<ILineOAuthStateStore, LineOAuthStateStore>();
 builder.Services.AddHttpClient<ILineOAuthClient, LineOAuthClient>();
 builder.Services.AddHttpClient<ILineLiffIdTokenVerifier, LineLiffIdTokenVerifier>();

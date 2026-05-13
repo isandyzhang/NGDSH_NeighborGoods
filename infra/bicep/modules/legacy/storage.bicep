@@ -49,6 +49,16 @@ resource blobContainer 'Microsoft.Storage/storageAccounts/blobServices/container
   }
 }
 
+// ASP.NET Core Data Protection key ring 容器；用於 LINE OAuth state 等簽章 / 加密，
+// 必須保持私有以免 key ring 外洩。
+resource dpKeysContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  name: 'dp-keys'
+  parent: blobService
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 output storageAccountName string = storageAccount.name
 output storageAccountId string = storageAccount.id
 output blobContainerName string = blobContainer.name
