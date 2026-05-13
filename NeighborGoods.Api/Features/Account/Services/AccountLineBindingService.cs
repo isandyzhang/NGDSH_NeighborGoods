@@ -16,6 +16,7 @@ public sealed class AccountLineBindingService(
     ILineLiffIdTokenVerifier liffIdTokenVerifier)
 {
     private static readonly TimeSpan BindingTokenTtl = TimeSpan.FromMinutes(15);
+    private const string DefaultWebBaseUrl = "https://www.neighborgoodstw.com";
 
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
 
@@ -59,8 +60,11 @@ public sealed class AccountLineBindingService(
 
             var existingBotLink = $"line://ti/p/{existingBotId}";
             var existingLiffId = _options.LiffId.Trim();
+            var existingWebBaseUrl = string.IsNullOrWhiteSpace(_options.WebBaseUrl)
+                ? DefaultWebBaseUrl
+                : _options.WebBaseUrl.TrimEnd('/');
             var existingLiffState =
-                $"/liff/line-notify?bindToken={Uri.EscapeDataString(activePending.Token)}&botLink={Uri.EscapeDataString(existingBotLink)}";
+                $"{existingWebBaseUrl}/liff/line-notify?bindToken={Uri.EscapeDataString(activePending.Token)}&botLink={Uri.EscapeDataString(existingBotLink)}";
             var existingLiffUrl =
                 $"https://liff.line.me/{existingLiffId}?liff.state={Uri.EscapeDataString(existingLiffState)}";
 
@@ -106,8 +110,11 @@ public sealed class AccountLineBindingService(
 
         var botLink = $"line://ti/p/{botId}";
         var liffId = _options.LiffId.Trim();
+        var webBaseUrl = string.IsNullOrWhiteSpace(_options.WebBaseUrl)
+            ? DefaultWebBaseUrl
+            : _options.WebBaseUrl.TrimEnd('/');
         var liffState =
-            $"/liff/line-notify?bindToken={Uri.EscapeDataString(token)}&botLink={Uri.EscapeDataString(botLink)}";
+            $"{webBaseUrl}/liff/line-notify?bindToken={Uri.EscapeDataString(token)}&botLink={Uri.EscapeDataString(botLink)}";
         var liffUrl =
             $"https://liff.line.me/{liffId}?liff.state={Uri.EscapeDataString(liffState)}";
 

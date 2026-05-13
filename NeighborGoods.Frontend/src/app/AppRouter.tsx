@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
 import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
@@ -60,34 +60,12 @@ const NotFoundPage = lazy(() =>
 
 const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">頁面載入中...</div>
 
-const HomeRoute = () => {
-  const [searchParams] = useSearchParams()
-  const liffStateRaw = searchParams.get('liff.state') ?? ''
-
-  if (liffStateRaw) {
-    const decodeSafely = (value: string) => {
-      try {
-        return decodeURIComponent(value)
-      } catch {
-        return value
-      }
-    }
-
-    const liffState = decodeSafely(liffStateRaw).trim()
-    if (liffState.startsWith('/liff/')) {
-      return <Navigate to={liffState} replace />
-    }
-  }
-
-  return <Navigate to="/listings" replace />
-}
-
 export const AppRouter = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<HomeRoute />} />
+          <Route path="/" element={<Navigate to="/listings" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
