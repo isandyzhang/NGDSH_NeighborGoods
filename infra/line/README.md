@@ -118,8 +118,9 @@ Optional GitHub Actions variables (set in `production` Environment):
 
 「我的帳號」綁定官方通知改為在 LINE 內開 LIFF 完成，不再依 webhook follow 自動寫入 pending。
 
-- **LIFF**：在 **LINE Login channel**（與網站 LINE 登入同一個）建立 LIFF，Endpoint URL 為 `{WebBaseUrl}/liff/line-notify`（須 HTTPS；本機可用 tunnel）。
+- **LIFF**：在 **LINE Login channel**（與網站 LINE 登入同一個）建立 LIFF，Endpoint URL 建議設為 `{WebBaseUrl}` 根目錄（須 HTTPS；本機可用 tunnel），實際功能頁以 LIFF deep link path 指向（例如 `/liff/line-notify`）。
 - **後端**：Container App 環境變數 `LineMessagingApi__WebBaseUrl`、`LineMessagingApi__LiffId`（與前端 `VITE_LINE_LIFF_ID` 一致）；`id_token` 驗證使用 `Line__ChannelId`（Login channel）。
 - **Console**：Login channel 與官方帳號 **Link a bot**，LIFF 可加 **Add friend** 以利 `getFriendship()` 與推播。
+- **擴充建議**：採用單一 LIFF App + 多路徑（`/liff/...`）模式，可依功能擴充不同頁面，不需每個功能額外建立新 LIFF App。
 
 `NeighborGoods.Web`（舊 MVC）仍含依 follow 寫入 pending 的綁定流程；若正式環境已僅使用 SPA + API，該路徑可視為遺留，之後再移除或改為導向新站即可。
