@@ -20,6 +20,9 @@ const AccountEmailVerifyPage = lazy(() =>
 const LineNotifyLiffPage = lazy(() =>
   import('@/features/account/pages/LineNotifyLiffPage').then((module) => ({ default: module.LineNotifyLiffPage })),
 )
+const LiffEntryPage = lazy(() =>
+  import('@/features/account/pages/LiffEntryPage').then((module) => ({ default: module.LiffEntryPage })),
+)
 const ContactAdminPage = lazy(() =>
   import('@/features/contact/pages/ContactAdminPage').then((module) => ({ default: module.ContactAdminPage })),
 )
@@ -69,6 +72,7 @@ export const AppRouter = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
+          <Route path="/liff-entry" element={<LiffEntryPage />} />
           <Route path="/liff/line-notify" element={<LineNotifyLiffPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
