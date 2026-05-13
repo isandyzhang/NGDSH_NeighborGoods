@@ -59,10 +59,8 @@ public sealed class AccountLineBindingService(
 
             var existingBotLink = $"line://ti/p/{existingBotId}";
             var existingLiffId = _options.LiffId.Trim();
-            var existingTarget =
-                $"/liff/line-notify?bindToken={Uri.EscapeDataString(activePending.Token)}&botLink={Uri.EscapeDataString(existingBotLink)}";
             var existingLiffUrl =
-                $"https://liff.line.me/{existingLiffId}?liff.state={Uri.EscapeDataString(existingTarget)}";
+                $"https://liff.line.me/{existingLiffId}?bindToken={Uri.EscapeDataString(activePending.Token)}&botLink={Uri.EscapeDataString(existingBotLink)}";
 
             var staleIds = existingPendings
                 .Where(x => x.Id != activePending.Id)
@@ -106,9 +104,8 @@ public sealed class AccountLineBindingService(
 
         var botLink = $"line://ti/p/{botId}";
         var liffId = _options.LiffId.Trim();
-        var target = $"/liff/line-notify?bindToken={Uri.EscapeDataString(token)}&botLink={Uri.EscapeDataString(botLink)}";
         var liffUrl =
-            $"https://liff.line.me/{liffId}?liff.state={Uri.EscapeDataString(target)}";
+            $"https://liff.line.me/{liffId}?bindToken={Uri.EscapeDataString(token)}&botLink={Uri.EscapeDataString(botLink)}";
 
         return (new StartLineBindingResponse(pending.Id, liffUrl, token, botLink), null, null);
     }

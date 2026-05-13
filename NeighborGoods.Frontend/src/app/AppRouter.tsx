@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
 import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
@@ -19,9 +19,6 @@ const AccountEmailVerifyPage = lazy(() =>
 )
 const LineNotifyLiffPage = lazy(() =>
   import('@/features/account/pages/LineNotifyLiffPage').then((module) => ({ default: module.LineNotifyLiffPage })),
-)
-const LiffEntryPage = lazy(() =>
-  import('@/features/account/pages/LiffEntryPage').then((module) => ({ default: module.LiffEntryPage })),
 )
 const ContactAdminPage = lazy(() =>
   import('@/features/contact/pages/ContactAdminPage').then((module) => ({ default: module.ContactAdminPage })),
@@ -63,50 +60,15 @@ const NotFoundPage = lazy(() =>
 
 const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">頁面載入中...</div>
 
-const decodeSafely = (value: string) => {
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    return value
-  }
-}
-
-const HomeRoute = () => {
-  const [searchParams] = useSearchParams()
-  const rawState = searchParams.get('liff.state') ?? ''
-  const decodedState = decodeSafely(rawState).trim()
-
-  if (decodedState) {
-    if (decodedState.startsWith('/liff/')) {
-      return <Navigate to={decodedState} replace />
-    }
-
-    if (decodedState.startsWith('http://') || decodedState.startsWith('https://')) {
-      try {
-        const url = new URL(decodedState)
-        const nextPath = `${url.pathname}${url.search}`
-        if (nextPath.startsWith('/liff/')) {
-          return <Navigate to={nextPath} replace />
-        }
-      } catch {
-        // Ignore invalid URL and fallback to listings.
-      }
-    }
-  }
-
-  return <Navigate to="/listings" replace />
-}
-
 export const AppRouter = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<HomeRoute />} />
+          <Route path="/" element={<Navigate to="/listings" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
-          <Route path="/liff-entry" element={<LiffEntryPage />} />
           <Route path="/liff/line-notify" element={<LineNotifyLiffPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />

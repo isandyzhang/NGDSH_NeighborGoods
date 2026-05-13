@@ -13,46 +13,9 @@ const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
 export const LineNotifyLiffPage = () => {
   const [searchParams] = useSearchParams()
   const liffStateRaw = searchParams.get('liff.state') ?? ''
-  const liffStateParams = (() => {
-    if (!liffStateRaw) {
-      return null
-    }
-
-    const decodeSafely = (value: string) => {
-      try {
-        return decodeURIComponent(value)
-      } catch {
-        return value
-      }
-    }
-
-    const rawValue = decodeSafely(liffStateRaw)
-    const queryStartIndex = rawValue.indexOf('?')
-
-    if (rawValue.startsWith('/')) {
-      if (queryStartIndex < 0) {
-        return null
-      }
-      return new URLSearchParams(rawValue.slice(queryStartIndex + 1))
-    }
-
-    if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
-      try {
-        const u = new URL(rawValue)
-        return new URLSearchParams(u.search.startsWith('?') ? u.search.slice(1) : u.search)
-      } catch {
-        return null
-      }
-    }
-
-    const normalized = rawValue.startsWith('?')
-      ? rawValue.slice(1)
-      : queryStartIndex >= 0
-        ? rawValue.slice(queryStartIndex + 1)
-        : rawValue
-
-    return normalized ? new URLSearchParams(normalized) : null
-  })()
+  const liffStateParams = liffStateRaw
+    ? new URLSearchParams(liffStateRaw.startsWith('?') ? liffStateRaw.slice(1) : liffStateRaw)
+    : null
   const bindToken = searchParams.get('bindToken') ?? liffStateParams?.get('bindToken') ?? ''
   const botLink = searchParams.get('botLink') ?? liffStateParams?.get('botLink') ?? ''
 
