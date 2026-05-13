@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Configuration;
 using NeighborGoods.Web.Data;
 using NeighborGoods.Web.Infrastructure;
 using NeighborGoods.Web.Models.Entities;
@@ -19,7 +18,6 @@ public class AccountController : BaseController
     private readonly IUserService _userService;
     private readonly IReviewService _reviewService;
     private readonly ILineMessagingApiService? _lineMessagingApiService;
-    private readonly IConfiguration _configuration;
     private readonly IEmailNotificationService? _emailNotificationService;
     private readonly IBlobService _blobService;
     private readonly AppDbContext _dbContext;
@@ -29,7 +27,6 @@ public class AccountController : BaseController
         SignInManager<ApplicationUser> signInManager,
         IUserService userService,
         IReviewService reviewService,
-        IConfiguration configuration,
         IBlobService blobService,
         AppDbContext dbContext,
         ILineMessagingApiService? lineMessagingApiService = null,
@@ -39,7 +36,6 @@ public class AccountController : BaseController
         _signInManager = signInManager;
         _userService = userService;
         _reviewService = reviewService;
-        _configuration = configuration;
         _blobService = blobService;
         _dbContext = dbContext;
         _lineMessagingApiService = lineMessagingApiService;
