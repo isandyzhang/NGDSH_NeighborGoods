@@ -223,7 +223,6 @@ var coreAppSettings = {
   AzureWebJobsStorage__credential: 'managedidentity'
   AzureWebJobsStorage__clientId: functionsUai.properties.clientId
   FUNCTIONS_EXTENSION_VERSION: '~4'
-  FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated'
   SCM_DO_BUILD_DURING_DEPLOYMENT: 'false'
   ASPNETCORE_ENVIRONMENT: aspnetcoreEnvironment
   ConnectionStrings__DefaultConnection: sqlConnectionString
