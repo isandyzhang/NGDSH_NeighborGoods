@@ -7,6 +7,11 @@ on:
     paths:
       - 'NeighborGoods.Api/**'
       - 'NeighborGoods.Api.Tests/**'
+      - 'NeighborGoods.Data/**'
+      - 'NeighborGoods.Notifications/**'
+      - 'NeighborGoods.Messaging/**'
+      - 'NeighborGoods.Workers/**'
+      - 'NeighborGoods.Functions/**'
       - 'Dockerfile.api'
       - '.github/workflows/backend_ci.yml'
   pull_request:
@@ -15,6 +20,11 @@ on:
     paths:
       - 'NeighborGoods.Api/**'
       - 'NeighborGoods.Api.Tests/**'
+      - 'NeighborGoods.Data/**'
+      - 'NeighborGoods.Notifications/**'
+      - 'NeighborGoods.Messaging/**'
+      - 'NeighborGoods.Workers/**'
+      - 'NeighborGoods.Functions/**'
       - 'Dockerfile.api'
       - '.github/workflows/backend_ci.yml'
 
@@ -30,22 +40,25 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore backend dependencies
         run: |
-          dotnet restore NeighborGoods.Api/NeighborGoods.Api.csproj
-          dotnet restore NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj
+          dotnet restore NeighborGoods.sln
 
       - name: Verify backend formatting
         run: |
           dotnet format NeighborGoods.Api/NeighborGoods.Api.csproj --verify-no-changes --verbosity minimal
           dotnet format NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --verify-no-changes --verbosity minimal
+          dotnet format NeighborGoods.Data/NeighborGoods.Data.csproj --verify-no-changes --verbosity minimal
+          dotnet format NeighborGoods.Notifications/NeighborGoods.Notifications.csproj --verify-no-changes --verbosity minimal
+          dotnet format NeighborGoods.Messaging/NeighborGoods.Messaging.csproj --verify-no-changes --verbosity minimal
+          dotnet format NeighborGoods.Workers/NeighborGoods.Workers.csproj --verify-no-changes --verbosity minimal
+          dotnet format NeighborGoods.Functions/NeighborGoods.Functions.csproj --verify-no-changes --verbosity minimal
 
       - name: Build backend
         run: |
-          dotnet build NeighborGoods.Api/NeighborGoods.Api.csproj --configuration Release --no-restore
-          dotnet build NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-restore
+          dotnet build NeighborGoods.sln --configuration Release --no-restore
 
       - name: Run backend unit-only tests (exclude integration tests)
         run: dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName!~EndpointsTests"

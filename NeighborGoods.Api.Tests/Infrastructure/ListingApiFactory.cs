@@ -9,9 +9,9 @@ using NeighborGoods.Api.Features.Auth.Services;
 using NeighborGoods.Api.Features.Integrations.Line.Services;
 using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Infrastructure.Storage;
-using NeighborGoods.Api.Shared.Notifications;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Notifications;
+using NeighborGoods.Data.LegacyEntities;
+using NeighborGoods.Data;
 
 namespace NeighborGoods.Api.Tests;
 
@@ -113,7 +113,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 emailConfirmed: true,
                 role: 3));
 
-            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            dbContext.Listings.Add(new global::NeighborGoods.Data.Listings.Listing
             {
                 Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 Title = "二手書櫃",
@@ -151,7 +151,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             });
 
             // 累加篩選測試用（標題含 filter-test- 前綴；皆為上架中）
-            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            dbContext.Listings.Add(new global::NeighborGoods.Data.Listings.Listing
             {
                 Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
                 Title = "filter-test-charity-only",
@@ -171,7 +171,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 CreatedAt = DateTime.UtcNow.AddDays(-1),
                 UpdatedAt = DateTime.UtcNow.AddDays(-1)
             });
-            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            dbContext.Listings.Add(new global::NeighborGoods.Data.Listings.Listing
             {
                 Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 Title = "filter-test-free-only",
@@ -191,7 +191,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 CreatedAt = DateTime.UtcNow.AddDays(-1),
                 UpdatedAt = DateTime.UtcNow.AddDays(-1)
             });
-            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            dbContext.Listings.Add(new global::NeighborGoods.Data.Listings.Listing
             {
                 Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
                 Title = "filter-test-both-flags",
@@ -211,7 +211,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
                 CreatedAt = DateTime.UtcNow.AddDays(-1),
                 UpdatedAt = DateTime.UtcNow.AddDays(-1)
             });
-            dbContext.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            dbContext.Listings.Add(new global::NeighborGoods.Data.Listings.Listing
             {
                 Id = Guid.Parse("55555555-5555-5555-5555-555555555555"),
                 Title = "filter-test-tradeable-only",

@@ -1,4 +1,4 @@
-using NeighborGoods.Api.Shared.Notifications;
+using NeighborGoods.Notifications;
 
 namespace NeighborGoods.Api.Tests;
 

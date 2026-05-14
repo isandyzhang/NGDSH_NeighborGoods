@@ -7,8 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Features.PurchaseRequests;
 using NeighborGoods.Api.Features.PurchaseRequests.Services;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Tests;
 

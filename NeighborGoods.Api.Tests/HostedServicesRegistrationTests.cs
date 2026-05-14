@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NeighborGoods.Api.Features.Integrations.Line.Services;
 
 namespace NeighborGoods.Api.Tests;
 
@@ -8,12 +7,22 @@ namespace NeighborGoods.Api.Tests;
 public sealed class HostedServicesRegistrationTests(SqlServerContainerFixture fixture)
 {
     [Fact]
-    public void Program_RegistersLinePreferencePushWorker()
+    public void Program_DoesNotRegisterBackgroundWorkers_AsHostedServices()
     {
         using var factory = new ListingApiFactory(fixture.ConnectionString);
 
         var hostedServices = factory.Services.GetServices<IHostedService>().ToList();
+        var typeNames = hostedServices.Select(s => s.GetType().FullName ?? s.GetType().Name).ToList();
 
-        Assert.Contains(hostedServices, service => service is LinePreferencePushWorker);
+        foreach (var removed in new[]
+                 {
+                     "LinePreferencePushWorker",
+                     "UnreadMessageEmailNotificationWorker",
+                     "PurchaseRequestExpirationWorker",
+                     "QuickResponderBadgeWorker"
+                 })
+        {
+            Assert.DoesNotContain(typeNames, n => n.Contains(removed, StringComparison.Ordinal));
+        }
     }
 }
