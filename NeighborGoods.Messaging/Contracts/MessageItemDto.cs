@@ -1,4 +1,4 @@
-namespace NeighborGoods.Api.Features.Messaging.Contracts.Responses;
+namespace NeighborGoods.Messaging.Contracts;
 
 public sealed class MessageItemDto
 {

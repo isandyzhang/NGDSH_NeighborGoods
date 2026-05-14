@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 using global::System.Security.Claims;
 
-namespace NeighborGoods.Api.Features.Messaging;
+namespace NeighborGoods.Messaging.Hubs;
 
 [Authorize]
 public sealed class MessageHub(
