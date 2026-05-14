@@ -45,11 +45,23 @@ param existingBlobContainerName string = ''
 @description('Deploy Email resources in this resource group')
 param deployEmailResources bool = false
 
-@description('Deploy Linux Consumption Function App（NeighborGoods.Functions / Workers）')
+@description('Deploy Linux Flex Consumption Function App（NeighborGoods.Functions / Workers、dotnet-isolated）')
 param deployFunctionsApp bool = false
 
-@description('Function App Linux FX stack（例 DOTNET-ISOLATED|10.0）')
-param functionsLinuxFxVersion string = 'DOTNET-ISOLATED|10.0'
+@description('Function App 名稱後綴（預設 -flex 與舊 Consumption 並存；空字串且先刪舊站可沿用 -func 名）')
+param functionsResourceNameSuffix string = '-flex'
+
+@description('Flex dotnet-isolated 執行階段版本（例 10.0）')
+param functionsIsolatedRuntimeVersion string = '10.0'
+
+@description('Flex 執行個體記憶體（MB）')
+@allowed([2048, 4096])
+param functionsFlexInstanceMemoryMB int = 2048
+
+@description('Flex 最大執行個體數')
+@minValue(40)
+@maxValue(1000)
+param functionsFlexMaximumInstanceCount int = 100
 
 @secure()
 @description('Existing Email connection string injected to Container App when not provisioning Email resources')
@@ -365,13 +377,16 @@ module containerapp 'modules/containerapp.bicep' = {
   }
 }
 
-module functionsWorker 'modules/functionapp-linux-consumption.bicep' = if (deployFunctionsApp) {
+module functionsWorker 'modules/functionapp-linux-flex-consumption.bicep' = if (deployFunctionsApp) {
   name: 'functions-worker-module'
   params: {
     location: location
     namePrefix: namePrefix
     environmentName: environmentName
-    functionsLinuxFxVersion: functionsLinuxFxVersion
+    functionsResourceNameSuffix: functionsResourceNameSuffix
+    functionsIsolatedRuntimeVersion: functionsIsolatedRuntimeVersion
+    functionsFlexInstanceMemoryMB: functionsFlexInstanceMemoryMB
+    functionsFlexMaximumInstanceCount: functionsFlexMaximumInstanceCount
     aspnetcoreEnvironment: aspnetcoreEnvironment
     #disable-next-line BCP318
     sqlConnectionString: provisionSqlResources ? sql.outputs.sqlConnectionString : existingSqlConnectionString

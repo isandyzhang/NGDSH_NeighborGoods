@@ -1,6 +1,6 @@
 # Azure Functions 背景工作者遷移（僅 Api 執行面）
 
-本文件為 **feature/azure-functions-workers** 分支的實作檢核表：將 `NeighborGoods.Api` 內四個 `IHostedService` 改由 **Azure Functions（Consumption / isolated .NET）** 的 Timer 觸發同一套「單次執行」邏輯；舊 **`NeighborGoods.Web`（MVC）** 已自 repo 移除，不再部署。
+本文件為 **feature/azure-functions-workers** 分支的實作檢核表：將 `NeighborGoods.Api` 內四個 `IHostedService` 改由 **Azure Functions（Linux Flex Consumption、isolated .NET）** 的 Timer 觸發同一套「單次執行」邏輯；舊 **`NeighborGoods.Web`（MVC）** 已自 repo 移除，不再部署。
 
 ## 原則
 
@@ -162,14 +162,15 @@ dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj -c Release --
 | 步驟 | 動作 | 驗證 |
 |------|------|------|
 | 8.1 | 更新 `.github/workflows/backend_ci.yml`：`paths` 含新專案目錄；`dotnet format` / `build` / `test` 涵蓋 solution 或各 csproj | PR 上 CI 綠 |
-| 8.2 | **IaC**：`deploy.bicep` 於 `deployFunctionsApp=true` 時部署 `functionapp-linux-consumption`（專用儲存體、Y1、Linux isolated）。**CD**：手動執行 [Backend CD (Azure Functions)](../.github/workflows/backend_cd_functions.yml)；Repository variables：`AZURE_RESOURCE_GROUP`、`AZURE_FUNCTION_APP_NAME`（須與 Bicep 命名 `${namePrefix}-${environmentName}-func` 一致）。OIDC secrets 同 Container App CD。 | IaC 部署成功；CD zip 發佈成功 |
+| 8.2 | **IaC**：`deploy.bicep` 於 `deployFunctionsApp=true` 時部署 [functionapp-linux-flex-consumption.bicep](../infra/bicep/modules/functionapp-linux-flex-consumption.bicep)（**Linux Flex Consumption、FC1**、`functionAppConfig`、dotnet-isolated、專用儲存體 + **User-assigned managed identity** 存取 Blob/Queue/Table、`deployments` 容器供 zip 套件）。預設 Function App 名稱為 `${namePrefix}-${environmentName}-func-flex`（參數 `functionsResourceNameSuffix`，預設 `-flex`；設為空字串則名稱為 `${namePrefix}-${environmentName}-func`，須先移除舊站以免名稱衝突）。**Linux Consumption（Y1）無法原地升級**，新站與舊站可並行於同一資源群組驗證後再改 CD 變數。**CD**：手動執行 [Backend CD (Azure Functions)](../.github/workflows/backend_cd_functions.yml)；Repository variables：`AZURE_RESOURCE_GROUP`、`AZURE_FUNCTION_APP_NAME`（須與目前 IaC 輸出的名稱一致，預設含 `-flex` 後綴）。OIDC secrets 同 Container App CD。上線前請確認區域支援 Flex：`az functionapp list-flexconsumption-locations`。 | IaC 部署成功；CD `config-zip` 發佈成功 |
 
 ---
 
-## Azure Consumption 注意事項（摘要）
+## Azure Functions 託管注意事項（Flex Consumption 摘要）
 
-- 方案代碼常見 **Y1**；免費額度依帳戶／區域而定。
-- **無 VNET 注入**：若 SQL 僅限私人端點，需改 Premium + VNET 或調整防火牆／原則。
+- 方案為 **Flex Consumption（FC1）**；與已淘汰路線的 **Linux Consumption（Y1）** 不同，後者不支援 .NET 10 後續堆疊，請勿再部署 Y1 範本。
+- **VNET／私人端點**：Flex 相較傳統 Consumption 對網路整合較完整；若 SQL 僅限私人存取，請對照 [Flex 網路](https://learn.microsoft.com/azure/azure-functions/flex-consumption-how-to) 與防火牆設定。
+- **部署槽、自管 TLS 憑證**：Flex 上限制請見 [遷移指南](https://learn.microsoft.com/azure/azure-functions/migrate-plan-consumption-to-flex)；本專案目前僅 Timer 觸發，無 Blob 輪詢觸發，遷移負擔較低。
 - 未讀信每分鐘觸發執行次數較高；若成本或延遲有壓力可改為 2～5 分鐘並調整產品容忍度。
 
 ---
@@ -179,7 +180,7 @@ dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj -c Release --
 - [x] `dotnet build NeighborGoods.sln -c Release` 通過  
 - [x] `dotnet test`（排除長時間 EndpointsTests）通過  
 - [x] Api 已移除四個 `IHostedService` 註冊  
-- [x] `NeighborGoods.Functions` 與四個 Timer（isolated .NET、`Microsoft.Azure.Functions.Worker.Sdk` 2.0.3+）  
+- [x] `NeighborGoods.Functions` 與四個 Timer（isolated .NET、`Microsoft.Azure.Functions.Worker` 2.51+、`Microsoft.Azure.Functions.Worker.Sdk` 2.0.6+）
 - [x] 舊 `NeighborGoods.Web` 已自 repo 移除；README／本文件已更新  
 
 ## 本分支已實作摘要

@@ -1,4 +1,4 @@
-# 手動發佈 NeighborGoods.Functions（Linux Consumption、.NET isolated）。
+# 手動發佈 NeighborGoods.Functions（Linux Flex Consumption、FC1、.NET isolated）。
 # 需先以 IaC（deploy.bicep + deployFunctionsApp=true）建立 Function App，或於 Azure 手動建立同名資源。
 name: Backend CD (Azure Functions)
 
@@ -51,8 +51,7 @@ jobs:
               exit 1
             fi
             az config set extension.use_dynamic_install=yes_without_prompt
-            # Function App 請用 config-zip（見 https://learn.microsoft.com/azure/azure-functions/deployment-zip-push）
-            # az webapp deploy --type zip 在部分 Linux Consumption 組合會回 Bad Request。
+            # Flex / Linux 請用 config-zip（https://learn.microsoft.com/azure/azure-functions/deployment-zip-push）
             az functionapp deployment source config-zip \
               --resource-group "${RG}" \
               --name "${APP}" \

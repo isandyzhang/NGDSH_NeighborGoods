@@ -8,6 +8,10 @@
     "deploySignalR": { "value": true },
     "deployEmailResources": { "value": false },
     "deployFunctionsApp": { "value": true },
+    "functionsResourceNameSuffix": { "value": "-flex" },
+    "functionsIsolatedRuntimeVersion": { "value": "10.0" },
+    "functionsFlexInstanceMemoryMB": { "value": 2048 },
+    "functionsFlexMaximumInstanceCount": { "value": 100 },
 
     "provisionSqlResources": { "value": false },
     "provisionStorageResources": { "value": false },
