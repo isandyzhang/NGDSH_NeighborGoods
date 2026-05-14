@@ -2,7 +2,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-env
 WORKDIR /app
 
-# 1. 先複製 API csproj (使用 Docker 快取)
+# 1. 複製還原圖所需之 csproj（僅 API 時 restore 會略過參考專案，publish --no-restore 會 NETSDK1004）
+COPY NeighborGoods.Data/NeighborGoods.Data.csproj ./NeighborGoods.Data/
+COPY NeighborGoods.Messaging/NeighborGoods.Messaging.csproj ./NeighborGoods.Messaging/
+COPY NeighborGoods.Notifications/NeighborGoods.Notifications.csproj ./NeighborGoods.Notifications/
+COPY NeighborGoods.Workers/NeighborGoods.Workers.csproj ./NeighborGoods.Workers/
 COPY NeighborGoods.Api/NeighborGoods.Api.csproj ./NeighborGoods.Api/
 RUN dotnet restore ./NeighborGoods.Api/NeighborGoods.Api.csproj
 
