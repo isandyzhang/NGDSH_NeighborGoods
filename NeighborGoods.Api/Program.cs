@@ -118,6 +118,7 @@ builder.Services.AddDbContext<NeighborGoodsDbContext>(options =>
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<LineOAuthOptions>(builder.Configuration.GetSection(LineOAuthOptions.SectionName));
 builder.Services.Configure<AzureBlobOptions>(builder.Configuration.GetSection(AzureBlobOptions.SectionName));
+builder.Services.AddSingleton<IBlobStorage, AzureBlobStorage>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 ValidateJwtOptions(jwtOptions);
