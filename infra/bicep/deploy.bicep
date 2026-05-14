@@ -45,6 +45,12 @@ param existingBlobContainerName string = ''
 @description('Deploy Email resources in this resource group')
 param deployEmailResources bool = false
 
+@description('Deploy Linux Consumption Function App（NeighborGoods.Functions / Workers）')
+param deployFunctionsApp bool = false
+
+@description('Function App Linux FX stack（例 DOTNET-ISOLATED|10.0）')
+param functionsLinuxFxVersion string = 'DOTNET-ISOLATED|10.0'
+
 @secure()
 @description('Existing Email connection string injected to Container App when not provisioning Email resources')
 param existingEmailConnectionString string = ''
@@ -359,6 +365,32 @@ module containerapp 'modules/containerapp.bicep' = {
   }
 }
 
+module functionsWorker 'modules/functionapp-linux-consumption.bicep' = if (deployFunctionsApp) {
+  name: 'functions-worker-module'
+  params: {
+    location: location
+    namePrefix: namePrefix
+    environmentName: environmentName
+    functionsLinuxFxVersion: functionsLinuxFxVersion
+    aspnetcoreEnvironment: aspnetcoreEnvironment
+    #disable-next-line BCP318
+    sqlConnectionString: provisionSqlResources ? sql.outputs.sqlConnectionString : existingSqlConnectionString
+    injectSignalR: deploySignalR
+    #disable-next-line BCP318
+    signalRConnectionString: deploySignalR ? signalr.outputs.signalRConnectionString : ''
+    #disable-next-line BCP318
+    emailConnectionString: deployEmailResources ? email.outputs.emailConnectionString : existingEmailConnectionString
+    emailFromAddress: emailFromAddress
+    lineMessagingChannelId: lineMessagingChannelId
+    lineMessagingChannelAccessToken: lineMessagingChannelAccessToken
+    lineMessagingChannelSecret: lineMessagingChannelSecret
+    lineMessagingBotId: lineMessagingBotId
+    lineMessagingBaseUrl: lineMessagingBaseUrl
+    lineMessagingWebBaseUrl: lineMessagingWebBaseUrl
+    lineMessagingLiffId: lineMessagingLiffId
+  }
+}
+
 module apiDnsRecords 'modules/azure-dns-api-records.bicep' = if (provisionApiDnsRecordsInAzureDns && !empty(apiDnsZoneName) && !empty(apiCustomDomainHostName) && !empty(apiDnsRecordRelativeName)) {
   name: 'api-dns-records-module'
   scope: resourceGroup(subscription().subscriptionId, apiDnsZoneRg)
@@ -384,7 +416,7 @@ module staticwebapp 'modules/staticwebapp.bicep' = {
   }
 }
 
-output deploymentSummary object = {
+var deploymentSummaryBase = {
   resourceGroup: resourceGroup().name
   location: location
   environment: environmentName
@@ -400,3 +432,19 @@ output deploymentSummary object = {
     staticWebAppHostName: staticwebapp.outputs.staticWebAppDefaultHostname
   }
 }
+
+#disable-next-line BCP318
+var functionsOutName = deployFunctionsApp ? functionsWorker.outputs.functionAppName : ''
+#disable-next-line BCP318
+var functionsOutHost = deployFunctionsApp ? functionsWorker.outputs.functionAppDefaultHostName : ''
+
+var deploymentSummaryFunctions = deployFunctionsApp
+  ? {
+      functions: {
+        functionAppName: functionsOutName
+        defaultHostName: functionsOutHost
+      }
+    }
+  : {}
+
+output deploymentSummary object = union(deploymentSummaryBase, deploymentSummaryFunctions)
