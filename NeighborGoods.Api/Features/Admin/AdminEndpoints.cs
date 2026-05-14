@@ -4,7 +4,7 @@ using NeighborGoods.Api.Features.Admin.Contracts.Responses;
 using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.ApiContracts;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Admin;

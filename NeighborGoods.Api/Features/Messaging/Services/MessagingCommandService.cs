@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Messaging.Contracts.Responses;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Messaging.Services;
 
 public sealed class MessagingCommandService(
     NeighborGoodsDbContext dbContext,
-    IHubContext<NeighborGoods.Api.Features.Messaging.MessageHub> hubContext,
+    IHubContext<NeighborGoods.Messaging.Hubs.MessageHub> hubContext,
     MessagingQueryService messagingQueryService)
 {
     private const string LineContactShareTemplate = "[系統發送] 這是我的 LINE 聯絡方式\nLINE ID: {0}\n加好友連結: https://line.me/R/ti/p/~{0}";
@@ -153,7 +153,7 @@ public sealed class MessagingCommandService(
             "ReceiveMessage",
             dto,
             cancellationToken);
-        await hubContext.Clients.Group(MessageHub.ConversationGroupName(conversation.Id)).SendAsync(
+        await hubContext.Clients.Group(NeighborGoods.Messaging.Hubs.MessageHub.ConversationGroupName(conversation.Id)).SendAsync(
             "ReceiveMessage",
             dto,
             cancellationToken);

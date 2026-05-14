@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NeighborGoods.Api.Features.Auth.Configuration;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Auth.Services;
 

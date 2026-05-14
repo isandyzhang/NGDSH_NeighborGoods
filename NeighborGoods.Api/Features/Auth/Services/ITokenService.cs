@@ -1,4 +1,4 @@
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Auth.Services;
 

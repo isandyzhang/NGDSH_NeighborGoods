@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Account.Contracts.Requests;
 using NeighborGoods.Api.Features.Auth.Services;
-using NeighborGoods.Api.Shared.Notifications;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Notifications;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Account.Services;
 

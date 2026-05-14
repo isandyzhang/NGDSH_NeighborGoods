@@ -7,6 +7,7 @@
     "environmentName": { "value": "prod" },
     "deploySignalR": { "value": true },
     "deployEmailResources": { "value": false },
+    "deployFunctionsApp": { "value": false },
 
     "provisionSqlResources": { "value": false },
     "provisionStorageResources": { "value": false },

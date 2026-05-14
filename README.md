@@ -23,21 +23,21 @@ NGDSH_NeighborGoods/
 ├─ NeighborGoods.Frontend/        # React SPA (production UI)
 ├─ NeighborGoods.Api/             # ASP.NET Core API (production HTTP API)
 ├─ NeighborGoods.Api.Tests/       # Backend tests (Docker + SQL Server via Testcontainers)
-├─ NeighborGoods.Web/             # Legacy ASP.NET site (see 1.3)
 ├─ infra/bicep/                   # Azure IaC (Bicep modules + parameters)
 ├─ .github/workflows/             # CI/CD workflows
 ├─ Dockerfile.api                 # Backend container image definition
+├─ docs/                          # Operational / migration notes
 └─ NeighborGoods.sln
 ```
 
-### 1.3 `NeighborGoods.Web` vs `NeighborGoods.Api`
+### 1.3 `NeighborGoods.Api`（後端單一路徑）
 
-- **`NeighborGoods.Api`**: the **current production** backend. It owns **EF Core migrations** under [`NeighborGoods.Api/Migrations`](NeighborGoods.Api/Migrations). In normal releases, apply pending migrations against the shared database as part of the API deployment pipeline (or an explicit migration step), not ad hoc on developer machines for production.
-- **`NeighborGoods.Web`**: legacy full-stack application retained in the repository for historical parity or comparison. **Do not treat it as the primary deployment surface** alongside the React + API stack unless you have an explicit dual-run strategy. If both ever pointed at the same database, **coordinate schema ownership** so only one path applies additive migrations, avoiding duplicate or conflicting DDL.
+- **`NeighborGoods.Api`**: the **current production** backend. It owns **EF Core migrations** under [`NeighborGoods.Data/Migrations`](NeighborGoods.Data/Migrations) (class library shared with workers). In normal releases, apply pending migrations against the shared database as part of the API deployment pipeline (or an explicit migration step), not ad hoc on developer machines for production.
+- The legacy ASP.NET MVC app (`NeighborGoods.Web`) has been **removed from this repository**; use Git history if you need to inspect old behavior.
 
 ### 1.4 SQL persistence models
 
-- Database-aligned EF entity classes live under [`NeighborGoods.Api/Shared/Persistence/LegacyEntities`](NeighborGoods.Api/Shared/Persistence/LegacyEntities) (namespace `NeighborGoods.Api.Shared.Persistence.LegacyEntities`). The **`Listings`** table is mapped with [`NeighborGoods.Api/Features/Listing/Listing.cs`](NeighborGoods.Api/Features/Listing/Listing.cs).
+- Database-aligned EF entity classes live under [`NeighborGoods.Data/LegacyEntities`](NeighborGoods.Data/LegacyEntities) (namespace `NeighborGoods.Data.LegacyEntities`). The **`Listings`** table is mapped with [`NeighborGoods.Data/Listings/Listing.cs`](NeighborGoods.Data/Listings/Listing.cs).
 
 ## 2. Tech Stack
 

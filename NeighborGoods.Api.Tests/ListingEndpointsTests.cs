@@ -6,8 +6,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NeighborGoods.Api.Features.Listing.Services;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Tests;
 
@@ -1095,7 +1095,7 @@ public sealed class ListingEndpointsTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
-            db.Listings.Add(new global::NeighborGoods.Api.Features.Listing.Listing
+            db.Listings.Add(new global::NeighborGoods.Data.Listings.Listing
             {
                 Id = extraListingId,
                 Title = "偏好分類測試",

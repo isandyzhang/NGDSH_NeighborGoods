@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Messaging.Contracts.Responses;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Messaging.Services;
 

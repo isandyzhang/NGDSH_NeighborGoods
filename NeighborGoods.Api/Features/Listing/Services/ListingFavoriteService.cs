@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Contracts;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 
 namespace NeighborGoods.Api.Features.Listing.Services;
 

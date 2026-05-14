@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 
 namespace NeighborGoods.Api.Tests;
 

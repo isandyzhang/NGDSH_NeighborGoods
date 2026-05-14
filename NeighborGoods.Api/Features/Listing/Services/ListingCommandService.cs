@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Infrastructure.Storage;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Listing.Services;
@@ -281,7 +281,7 @@ public sealed class ListingCommandService(
         return new ListingImageUploadResult(imageEntity.Id, imageEntity.SortOrder, blobName);
     }
 
-    private async Task<(Listing Listing, AspNetUser Seller)> PrepareListingForCreateAsync(
+    private async Task<(ListingEntity Listing, AspNetUser Seller)> PrepareListingForCreateAsync(
         CreateListingRequest request,
         CancellationToken cancellationToken)
     {
@@ -330,7 +330,7 @@ public sealed class ListingCommandService(
         }
 
         var now = DateTime.UtcNow;
-        var entity = new Listing
+        var entity = new ListingEntity
         {
             Id = Guid.NewGuid(),
             Title = request.Title.Trim(),
@@ -482,7 +482,7 @@ public sealed class ListingCommandService(
         }
     }
 
-    private void EnsureCurrentUserOwnsListing(Listing entity)
+    private void EnsureCurrentUserOwnsListing(ListingEntity entity)
     {
         var userId = currentUserContext.GetRequiredUserId();
         if (!string.Equals(entity.SellerId, userId, StringComparison.Ordinal))

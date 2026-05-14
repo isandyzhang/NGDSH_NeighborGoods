@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Listing.Services;

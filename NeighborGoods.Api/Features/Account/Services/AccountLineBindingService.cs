@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NeighborGoods.Api.Features.Account.Contracts.Responses;
 using NeighborGoods.Api.Features.Integrations.Line.Services;
-using NeighborGoods.Api.Shared.Notifications;
-using NeighborGoods.Api.Shared.Persistence;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Notifications;
+using NeighborGoods.Data;
+using NeighborGoods.Data.LegacyEntities;
 
 namespace NeighborGoods.Api.Features.Account.Services;
 

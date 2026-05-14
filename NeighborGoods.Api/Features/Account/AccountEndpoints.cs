@@ -2,7 +2,7 @@ using NeighborGoods.Api.Features.Account.Contracts.Requests;
 using NeighborGoods.Api.Features.Account.Contracts.Responses;
 using NeighborGoods.Api.Features.Account.Services;
 using NeighborGoods.Api.Shared.ApiContracts;
-using NeighborGoods.Api.Shared.Notifications;
+using NeighborGoods.Notifications;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Account;

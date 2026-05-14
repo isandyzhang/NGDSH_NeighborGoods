@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 
 namespace NeighborGoods.Api.Features.Lookups;
 

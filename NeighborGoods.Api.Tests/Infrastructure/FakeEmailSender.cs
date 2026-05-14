@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using NeighborGoods.Api.Shared.Notifications;
+using NeighborGoods.Notifications;
 
 namespace NeighborGoods.Api.Tests;
 

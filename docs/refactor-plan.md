@@ -83,14 +83,12 @@
   - `Security/ICurrentUserContext.cs`
   - `Security/HttpCurrentUserContext.cs`
 
-## 3.2 API / Web 邊界守則（重構期間）
+## 3.2 API / Web 邊界守則（歷史）
 
-- 定位原則：`NeighborGoods.Web` 僅作為商業流程與舊行為的參考來源，不列入正式依賴鏈。
-- 依賴原則：`NeighborGoods.Api` 與 `NeighborGoods.Web` 之間禁止專案參考（`ProjectReference`）與程式碼相依（namespace/type 互引）。
+- **`NeighborGoods.Web`（舊 MVC）** 已自本 repo 移除；若需對照舊行為請查 Git 歷史。
+- **依賴原則**（仍適用）：`NeighborGoods.Api` 不得與舊 MVC 專案建立 `ProjectReference` 或互引 type／namespace。
 - 實作原則：API 僅依據自身 domain、contract、資料模型實作商業邏輯；不得複製或綁定 MVC ViewModel / UI 專用 enum / controller 邏輯。
-- 驗證原則：凡從 Web 參考而來的流程，需先轉成 API use-case 與測試案例（整合測試優先），再進入 API 實作。
-- 契約原則：API 對外行為以 `/api/v1` 契約為唯一準則；Web 既有行為若與 API 契約衝突，以 API 契約為準並記錄差異。
-- 退場原則：Web 移除前，需確認核心流程（登入、刊登、查詢、訊息、圖片）可由 API 驗證通過，且無任何 API 程式碼依賴 Web 內容。
+- 契約原則：API 對外行為以 `/api/v1` 契約為唯一準則。
 
 ## 4. 單一執行路線圖
 
@@ -163,7 +161,7 @@
 ### Phase 2 - 主檔去硬編碼（3-5 天）
 
 - 將 `Category/Condition/Residence/PickupLocation` 轉為資料表維護。
-- **進度**：`Category` / `Condition` / `Residence` / `PickupLocation` 皆已改為資料表、seed、FK、lookup API 與寫入驗證；`ListingLookupCatalog` 已移除。Web MVC 仍暫以 enum 對應數值，後續可改讀 API 或同庫。
+- **進度**：`Category` / `Condition` / `Residence` / `PickupLocation` 皆已改為資料表、seed、FK、lookup API 與寫入驗證；`ListingLookupCatalog` 已移除。產品 UI 以 React SPA 為準。
 - 查詢與表單改由 Lookup table 提供，不再依賴 enum 硬編碼。
 - 採雙軌遷移：先讀取切換，再寫入切換，最後移除舊欄位。
 
@@ -177,8 +175,7 @@
 
 - 建立 React 前端骨架並完成最小流程：Login、Listing List、Listing Detail。
 - 前端 API 呼叫走統一 client，型別化 DTO，錯誤統一轉換。
-- 逐步由 MVC 切換，保留短期備援。
-- 重構期間 `NeighborGoods.Web` 僅供參考，不作為 API 依賴；完成切換後可直接下線移除。
+- 產品已以前後端分離為主；舊 MVC 原始碼已自 repo 移除。
 
 #### Phase 4A - React Frontend 首波交付（2026-04 啟動）
 
