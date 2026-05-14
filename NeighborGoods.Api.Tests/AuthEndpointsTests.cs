@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -99,6 +100,28 @@ public sealed class AuthEndpointsTests
         var oldRefreshBody = await oldRefreshResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.False(oldRefreshBody.GetProperty("success").GetBoolean());
         Assert.Equal("UNAUTHORIZED", oldRefreshBody.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AuthorizedEndpoint_WithRefreshToken_ReturnsUnauthorized()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            userNameOrEmail = ConfirmedUserName,
+            password = UserPassword
+        });
+        loginResponse.EnsureSuccessStatusCode();
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var refreshToken = loginBody.GetProperty("data").GetProperty("refreshToken").GetString();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", refreshToken);
+
+        var response = await client.GetAsync("/api/v1/account/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

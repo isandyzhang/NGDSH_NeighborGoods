@@ -168,6 +168,16 @@ builder.Services
                 }
 
                 return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var tokenType = context.Principal?.FindFirst("token_type")?.Value;
+                if (!string.Equals(tokenType, "access", StringComparison.Ordinal))
+                {
+                    context.Fail("Only access tokens are accepted for API authorization.");
+                }
+
+                return Task.CompletedTask;
             }
         };
     });
