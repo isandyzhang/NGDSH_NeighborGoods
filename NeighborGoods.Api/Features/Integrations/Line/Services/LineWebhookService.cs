@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using NeighborGoods.Api.Features.Account.Services;
-using NeighborGoods.Api.Shared.Notifications;
+using NeighborGoods.Notifications;
 
 namespace NeighborGoods.Api.Features.Integrations.Line.Services;
 

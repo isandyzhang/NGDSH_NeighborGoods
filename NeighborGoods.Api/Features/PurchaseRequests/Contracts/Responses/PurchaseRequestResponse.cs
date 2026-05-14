@@ -1,5 +1,3 @@
-using NeighborGoods.Api.Features.PurchaseRequests;
-
 namespace NeighborGoods.Api.Features.PurchaseRequests.Contracts.Responses;
 
 public sealed class PurchaseRequestResponse

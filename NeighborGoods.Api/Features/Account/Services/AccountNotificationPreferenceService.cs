@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using NeighborGoods.Api.Shared.Notifications;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Notifications;
+using NeighborGoods.Data;
 
 namespace NeighborGoods.Api.Features.Account.Services;
 

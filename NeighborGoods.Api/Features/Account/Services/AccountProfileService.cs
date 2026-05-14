@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Account.Contracts.Responses;
 using NeighborGoods.Api.Features.Listing;
-using NeighborGoods.Api.Shared.Persistence;
+using NeighborGoods.Data;
 
 namespace NeighborGoods.Api.Features.Account.Services;
 
