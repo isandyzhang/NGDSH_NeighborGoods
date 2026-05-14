@@ -2,7 +2,7 @@ using Azure;
 using Azure.Communication.Email;
 using Microsoft.Extensions.Options;
 
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 public sealed class AcsEmailSender(
     IOptions<EmailSenderOptions> options,

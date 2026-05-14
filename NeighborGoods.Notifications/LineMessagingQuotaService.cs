@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 public sealed class LineMessagingQuotaService(
     HttpClient httpClient,

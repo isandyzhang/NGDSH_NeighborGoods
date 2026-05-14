@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 public sealed class LinePushQuotaTracker(IMemoryCache memoryCache)
 {

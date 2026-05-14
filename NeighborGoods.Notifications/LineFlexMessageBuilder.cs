@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Options;
-using NeighborGoods.Api.Shared.Notifications;
 
-namespace NeighborGoods.Api.Features.Integrations.Line.Services;
+namespace NeighborGoods.Notifications;
 
 public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> options)
 {

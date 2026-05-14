@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 public sealed class LineMessageSender(
     HttpClient httpClient,

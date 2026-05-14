@@ -1,4 +1,4 @@
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 public sealed class LineMessagingOptions
 {

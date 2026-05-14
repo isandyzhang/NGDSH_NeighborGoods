@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
-using NeighborGoods.Api.Shared.Persistence.LegacyEntities;
+using NeighborGoods.Data.LegacyEntities;
 
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 public sealed class LinePushPolicyService(
     IOptions<LineMessagingOptions> options,

@@ -1,4 +1,4 @@
-namespace NeighborGoods.Api.Shared.Notifications;
+namespace NeighborGoods.Notifications;
 
 [Flags]
 public enum LineNotificationPreferenceFlags
