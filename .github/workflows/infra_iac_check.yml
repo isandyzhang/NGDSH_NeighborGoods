@@ -1,4 +1,4 @@
-﻿name: IaC Check
+name: IaC Check
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # 選填：LINE 官方通知 LIFF；未設時仍沿用 deploy.parameters.prod.json。設定方式見 infra/line/README.md
       - name: LIFF 設定提示（LineMessagingApi:LiffId）

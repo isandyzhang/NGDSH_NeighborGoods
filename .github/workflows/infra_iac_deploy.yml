@@ -1,4 +1,4 @@
-﻿# 日常／完整部署：預設依 infra/bicep/deploy.parameters.prod.json（含 apiCustomDomainHostName、TLS、DNS 開關）。
+# 日常／完整部署：預設依 infra/bicep/deploy.parameters.prod.json（含 apiCustomDomainHostName、TLS、DNS 開關）。
 # 可用手動輸入覆寫「是否綁受控 TLS」「是否在 Azure DNS 寫紀錄」，無需改 commit。
 name: IaC Deploy
 
@@ -38,7 +38,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Login to Azure
         uses: azure/login@v2
