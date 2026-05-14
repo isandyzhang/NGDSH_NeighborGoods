@@ -265,7 +265,7 @@ public sealed class PurchaseRequestService(
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
             request.RespondedAt = now;
-                request.ResponseReason = "??????????";
+            request.ResponseReason = "??????????";
             await AddSystemMessageAsync(
                 request.ConversationId,
                 request.SellerId,
