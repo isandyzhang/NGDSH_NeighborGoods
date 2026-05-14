@@ -23,7 +23,6 @@ NGDSH_NeighborGoods/
 ├─ NeighborGoods.Frontend/        # React SPA (production UI)
 ├─ NeighborGoods.Api/             # ASP.NET Core API (production HTTP API)
 ├─ NeighborGoods.Api.Tests/       # Backend tests (Docker + SQL Server via Testcontainers)
-├─ legacy/NeighborGoods.Web/      # Legacy ASP.NET site (see 1.3; archived)
 ├─ infra/bicep/                   # Azure IaC (Bicep modules + parameters)
 ├─ .github/workflows/             # CI/CD workflows
 ├─ Dockerfile.api                 # Backend container image definition
@@ -31,10 +30,10 @@ NGDSH_NeighborGoods/
 └─ NeighborGoods.sln
 ```
 
-### 1.3 `legacy/NeighborGoods.Web` vs `NeighborGoods.Api`
+### 1.3 `NeighborGoods.Api`（後端單一路徑）
 
 - **`NeighborGoods.Api`**: the **current production** backend. It owns **EF Core migrations** under [`NeighborGoods.Data/Migrations`](NeighborGoods.Data/Migrations) (class library shared with workers). In normal releases, apply pending migrations against the shared database as part of the API deployment pipeline (or an explicit migration step), not ad hoc on developer machines for production.
-- **`legacy/NeighborGoods.Web`**: legacy full-stack application **archived** under [`legacy/`](legacy/README.md) for historical parity or comparison only. **Do not treat it as the primary deployment surface** alongside the React + API stack. Do **not** mix its migration approach with the current API-owned schema path.
+- The legacy ASP.NET MVC app (`NeighborGoods.Web`) has been **removed from this repository**; use Git history if you need to inspect old behavior.
 
 ### 1.4 SQL persistence models
 

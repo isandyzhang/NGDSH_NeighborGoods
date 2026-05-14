@@ -1,11 +1,11 @@
 # Azure Functions 背景工作者遷移（僅 Api 執行面）
 
-本文件為 **feature/azure-functions-workers** 分支的實作檢核表：將 `NeighborGoods.Api` 內四個 `IHostedService` 改由 **Azure Functions（Consumption / isolated .NET）** 的 Timer 觸發同一套「單次執行」邏輯；**不部署** `NeighborGoods.Web`（封存至 `legacy/`）。
+本文件為 **feature/azure-functions-workers** 分支的實作檢核表：將 `NeighborGoods.Api` 內四個 `IHostedService` 改由 **Azure Functions（Consumption / isolated .NET）** 的 Timer 觸發同一套「單次執行」邏輯；舊 **`NeighborGoods.Web`（MVC）** 已自 repo 移除，不再部署。
 
 ## 原則
 
 - **納入**：`NeighborGoods.Api`、`NeighborGoods.Functions`、`NeighborGoods.Data`、`NeighborGoods.Notifications`、`NeighborGoods.Workers`、`NeighborGoods.Messaging`（SignalR 即時推播與訊息 DTO 共用）。
-- **不納入**：`legacy/NeighborGoods.Web` — 僅歷史對照，不與現行 Api migration 策略混用。
+- **不納入**：舊 MVC 全站（已刪除；考古請用 Git 歷史）。
 - **解耦**：Api 不參考 Functions；Functions 不參考 Api WebHost；共用透過上述類別庫。
 - **雙跑風險**：正式上線前僅在一側啟用排程（本變更預設 **Api 已移除 HostedService**，由 Functions 負責）。
 
@@ -29,14 +29,12 @@
 
 ---
 
-## 階段 1：封存 Web（legacy）
+## 階段 1：舊 MVC（已自 repo 移除）
 
 | 步驟 | 動作 | 驗證 |
 |------|------|------|
-| 1.1 | 建立 `legacy/`，將 `NeighborGoods.Web` 移至 `legacy/NeighborGoods.Web` | 目錄存在 |
-| 1.2 | 更新 `NeighborGoods.sln` 中 Web 專案路徑為 `legacy\NeighborGoods.Web\...` | `dotnet sln list` 含 Web |
-| 1.3 | 新增 `legacy/README.md`（僅歷史對照、非主要產品路徑） | 檔案存在 |
-| 1.4 | 更新根目錄 `README.md` 1.2 目錄樹與 1.3 說明（legacy 路徑） | 手動閱讀 |
+| 1.1 | 自 `NeighborGoods.sln` 移除 `NeighborGoods.Web`，並刪除 repo 內舊 MVC 原始碼 | `dotnet sln list` 不含 Web；repo 根目錄無舊 MVC 之 `legacy/` |
+| 1.2 | 更新根目錄 `README.md` 與本文件，不再描述封存之 `legacy/NeighborGoods.Web` | 手動閱讀 |
 
 **驗證指令：**
 
@@ -182,11 +180,11 @@ dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj -c Release --
 - [x] `dotnet test`（排除長時間 EndpointsTests）通過  
 - [x] Api 已移除四個 `IHostedService` 註冊  
 - [x] `NeighborGoods.Functions` 與四個 Timer（isolated .NET、`Microsoft.Azure.Functions.Worker.Sdk` 2.0.3+）  
-- [x] `legacy/NeighborGoods.Web` 與 README／本文件說明一致  
+- [x] 舊 `NeighborGoods.Web` 已自 repo 移除；README／本文件已更新  
 
 ## 本分支已實作摘要
 
-- **legacy**：`NeighborGoods.Web` → `legacy/NeighborGoods.Web`，`legacy/README.md`，`NeighborGoods.sln` 路徑更新，根 `README.md` 1.2／1.3 更新。  
+- **舊 MVC**：`NeighborGoods.Web` 已自 repo 刪除；`NeighborGoods.sln` 不再含該專案；根 `README.md` 已更新。  
 - **NeighborGoods.Data**：EF `NeighborGoodsDbContext`、`LegacyEntities`、Listing 實體、`PurchaseRequestConstants`、`Migrations` 自 Api 移出；Api 以 `ProjectReference` 參考。  
 - **NeighborGoods.Notifications**：原 `Shared/Notifications` 與 `LineFlexMessageBuilder`、`LineFlexDtos`（自 `LineMenuQueryService` 抽出之 record）。  
 - **NeighborGoods.Messaging**：`MessageHub`、`MessageItemDto`、`ISystemMessageRealtimePublisher`／`SystemMessageRealtimePublisher`；Api 註冊推播實作。  

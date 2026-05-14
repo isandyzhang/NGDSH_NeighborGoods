@@ -122,4 +122,4 @@ Optional GitHub Actions variables (set in `production` Environment):
 - **後端**：Container App 環境變數 `LineMessagingApi__WebBaseUrl`、`LineMessagingApi__LiffId`（與前端 `VITE_LINE_LIFF_ID` 一致）；`id_token` 驗證使用 `Line__ChannelId`（Login channel）。
 - **Console**：Login channel 與官方帳號 **Link a bot**，LIFF 可加 **Add friend** 以利 `getFriendship()` 與推播。
 
-`NeighborGoods.Web`（舊 MVC）仍含依 follow 寫入 pending 的綁定流程；若正式環境已僅使用 SPA + API，該路徑可視為遺留，之後再移除或改為導向新站即可。
+舊 MVC 專案（`NeighborGoods.Web`）已自本 repo 移除；正式環境以 SPA + API + LIFF 綁定為準。
