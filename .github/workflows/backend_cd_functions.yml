@@ -51,6 +51,13 @@ jobs:
               exit 1
             fi
             az config set extension.use_dynamic_install=yes_without_prompt
+            # Linux Flex Consumption 不支援 SCM_DO_BUILD_DURING_DEPLOYMENT（舊 IaC 可能已寫入）
+            echo "Removing SCM_DO_BUILD_DURING_DEPLOYMENT if present..."
+            az functionapp config appsettings delete \
+              --resource-group "${RG}" \
+              --name "${APP}" \
+              --setting-names SCM_DO_BUILD_DURING_DEPLOYMENT \
+              || echo "SCM_DO_BUILD_DURING_DEPLOYMENT not set (ok)"
             # Flex / Linux 請用 config-zip（https://learn.microsoft.com/azure/azure-functions/deployment-zip-push）
             az functionapp deployment source config-zip \
               --resource-group "${RG}" \

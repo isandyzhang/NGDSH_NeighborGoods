@@ -197,6 +197,14 @@ dotnet test NeighborGoods.Api.Tests/NeighborGoods.Api.Tests.csproj -c Release --
 
 ## 已知議題（請於合併前處理）
 
+- **zip 部署失敗 `InvalidAppSettingsException: SCM_DO_BUILD_DURING_DEPLOYMENT`**：Linux **Flex Consumption** 不支援此應用程式設定（即使值為 `false`）。若 IaC 曾寫入，請先刪除再重新 `config-zip`：
+  ```powershell
+  az functionapp config appsettings delete `
+    --resource-group <resource-group> `
+    --name neighborgoods-prod-func-flex `
+    --setting-names SCM_DO_BUILD_DURING_DEPLOYMENT
+  ```
+  `functionapp-linux-flex-consumption.bicep` 已移除該設定；既有資源需手動刪除或重跑 IaC 後再部署。
 - **本機執行 Functions**：需安裝 [Azure Functions Core Tools](https://learn.microsoft.com/azure/azure-functions/functions-run-local) 並設定 `local.settings.json` 內 `ConnectionStrings:DefaultConnection`、（選用）`Azure:SignalR:ConnectionString` 與 Email／Line 區段與 Api 一致。  
 - **`PurchaseRequestService.cs` 與 `PurchaseRequestScheduledOperations.cs` 之繁體字串**：請維持 UTF-8；系統訊息字首須與 `SystemMessageRealtimePublisher` 內 `StartsWith("[系統發送]")` 一致。
 
