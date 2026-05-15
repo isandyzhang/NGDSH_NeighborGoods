@@ -36,11 +36,22 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
         Assert.Equal(SeededListingId, data.GetProperty("listingId").GetGuid());
         Assert.Equal((int)PurchaseRequestStatus.Pending, data.GetProperty("status").GetInt32());
         Assert.True(data.GetProperty("remainingSeconds").GetInt32() > 0);
+        var conversationId = data.GetProperty("conversationId").GetGuid();
 
         var expireAt = data.GetProperty("expireAt").GetDateTime();
         var createdAt = data.GetProperty("createdAt").GetDateTime();
         var diff = expireAt - createdAt;
         Assert.True(diff.TotalHours is > 11.9 and < 12.1);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var systemMessage = await db.Messages
+            .Where(x => x.ConversationId == conversationId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => x.Content)
+            .FirstAsync();
+        Assert.StartsWith("[系統發送]", systemMessage);
+        Assert.Contains("買家已送出購買請求", systemMessage);
     }
 
     [Fact]
