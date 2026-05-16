@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
 
         services.Configure<EmailSenderOptions>(configuration.GetSection(EmailSenderOptions.SectionName));
         services.Configure<LineMessagingOptions>(configuration.GetSection(LineMessagingOptions.SectionName));
+        services.AddMemoryCache();
         services.AddSingleton<IEmailSender, AcsEmailSender>();
         services.AddHttpClient<ILineMessageSender, LineMessageSender>();
         services.AddHttpClient<LineMessagingQuotaService>();

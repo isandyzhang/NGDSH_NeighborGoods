@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NeighborGoods.Api\NeighborGoods.Api.csproj" />
+    <ProjectReference Include="..\NeighborGoods.Workers\NeighborGoods.Workers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
