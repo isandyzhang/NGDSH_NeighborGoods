@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { listingApi, type ListingMutationPayload } from '@/features/listings/api/listingApi'
+import {
+  CreateListingSuccessModal,
+  type CreatedListingSummary,
+} from '@/features/listings/components/CreateListingSuccessModal'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -33,8 +36,10 @@ type ValidationField =
   | 'images'
 
 
+const resolveLookupName = (items: LookupItem[], code: number) =>
+  items.find((item) => item.id === code)?.displayName ?? ''
+
 export const CreateListingPage = () => {
-  const navigate = useNavigate()
   const [form, setForm] = useState<ListingMutationPayload>(defaultForm)
   const [images, setImages] = useState<File[]>([])
   const [categories, setCategories] = useState<LookupItem[]>([])
@@ -42,6 +47,8 @@ export const CreateListingPage = () => {
   const [residences, setResidences] = useState<LookupItem[]>([])
   const [pickupLocations, setPickupLocations] = useState<LookupItem[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [createdListing, setCreatedListing] = useState<CreatedListingSummary | null>(null)
+  const [successModalOpen, setSuccessModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightField, setHighlightField] = useState<ValidationField | null>(null)
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
@@ -222,14 +229,20 @@ export const CreateListingPage = () => {
     setHighlightField(null)
     setError(null)
     try {
-      const result = await listingApi.create(
-        {
-          ...form,
-          price: form.isFree ? 0 : form.price,
-        },
-        images,
-      )
-      navigate(`/listings/${result.id}?from=create`)
+      const payload = {
+        ...form,
+        price: form.isFree ? 0 : form.price,
+      }
+      const result = await listingApi.create(payload, images)
+      setCreatedListing({
+        id: result.id,
+        title: payload.title.trim(),
+        categoryName: resolveLookupName(categories, payload.categoryCode),
+        conditionName: resolveLookupName(conditions, payload.conditionCode),
+        isFree: payload.isFree,
+        price: payload.price,
+      })
+      setSuccessModalOpen(true)
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '建立商品失敗')
     } finally {
@@ -435,6 +448,12 @@ export const CreateListingPage = () => {
           </Button>
         </form>
       </Card>
+
+      <CreateListingSuccessModal
+        open={successModalOpen}
+        listing={createdListing}
+        onClose={() => setSuccessModalOpen(false)}
+      />
     </main>
   )
 }
