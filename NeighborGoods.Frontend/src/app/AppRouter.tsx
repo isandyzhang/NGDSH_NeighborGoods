@@ -71,12 +71,23 @@ const RootEntry = () => {
   return <Navigate to="/listings" replace />
 }
 
+const LiffPathEntry = () => {
+  const location = useLocation()
+  const target = resolveLiffEntryTarget(location.pathname, location.search)
+  if (target) {
+    return <Navigate to={target} replace />
+  }
+
+  return <Navigate to="/listings" replace />
+}
+
 export const AppRouter = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<RootEntry />} />
+          <Route path="/liff" element={<LiffPathEntry />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />

@@ -1,5 +1,8 @@
 const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
 
+const buildLineNotifyTarget = (bindToken: string, botLink: string) =>
+  `/liff/line-notify?bindToken=${encodeURIComponent(bindToken)}&botLink=${encodeURIComponent(botLink)}`
+
 const parseLiffStateTarget = (liffState: string): string | null => {
   const decoded = decodeURIComponent(liffState.trim())
   if (!decoded) {
@@ -11,11 +14,18 @@ const parseLiffStateTarget = (liffState: string): string | null => {
   const path = qIndex >= 0 ? normalized.slice(0, qIndex) : normalized
   const query = qIndex >= 0 ? normalized.slice(qIndex) : ''
 
-  if (!isSafeInternalPath(path)) {
-    return null
+  if (isSafeInternalPath(path)) {
+    return `${path}${query}`
   }
 
-  return `${path}${query}`
+  // liff.state may carry query-only params (e.g. bindToken=...&botLink=...)
+  const params = new URLSearchParams(normalized)
+  const bindToken = params.get('bindToken')
+  if (bindToken) {
+    return buildLineNotifyTarget(bindToken, params.get('botLink') ?? '')
+  }
+
+  return null
 }
 
 export const resolveLiffEntryTarget = (pathname: string, search: string): string | null => {
@@ -30,9 +40,8 @@ export const resolveLiffEntryTarget = (pathname: string, search: string): string
   }
 
   const bindToken = params.get('bindToken')
-  if (bindToken && pathname === '/') {
-    const botLink = params.get('botLink') ?? ''
-    return `/liff/line-notify?bindToken=${encodeURIComponent(bindToken)}&botLink=${encodeURIComponent(botLink)}`
+  if (bindToken && (pathname === '/' || pathname === '/liff')) {
+    return buildLineNotifyTarget(bindToken, params.get('botLink') ?? '')
   }
 
   return null

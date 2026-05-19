@@ -120,7 +120,7 @@ Optional GitHub Actions variables (set in `production` Environment):
 
 - **LIFF**：在 **LINE Login channel**（與網站 LINE 登入同一個）建立 LIFF，Endpoint URL 為 `{WebBaseUrl}/`（網站根目錄；須 HTTPS；本機可用 tunnel）。同一 LIFF 兼用深層連結與綁定流程。
 - **深層連結**：LINE 內分享常產生 `?liff.state=/listings/{id}` 等形式；前端根路由 `RootEntry` 會讀取 `liff.state` 並導向對應頁面。請勿依賴 path 格式 `liff.line.me/{liffId}/listings/{id}`（實測 uuid 段可能被 LINE 截斷）。
-- **綁定 URL**：後端產生 `https://liff.line.me/{LiffId}/liff/line-notify?bindToken=...&botLink=...`（path 格式，直接開啟綁定頁）。
+- **綁定 URL**：後端產生 `https://liff.line.me/{LiffId}?liff.state=/liff/line-notify?bindToken=...&botLink=...`（與深層連結相同，用 `liff.state` 傳遞；勿用 path 格式 `/liff/line-notify`，LINE 可能截斷 path）。
 - **後端**：Container App 環境變數 `LineMessagingApi__WebBaseUrl`、`LineMessagingApi__LiffId`（與前端 `VITE_LINE_LIFF_ID` 一致）；`id_token` 驗證使用 `Line__ChannelId`（Login channel）。
 - **Console**：Login channel 與官方帳號 **Link a bot**，LIFF 可加 **Add friend** 以利 `getFriendship()` 與推播。
 
