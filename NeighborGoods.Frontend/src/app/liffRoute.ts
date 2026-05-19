@@ -30,6 +30,13 @@ const parseLiffStateTarget = (liffState: string): string | null => {
 
 export const resolveLiffEntryTarget = (pathname: string, search: string): string | null => {
   const params = new URLSearchParams(search)
+  const bindToken = params.get('bindToken')
+  const botLink = params.get('botLink') ?? ''
+
+  // Binding: outer bindToken first (LINE may truncate liff.state).
+  if (bindToken && (pathname === '/' || pathname === '/liff')) {
+    return buildLineNotifyTarget(bindToken, botLink)
+  }
 
   const liffState = params.get('liff.state')
   if (liffState) {
@@ -37,11 +44,6 @@ export const resolveLiffEntryTarget = (pathname: string, search: string): string
     if (target) {
       return target
     }
-  }
-
-  const bindToken = params.get('bindToken')
-  if (bindToken && (pathname === '/' || pathname === '/liff')) {
-    return buildLineNotifyTarget(bindToken, params.get('botLink') ?? '')
   }
 
   return null

@@ -21,10 +21,12 @@ public sealed class AccountLineBindingService(
 
     private static string BuildLiffBindingUrl(string liffId, string bindToken, string botLink)
     {
-        // Use liff.state (Primary redirect): path-format /liff/line-notify loses segments in LINE, same as /listings/{id}.
-        var state =
-            $"/liff/line-notify?bindToken={Uri.EscapeDataString(bindToken)}&botLink={Uri.EscapeDataString(botLink)}";
-        return $"https://liff.line.me/{liffId.Trim()}?liff.state={Uri.EscapeDataString(state)}";
+        // liff.state carries path only; bindToken/botLink stay as outer query params (nested query in liff.state is dropped by LINE).
+        const string state = "/liff/line-notify";
+        return $"https://liff.line.me/{liffId.Trim()}" +
+               $"?liff.state={Uri.EscapeDataString(state)}" +
+               $"&bindToken={Uri.EscapeDataString(bindToken)}" +
+               $"&botLink={Uri.EscapeDataString(botLink)}";
     }
 
     public async Task<(StartLineBindingResponse? Data, string? ErrorCode, string? ErrorMessage)> StartAsync(
