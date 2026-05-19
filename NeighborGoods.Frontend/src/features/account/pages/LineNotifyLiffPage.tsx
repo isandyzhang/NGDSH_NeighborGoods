@@ -23,11 +23,11 @@ export const LineNotifyLiffPage = () => {
   const [errorText, setErrorText] = useState<string | null>(null)
   const isCheckingFriendshipRef = useRef(false)
 
-  const postComplete = useCallback(async () => {
+  const postComplete = useCallback(async (): Promise<boolean> => {
     const idToken = liff.getIDToken()
     if (!idToken) {
       liff.login({ redirectUri: window.location.href })
-      return
+      return false
     }
 
     const res = await fetch(`${env.apiBaseUrl}/api/v1/account/line/bind/liff-complete`, {
@@ -37,6 +37,7 @@ export const LineNotifyLiffPage = () => {
     })
     const json = (await res.json()) as ApiResponse<{ bound: boolean }>
     unwrapApiResponse(json)
+    return true
   }, [bindToken])
 
   const finishAndClose = useCallback(async () => {
@@ -59,7 +60,11 @@ export const LineNotifyLiffPage = () => {
     setPhase('submitting')
     setErrorText(null)
     try {
-      await postComplete()
+      const completed = await postComplete()
+      if (!completed) {
+        setPhase('loading')
+        return
+      }
       await finishAndClose()
     } catch (err) {
       setPhase('error')
