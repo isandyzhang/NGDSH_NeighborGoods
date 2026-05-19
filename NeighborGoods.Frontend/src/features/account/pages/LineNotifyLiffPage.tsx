@@ -24,7 +24,12 @@ export const LineNotifyLiffPage = () => {
   const isCheckingFriendshipRef = useRef(false)
 
   const postComplete = useCallback(async () => {
-    const idToken = await liff.getIDToken()
+    const idToken = liff.getIDToken()
+    if (!idToken) {
+      liff.login({ redirectUri: window.location.href })
+      return
+    }
+
     const res = await fetch(`${env.apiBaseUrl}/api/v1/account/line/bind/liff-complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -69,16 +74,32 @@ export const LineNotifyLiffPage = () => {
 
     isCheckingFriendshipRef.current = true
     try {
+      if (!liff.isApiAvailable('getFriendship')) {
+        setPhase('needFriend')
+        return
+      }
+
       const f = await liff.getFriendship()
       if (f.friendFlag) {
         await runComplete()
       } else {
         setPhase('needFriend')
       }
+    } catch {
+      setPhase('needFriend')
     } finally {
       isCheckingFriendshipRef.current = false
     }
   }, [runComplete])
+
+  const handleConfirmFriend = useCallback(() => {
+    if (liff.isApiAvailable('getFriendship')) {
+      void refreshFriendship()
+      return
+    }
+
+    void runComplete()
+  }, [refreshFriendship, runComplete])
 
   useEffect(() => {
     let disposed = false
@@ -104,6 +125,11 @@ export const LineNotifyLiffPage = () => {
 
         if (!liff.isInClient()) {
           setPhase('needLineApp')
+          return
+        }
+
+        if (!liff.isLoggedIn()) {
+          liff.login({ redirectUri: window.location.href })
           return
         }
 
@@ -165,7 +191,7 @@ export const LineNotifyLiffPage = () => {
           <Button type="button" className="w-full" onClick={() => void handleOpenAddFriend()}>
             開啟加好友
           </Button>
-          <Button type="button" variant="secondary" className="w-full" onClick={() => void refreshFriendship()}>
+          <Button type="button" variant="secondary" className="w-full" onClick={() => void handleConfirmFriend()}>
             我已完成加好友
           </Button>
         </div>
