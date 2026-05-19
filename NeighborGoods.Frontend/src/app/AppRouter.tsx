@@ -1,10 +1,11 @@
 import { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
 import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
 import { SellerPage } from '@/features/seller/pages/SellerPage'
 import { AppLayout } from '@/app/AppLayout'
+import { resolveLiffEntryTarget } from '@/app/liffRoute'
 
 const LineLoginCallbackPage = lazy(() =>
   import('@/features/auth/pages/LineLoginCallbackPage').then((module) => ({ default: module.LineLoginCallbackPage })),
@@ -60,12 +61,22 @@ const NotFoundPage = lazy(() =>
 
 const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">頁面載入中...</div>
 
+const RootEntry = () => {
+  const location = useLocation()
+  const target = resolveLiffEntryTarget(location.pathname, location.search)
+  if (target) {
+    return <Navigate to={target} replace />
+  }
+
+  return <Navigate to="/listings" replace />
+}
+
 export const AppRouter = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/listings" replace />} />
+          <Route path="/" element={<RootEntry />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />

@@ -282,6 +282,7 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         var liffUrl = data.GetProperty("liffUrl").GetString();
         Assert.False(string.IsNullOrWhiteSpace(liffUrl));
         Assert.Contains("bindToken=", liffUrl!, StringComparison.Ordinal);
+        Assert.Contains("/liff/line-notify", liffUrl!, StringComparison.Ordinal);
         Assert.Contains(bindingToken!, liffUrl!, StringComparison.Ordinal);
 
         using var anon = factory.CreateClient();
