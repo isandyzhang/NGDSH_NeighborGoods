@@ -17,7 +17,7 @@ export const getScopeLabel = (scope: number) =>
 
 /** 跑馬燈前方 emoji，區分資訊 / 注意 / 緊急 */
 export const ANNOUNCEMENT_SEVERITY_EMOJI: Record<number, string> = {
-  1: 'ℹ️',
+  1: '📢',
   2: '⚠️',
   3: '🚨',
 }
