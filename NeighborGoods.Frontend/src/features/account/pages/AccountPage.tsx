@@ -14,6 +14,8 @@ import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
 const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
+const LINE_BIND_POLL_INTERVAL_MS = 1500
+const LINE_BIND_POLL_MAX_MS = 20000
 
 export const AccountPage = () => {
   const navigate = useNavigate()
@@ -30,7 +32,35 @@ export const AccountPage = () => {
     const [me, prefs] = await Promise.all([accountApi.me(), accountApi.getLinePreferences()])
     setProfile(me)
     setLinePreferences(prefs)
+    return me
   }, [])
+
+  const pollUntilLineBound = useCallback(
+    async (isCancelled?: () => boolean) => {
+      const startedAt = Date.now()
+      while (Date.now() - startedAt < LINE_BIND_POLL_MAX_MS) {
+        if (isCancelled?.()) {
+          return false
+        }
+
+        try {
+          const me = await reloadData()
+          if (me.lineNotifyBound) {
+            setBindingStart(null)
+            sessionStorage.removeItem(LINE_BINDING_COMPLETED_FLAG)
+            return true
+          }
+        } catch {
+          // ignore transient errors while polling
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, LINE_BIND_POLL_INTERVAL_MS))
+      }
+
+      return false
+    },
+    [reloadData],
+  )
 
   useEffect(() => {
     if (searchParams.get('lineBound') !== '1') {
@@ -38,29 +68,34 @@ export const AccountPage = () => {
     }
 
     setSearchParams({}, { replace: true })
-    void reloadData().catch(() => undefined)
-  }, [reloadData, searchParams, setSearchParams])
+    let cancelled = false
+    void pollUntilLineBound(() => cancelled)
+    return () => {
+      cancelled = true
+    }
+  }, [pollUntilLineBound, searchParams, setSearchParams])
 
   useEffect(() => {
+    let cancelled = false
+
     const refreshIfLineBindingCompleted = () => {
       const completed = sessionStorage.getItem(LINE_BINDING_COMPLETED_FLAG)
       if (completed !== '1') {
         return
       }
 
-      sessionStorage.removeItem(LINE_BINDING_COMPLETED_FLAG)
-      // 從 LINE 綁定頁關閉回來時，強制重抓帳號資料，確保 UI 立即反映綁定狀態。
-      void reloadData().catch(() => undefined)
+      void pollUntilLineBound(() => cancelled)
     }
 
     refreshIfLineBindingCompleted()
     window.addEventListener('focus', refreshIfLineBindingCompleted)
     document.addEventListener('visibilitychange', refreshIfLineBindingCompleted)
     return () => {
+      cancelled = true
       window.removeEventListener('focus', refreshIfLineBindingCompleted)
       document.removeEventListener('visibilitychange', refreshIfLineBindingCompleted)
     }
-  }, [reloadData])
+  }, [pollUntilLineBound])
 
   useEffect(() => {
     setLineContactDraft(profile?.lineContactId ?? '')
@@ -112,25 +147,15 @@ export const AccountPage = () => {
     setLinePreferences(updated)
   }, [linePreferences])
 
-  const openLineBindingWindow = useCallback(async (result: StartLineBindingResponse) => {
+  const openLineBindingWindow = useCallback((result: StartLineBindingResponse) => {
     if (isLineBindDebugEnabled(window.location.search)) {
       enableLineBindDebugSession()
     }
     const targetUrl = isLineBindDebugEnabled(window.location.search)
       ? appendLiffDebugToUrl(result.liffUrl)
       : result.liffUrl
-
-    try {
-      const liffMod = await import('@line/liff')
-      if (liffMod.default.isInClient()) {
-        // Full navigation — do not open liff.line.me inside the current LIFF webview (nested LIFF).
-        window.location.assign(targetUrl)
-        return
-      }
-    } catch {
-      // fall through
-    }
-    window.open(targetUrl, '_blank', 'noopener,noreferrer')
+    // Same-tab navigation avoids popup blockers after async startLineBinding().
+    window.location.assign(targetUrl)
   }, [])
 
   const handleStartLineOfficialBinding = async () => {
@@ -139,7 +164,7 @@ export const AccountPage = () => {
     }
 
     if (bindingStart) {
-      await openLineBindingWindow(bindingStart)
+      openLineBindingWindow(bindingStart)
       return
     }
 
@@ -149,7 +174,7 @@ export const AccountPage = () => {
       const result = await accountApi.startLineBinding()
       saveLineBindingPending(result.bindingToken, result.botLink)
       setBindingStart(result)
-      await openLineBindingWindow(result)
+      openLineBindingWindow(result)
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '無法開始 LINE 綁定')
     } finally {
