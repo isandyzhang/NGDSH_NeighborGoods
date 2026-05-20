@@ -122,6 +122,6 @@ Optional GitHub Actions variables (set in `production` Environment):
 - **深層連結**：LINE 內分享常產生 `?liff.state=/listings/{id}` 等形式；前端根路由 `RootEntry` 會讀取 `liff.state` 並導向對應頁面。請勿依賴 path 格式 `liff.line.me/{liffId}/listings/{id}`（實測 uuid 段可能被 LINE 截斷）。
 - **綁定 URL**：後端產生 `https://liff.line.me/{LiffId}?liff.state=/liff/line-notify&bindToken=...&botLink=...`（`liff.state` 只帶 path，`bindToken`/`botLink` 放在外層 query；勿嵌套在 `liff.state` 內，LINE 會丟失）。
 - **後端**：Container App 環境變數 `LineMessagingApi__WebBaseUrl`、`LineMessagingApi__LiffId`（與前端 `VITE_LINE_LIFF_ID` 一致）；`id_token` 驗證使用 `Line__ChannelId`（Login channel）。
-- **Console**：Login channel 與官方帳號 **Link a bot**，LIFF 可加 **Add friend** 以利 `getFriendship()` 與推播。
+- **Console**：Login channel 與官方帳號 **Link a bot**；LIFF **Add friend option**（建議 On aggressive）由 LINE 引導加好友。綁定頁只以 `id_token` 寫入 DB，不再以 `getFriendship()` 阻擋綁定。
 
 舊 MVC 專案（`NeighborGoods.Web`）已自本 repo 移除；正式環境以 SPA + API + LIFF 綁定為準。
