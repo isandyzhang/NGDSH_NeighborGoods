@@ -36,6 +36,35 @@ export type AdminDashboard = {
   }>
 }
 
+export type AdminAnnouncement = {
+  id: string
+  message: string
+  severity: number
+  scope: number
+  sortOrder: number
+  isEnabled: boolean
+  startsAt: string | null
+  endsAt: string | null
+  linkUrl: string | null
+  linkLabel: string | null
+  createdAt: string
+  createdByUserId: string | null
+  updatedAt: string | null
+  updatedByUserId: string | null
+}
+
+export type UpsertAdminAnnouncementPayload = {
+  message: string
+  severity: number
+  scope: number
+  sortOrder: number
+  isEnabled: boolean
+  startsAt: string | null
+  endsAt: string | null
+  linkUrl: string | null
+  linkLabel: string | null
+}
+
 export type AdminListingManagement = {
   items: Array<{
     id: string
@@ -87,5 +116,30 @@ export const adminApi = {
       status,
     })
     return unwrapApiResponse(response.data)
+  },
+
+  async listAnnouncements(): Promise<AdminAnnouncement[]> {
+    const response = await http.get<ApiResponse<{ items: AdminAnnouncement[] }>>('/api/v1/admin/announcements')
+    return unwrapApiResponse(response.data).items
+  },
+
+  async createAnnouncement(payload: UpsertAdminAnnouncementPayload): Promise<AdminAnnouncement> {
+    const response = await http.post<ApiResponse<AdminAnnouncement>>('/api/v1/admin/announcements', payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async updateAnnouncement(id: string, payload: UpsertAdminAnnouncementPayload): Promise<AdminAnnouncement> {
+    const response = await http.patch<ApiResponse<AdminAnnouncement>>(`/api/v1/admin/announcements/${id}`, payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async setAnnouncementEnabled(id: string, isEnabled: boolean): Promise<AdminAnnouncement> {
+    const response = await http.patch<ApiResponse<AdminAnnouncement>>(`/api/v1/admin/announcements/${id}/enabled`, { isEnabled })
+    return unwrapApiResponse(response.data)
+  },
+
+  async deleteAnnouncement(id: string): Promise<void> {
+    const response = await http.delete<ApiResponse<{ id: string; deleted: boolean }>>(`/api/v1/admin/announcements/${id}`)
+    unwrapApiResponse(response.data)
   },
 }

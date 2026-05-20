@@ -78,6 +78,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingImages]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingTopSubmissions]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AdminMessages]");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [SiteAnnouncements]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [LineBindingPending]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Listings]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AspNetUserRoles]");

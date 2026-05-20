@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NeighborGoods.Data.Announcements;
 using NeighborGoods.Data.LegacyEntities;
 using NeighborGoods.Data.Listings;
 using ListingEntity = NeighborGoods.Data.Listings.Listing;
@@ -28,6 +29,7 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<SiteAnnouncement> SiteAnnouncements => Set<SiteAnnouncement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -379,6 +381,19 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
                 .WithMany(p => p.Reviews)
                 .HasForeignKey(d => d.PurchaseRequestId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<SiteAnnouncement>(entity =>
+        {
+            entity.ToTable("SiteAnnouncements");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.Message).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.LinkUrl).HasMaxLength(2048);
+            entity.Property(e => e.LinkLabel).HasMaxLength(64);
+            entity.Property(e => e.CreatedByUserId).HasMaxLength(450);
+            entity.Property(e => e.UpdatedByUserId).HasMaxLength(450);
+            entity.HasIndex(e => new { e.IsEnabled, e.StartsAt, e.EndsAt, e.SortOrder }, "IX_SiteAnnouncements_Active_Display");
         });
     }
 }

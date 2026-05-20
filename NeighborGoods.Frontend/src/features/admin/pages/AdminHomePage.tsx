@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminApi, type AdminDashboard, type AdminListingManagement } from '@/features/admin/api/adminApi'
+import { AdminAnnouncementsCard } from '@/features/admin/components/AdminAnnouncementsCard'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -143,6 +144,8 @@ export const AdminHomePage = () => {
 
   return (
     <div className="space-y-6">
+      <AdminAnnouncementsCard />
+
       <Card className="border-[#f2d59a] bg-[#fff7e0]">
         <p className="text-sm text-text-subtle">系統提醒</p>
         <p className="mt-1 text-lg font-semibold text-text-main">

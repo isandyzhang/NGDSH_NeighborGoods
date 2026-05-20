@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Admin.Contracts.Requests;
 using NeighborGoods.Api.Features.Admin.Contracts.Responses;
+using NeighborGoods.Api.Features.Announcements.Contracts;
+using NeighborGoods.Api.Features.Announcements.Services;
 using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Data;
+using NeighborGoods.Data.Announcements;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Admin;
@@ -34,6 +37,26 @@ public static class AdminEndpoints
 
         app.MapGet("/api/v1/admin/listings", GetAdminListingsAsync)
         .WithName("AdminGetListingsV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/announcements", GetAdminAnnouncementsAsync)
+        .WithName("AdminGetAnnouncementsV1")
+        .RequireAuthorization();
+
+        app.MapPost("/api/v1/admin/announcements", CreateAdminAnnouncementAsync)
+        .WithName("AdminCreateAnnouncementV1")
+        .RequireAuthorization();
+
+        app.MapPatch("/api/v1/admin/announcements/{id:guid}", UpdateAdminAnnouncementAsync)
+        .WithName("AdminUpdateAnnouncementV1")
+        .RequireAuthorization();
+
+        app.MapPatch("/api/v1/admin/announcements/{id:guid}/enabled", SetAdminAnnouncementEnabledAsync)
+        .WithName("AdminSetAnnouncementEnabledV1")
+        .RequireAuthorization();
+
+        app.MapDelete("/api/v1/admin/announcements/{id:guid}", DeleteAdminAnnouncementAsync)
+        .WithName("AdminDeleteAnnouncementV1")
         .RequireAuthorization();
 
         return app;
@@ -284,6 +307,196 @@ public static class AdminEndpoints
 
         return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
     }
+
+    private static async Task<IResult> GetAdminAnnouncementsAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        AnnouncementQueryService queryService,
+        NeighborGoodsDbContext dbContext,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var items = await queryService.GetAllForAdminAsync(ct);
+        return Results.Ok(ApiResponseFactory.Success(new AdminAnnouncementsListResponse(items), httpContext));
+    }
+
+    private static async Task<IResult> CreateAdminAnnouncementAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        UpsertAnnouncementRequest request,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var validation = AnnouncementValidation.ValidateWrite(
+            request.Message,
+            request.Severity,
+            request.Scope,
+            request.StartsAt,
+            request.EndsAt,
+            request.LinkUrl);
+        if (!validation.IsValid)
+        {
+            return Results.BadRequest(ApiResponseFactory.Error(validation.ErrorCode!, validation.ErrorMessage!, httpContext));
+        }
+
+        var userId = currentUser.GetRequiredUserId();
+        var now = DateTime.UtcNow;
+        var entity = new SiteAnnouncement
+        {
+            Id = Guid.NewGuid(),
+            Message = request.Message.Trim(),
+            Severity = request.Severity,
+            Scope = request.Scope,
+            SortOrder = request.SortOrder,
+            IsEnabled = request.IsEnabled,
+            StartsAt = request.StartsAt,
+            EndsAt = request.EndsAt,
+            LinkUrl = string.IsNullOrWhiteSpace(request.LinkUrl) ? null : request.LinkUrl.Trim(),
+            LinkLabel = string.IsNullOrWhiteSpace(request.LinkLabel) ? null : request.LinkLabel.Trim(),
+            CreatedAt = now,
+            CreatedByUserId = userId,
+        };
+
+        dbContext.SiteAnnouncements.Add(entity);
+        await dbContext.SaveChangesAsync(ct);
+
+        return Results.Ok(ApiResponseFactory.Success(ToAdminResponse(entity), httpContext));
+    }
+
+    private static async Task<IResult> UpdateAdminAnnouncementAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid id,
+        UpsertAnnouncementRequest request,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var validation = AnnouncementValidation.ValidateWrite(
+            request.Message,
+            request.Severity,
+            request.Scope,
+            request.StartsAt,
+            request.EndsAt,
+            request.LinkUrl);
+        if (!validation.IsValid)
+        {
+            return Results.BadRequest(ApiResponseFactory.Error(validation.ErrorCode!, validation.ErrorMessage!, httpContext));
+        }
+
+        var entity = await dbContext.SiteAnnouncements.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(ApiResponseFactory.Error("ANNOUNCEMENT_NOT_FOUND", "找不到公告", httpContext));
+        }
+
+        var userId = currentUser.GetRequiredUserId();
+        entity.Message = request.Message.Trim();
+        entity.Severity = request.Severity;
+        entity.Scope = request.Scope;
+        entity.SortOrder = request.SortOrder;
+        entity.IsEnabled = request.IsEnabled;
+        entity.StartsAt = request.StartsAt;
+        entity.EndsAt = request.EndsAt;
+        entity.LinkUrl = string.IsNullOrWhiteSpace(request.LinkUrl) ? null : request.LinkUrl.Trim();
+        entity.LinkLabel = string.IsNullOrWhiteSpace(request.LinkLabel) ? null : request.LinkLabel.Trim();
+        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedByUserId = userId;
+
+        await dbContext.SaveChangesAsync(ct);
+        return Results.Ok(ApiResponseFactory.Success(ToAdminResponse(entity), httpContext));
+    }
+
+    private static async Task<IResult> SetAdminAnnouncementEnabledAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid id,
+        SetAnnouncementEnabledRequest request,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var entity = await dbContext.SiteAnnouncements.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(ApiResponseFactory.Error("ANNOUNCEMENT_NOT_FOUND", "找不到公告", httpContext));
+        }
+
+        entity.IsEnabled = request.IsEnabled;
+        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedByUserId = currentUser.GetRequiredUserId();
+        await dbContext.SaveChangesAsync(ct);
+
+        return Results.Ok(ApiResponseFactory.Success(ToAdminResponse(entity), httpContext));
+    }
+
+    private static async Task<IResult> DeleteAdminAnnouncementAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid id,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var entity = await dbContext.SiteAnnouncements.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(ApiResponseFactory.Error("ANNOUNCEMENT_NOT_FOUND", "找不到公告", httpContext));
+        }
+
+        dbContext.SiteAnnouncements.Remove(entity);
+        await dbContext.SaveChangesAsync(ct);
+
+        return Results.Ok(ApiResponseFactory.Success(new { id, deleted = true }, httpContext));
+    }
+
+    private static AdminAnnouncementResponse ToAdminResponse(SiteAnnouncement entity) =>
+        new(
+            entity.Id,
+            entity.Message,
+            entity.Severity,
+            entity.Scope,
+            entity.SortOrder,
+            entity.IsEnabled,
+            entity.StartsAt,
+            entity.EndsAt,
+            entity.LinkUrl,
+            entity.LinkLabel,
+            entity.CreatedAt,
+            entity.CreatedByUserId,
+            entity.UpdatedAt,
+            entity.UpdatedByUserId);
 
     private static async Task<bool> IsAdminAsync(
         ICurrentUserContext currentUser,

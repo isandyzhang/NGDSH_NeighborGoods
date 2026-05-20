@@ -26,6 +26,8 @@ using NeighborGoods.Api.Features.Reviews;
 using NeighborGoods.Api.Features.Reviews.Services;
 using NeighborGoods.Api.Infrastructure;
 using NeighborGoods.Api.Infrastructure.Storage;
+using NeighborGoods.Api.Features.Announcements;
+using NeighborGoods.Api.Features.Announcements.Services;
 using NeighborGoods.Api.Features.Lookups;
 using NeighborGoods.Api.Features.System;
 using NeighborGoods.Api.Shared.ApiContracts;
@@ -50,6 +52,7 @@ builder.Services.AddScoped<MessagingCommandService>();
 builder.Services.AddNeighborGoodsWorkerJobs();
 builder.Services.AddScoped<PurchaseRequestService>();
 builder.Services.AddScoped<ReviewService>();
+builder.Services.AddScoped<AnnouncementQueryService>();
 var azureSignalRConnectionString = builder.Configuration["Azure:SignalR:ConnectionString"]
     ?? builder.Configuration["AzureSignalR:ConnectionString"];
 if (!string.IsNullOrWhiteSpace(azureSignalRConnectionString))
@@ -240,6 +243,7 @@ app.MapListingEndpoints();
 app.MapMessagingEndpoints();
 app.MapPurchaseRequestEndpoints();
 app.MapReviewEndpoints();
+app.MapAnnouncementEndpoints();
 app.MapAdminEndpoints();
 app.MapHub<MessageHub>("/hubs/messages");
 
