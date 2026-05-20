@@ -6,6 +6,15 @@ import { accountApi } from '@/features/account/api/accountApi'
 import { saveLineBindingPending } from '@/features/account/lineBindingSession'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { ListingImageCarousel } from '@/features/listings/components/ListingImageCarousel'
+import {
+  canEditListing,
+  canPurchaseListing,
+  canShareListing,
+  getListingDetailOverlay,
+  getListingStatusLabel,
+  getUnavailableBannerMessage,
+  shouldShowUnavailableBanner,
+} from '@/features/listings/constants/listingStatus'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
   getLiffShareDiagnostics,
@@ -68,7 +77,8 @@ export const ListingDetailPage = () => {
     queryKey: ['listings', 'detail', id],
     queryFn: () => listingApi.getById(id),
     enabled: Boolean(id),
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   })
 
   const item: ListingDetail | null = detailQuery.data ?? null
@@ -128,6 +138,13 @@ export const ListingDetailPage = () => {
     pendingRemainingFromNow ?? (pendingRemainingFromServer == null ? null : Math.max(0, pendingRemainingFromServer))
   const hasPendingPurchaseRequest = pendingRemainingSeconds != null && pendingRemainingSeconds > 0
   const isOwnListing = !!item && tokens?.userId === item.seller.id
+  const canPurchase = item
+    ? canPurchaseListing(item.statusCode, { hasPendingPurchaseRequest })
+    : false
+  const canEdit = item ? isOwnListing && canEditListing(item.statusCode) : false
+  const canShare = item ? canShareListing(item.statusCode) : false
+  const detailOverlay = item ? getListingDetailOverlay(item.statusCode, hasPendingPurchaseRequest) : null
+  const showUnavailableBanner = item ? shouldShowUnavailableBanner(item.statusCode) : false
   const source = searchParams.get('from')
   const sourceConversationId = searchParams.get('conversationId')
   const shareDebugEnabled = searchParams.get('liffDebug') === '1'
@@ -207,6 +224,9 @@ export const ListingDetailPage = () => {
     if (!item) {
       return
     }
+    if (!canPurchase) {
+      return
+    }
     if (!isAuthenticated) {
       navigate('/login')
       return
@@ -219,7 +239,7 @@ export const ListingDetailPage = () => {
   }
 
   const handlePurchase = async () => {
-    if (!item || purchaseBusy) {
+    if (!item || purchaseBusy || !canPurchase) {
       return
     }
 
@@ -278,7 +298,7 @@ export const ListingDetailPage = () => {
   }
 
   const handleShareToLine = async () => {
-    if (!item) {
+    if (!item || !canShare) {
       return
     }
 
@@ -327,7 +347,17 @@ export const ListingDetailPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.76fr)_minmax(0,1.24fr)] lg:items-start">
+          {showUnavailableBanner ? (
+            <motion.div
+              className="mb-4 rounded-2xl border border-[#D4A574] bg-[#FFF4E8] px-4 py-3 text-text-main"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22 }}
+            >
+              <p className="text-lg font-semibold md:text-xl">{getUnavailableBannerMessage(item.statusCode)}</p>
+            </motion.div>
+          ) : null}
+          <motion.div className="grid gap-4 lg:grid-cols-[minmax(0,0.76fr)_minmax(0,1.24fr)] lg:items-start">
             <motion.div
               initial={{ opacity: 0, x: -14 }}
               animate={{ opacity: 1, x: 0 }}
@@ -371,7 +401,12 @@ export const ListingDetailPage = () => {
             >
             <Card className="space-y-4 border-border bg-surface p-4 md:p-5 lg:p-4">
               <section className="space-y-4">
-                <h2 className="text-2xl font-bold text-text-main md:text-3xl lg:text-2xl">商品資訊</h2>
+                <motion.div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-2xl font-bold text-text-main md:text-3xl lg:text-2xl">商品資訊</h2>
+                  <span className="rounded-full bg-surface-2 px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                    {getListingStatusLabel(item.statusCode)}
+                  </span>
+                </motion.div>
                 <div className="space-y-4 lg:flex lg:items-start lg:gap-4 lg:space-y-0">
                   <div className="relative overflow-hidden rounded-2xl border border-border bg-surface-2 lg:w-[44%] lg:shrink-0">
                     {imageSlides.length > 0 ? (
@@ -381,11 +416,15 @@ export const ListingDetailPage = () => {
                         無圖片
                       </div>
                     )}
-                    {hasPendingPurchaseRequest ? (
-                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+                    {detailOverlay === 'pending' ? (
+                      <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
                         <p className="text-xl font-semibold tracking-wide">交易處理中</p>
-                        <p className="text-3xl font-bold tabular-nums">{formatCountdown(pendingRemainingSeconds)}</p>
-                      </div>
+                        <p className="text-3xl font-bold tabular-nums">{formatCountdown(pendingRemainingSeconds ?? 0)}</p>
+                      </motion.div>
+                    ) : detailOverlay === 'reserved' ? (
+                      <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+                        <p className="text-xl font-semibold tracking-wide">已保留</p>
+                      </motion.div>
                     ) : null}
                   </div>
 
@@ -414,16 +453,33 @@ export const ListingDetailPage = () => {
                   </div>
                 </div>
                 <div className="space-y-3 pt-2">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={`grid gap-3 ${isOwnListing || !canPurchase ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   {isOwnListing ? (
+                    canEdit ? (
                     <Link
                       to={`/listings/${item.id}/edit`}
                       className={getButtonClassName({
-                        className: 'col-span-2 inline-flex min-h-[3.2rem] items-center justify-center text-xl font-semibold md:text-2xl',
+                        className: 'inline-flex min-h-[3.2rem] items-center justify-center text-xl font-semibold md:text-2xl',
                       })}
                     >
                       修改商品
                     </Link>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-center text-lg font-medium text-text-subtle md:text-xl">
+                          目前狀態：{getListingStatusLabel(item.statusCode)}
+                        </p>
+                        <Link
+                          to="/my-listings"
+                          className={getButtonClassName({
+                            className:
+                              'inline-flex min-h-[3.2rem] w-full items-center justify-center text-xl font-semibold md:text-2xl',
+                          })}
+                        >
+                          返回我的商品
+                        </Link>
+                      </div>
+                    )
                   ) : (
                     <>
                       <Button
@@ -435,20 +491,23 @@ export const ListingDetailPage = () => {
                       >
                         {conversationBusy ? '連線中...' : '聊一下'}
                       </Button>
-                      <Button
-                        type="button"
-                        onClick={openPurchaseConfirm}
-                        disabled={purchaseBusy}
-                        className="min-h-[3.2rem] text-xl font-semibold md:text-2xl"
-                      >
-                        {purchaseBusy ? '處理中...' : '購買'}
-                      </Button>
+                      {canPurchase ? (
+                        <Button
+                          type="button"
+                          onClick={openPurchaseConfirm}
+                          disabled={purchaseBusy}
+                          className="min-h-[3.2rem] text-xl font-semibold md:text-2xl"
+                        >
+                          {purchaseBusy ? '處理中...' : '購買'}
+                        </Button>
+                      ) : null}
                     </>
                   )}
                   </div>
                   <Button
                     type="button"
                     onClick={() => void handleShareToLine()}
+                    disabled={!canShare}
                     variant="secondary"
                     className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
                   >
@@ -458,7 +517,7 @@ export const ListingDetailPage = () => {
               </section>
             </Card>
             </motion.div>
-          </div>
+          </motion.div>
         </motion.section>
       ) : null}
       <PurchaseConfirmModal

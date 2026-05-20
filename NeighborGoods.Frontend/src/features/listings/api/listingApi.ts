@@ -207,6 +207,16 @@ export type ListingMutationPayload = {
   isTradeable: boolean
 }
 
+export type ListingCreateFormState = Omit<
+  ListingMutationPayload,
+  'categoryCode' | 'conditionCode' | 'residenceCode' | 'pickupLocationCode'
+> & {
+  categoryCode: number | null
+  conditionCode: number | null
+  residenceCode: number | null
+  pickupLocationCode: number | null
+}
+
 export type TopPinPayload = {
   id: string
 }

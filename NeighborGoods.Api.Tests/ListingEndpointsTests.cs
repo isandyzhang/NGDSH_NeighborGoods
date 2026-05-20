@@ -195,6 +195,26 @@ public sealed class ListingEndpointsTests
     }
 
     [Fact]
+    public async Task GetListingById_WhenInactive_ReturnsOkWithStatusCodeForAnonymousClient()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var authClient = factory.CreateClient();
+        await AuthenticateAsAsync(authClient, ConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(authClient, "狀態測試-GetByIdInactive");
+        var inactiveResponse = await authClient.PatchAsync($"/api/v1/listings/{id}/inactive", content: null);
+        Assert.Equal(HttpStatusCode.OK, inactiveResponse.StatusCode);
+
+        using var anonymousClient = factory.CreateClient();
+        var response = await anonymousClient.GetAsync($"/api/v1/listings/{id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("success").GetBoolean());
+        Assert.Equal(4, body.GetProperty("data").GetProperty("statusCode").GetInt32());
+    }
+
+    [Fact]
     public async Task GetListingById_ReturnsDualCompatibleImageUrls()
     {
         using var factory = new ListingApiFactory(_fixture.ConnectionString);

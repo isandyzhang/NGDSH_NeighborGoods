@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listingApi, type ListingMutationPayload } from '@/features/listings/api/listingApi'
+import { listingApi, type ListingCreateFormState, type ListingMutationPayload } from '@/features/listings/api/listingApi'
 import {
   CreateListingSuccessModal,
   type CreatedListingSummary,
@@ -13,14 +13,14 @@ import { Input } from '@/shared/ui/Input'
 
 const invalidBorderClass = '!border-2 !border-[#dc2626] transition-colors duration-300 ease-out'
 
-const defaultForm: ListingMutationPayload = {
+const defaultForm: ListingCreateFormState = {
   title: '',
   description: '',
-  categoryCode: 0,
-  conditionCode: 0,
+  categoryCode: null,
+  conditionCode: null,
   price: 0,
-  residenceCode: 0,
-  pickupLocationCode: 0,
+  residenceCode: null,
+  pickupLocationCode: null,
   isFree: false,
   isCharity: false,
   isTradeable: false,
@@ -36,11 +36,30 @@ type ValidationField =
   | 'images'
 
 
-const resolveLookupName = (items: LookupItem[], code: number) =>
-  items.find((item) => item.id === code)?.displayName ?? ''
+const resolveLookupName = (items: LookupItem[], code: number | null) =>
+  code === null ? '' : (items.find((item) => item.id === code)?.displayName ?? '')
+
+const toMutationPayload = (form: ListingCreateFormState): ListingMutationPayload | null => {
+  if (
+    form.categoryCode === null ||
+    form.conditionCode === null ||
+    form.residenceCode === null ||
+    form.pickupLocationCode === null
+  ) {
+    return null
+  }
+
+  return {
+    ...form,
+    categoryCode: form.categoryCode,
+    conditionCode: form.conditionCode,
+    residenceCode: form.residenceCode,
+    pickupLocationCode: form.pickupLocationCode,
+  }
+}
 
 export const CreateListingPage = () => {
-  const [form, setForm] = useState<ListingMutationPayload>(defaultForm)
+  const [form, setForm] = useState<ListingCreateFormState>(defaultForm)
   const [images, setImages] = useState<File[]>([])
   const [categories, setCategories] = useState<LookupItem[]>([])
   const [conditions, setConditions] = useState<LookupItem[]>([])
@@ -151,16 +170,16 @@ export const CreateListingPage = () => {
     if (!form.title.trim()) {
       issues.push('title')
     }
-    if (form.categoryCode <= 0) {
+    if (form.categoryCode === null) {
       issues.push('category')
     }
-    if (form.conditionCode <= 0) {
+    if (form.conditionCode === null) {
       issues.push('condition')
     }
-    if (form.residenceCode <= 0) {
+    if (form.residenceCode === null) {
       issues.push('residence')
     }
-    if (form.pickupLocationCode <= 0) {
+    if (form.pickupLocationCode === null) {
       issues.push('pickupLocation')
     }
     if (!form.isFree && (!Number.isFinite(form.price) || form.price < 0)) {
@@ -229,8 +248,13 @@ export const CreateListingPage = () => {
     setHighlightField(null)
     setError(null)
     try {
+      const mutationPayload = toMutationPayload(form)
+      if (!mutationPayload) {
+        return
+      }
+
       const payload = {
-        ...form,
+        ...mutationPayload,
         price: form.isFree ? 0 : form.price,
       }
       const result = await listingApi.create(payload, images)

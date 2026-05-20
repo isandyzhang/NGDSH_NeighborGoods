@@ -5,9 +5,9 @@ const invalidBorderClass = 'border-2 border-[#dc2626] transition-colors duration
 
 type ExpandableSelectFieldProps = {
   label: string
-  value: number
+  value: number | null
   options: LookupItem[]
-  onChange: (nextValue: number) => void
+  onChange: (nextValue: number | null) => void
   invalid?: boolean
   placeholder?: string
   includeEmptyOption?: boolean
@@ -25,17 +25,12 @@ export const ExpandableSelectField = ({
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
-  const selectableOptions = useMemo(
-    () => (includeEmptyOption ? options.filter((item) => item.id > 0) : options),
-    [includeEmptyOption, options],
-  )
-
   const selectedLabel = useMemo(() => {
-    if (includeEmptyOption && value <= 0) {
+    if (includeEmptyOption && value === null) {
       return placeholder
     }
-    return selectableOptions.find((item) => item.id === value)?.displayName ?? placeholder
-  }, [includeEmptyOption, placeholder, selectableOptions, value])
+    return options.find((item) => item.id === value)?.displayName ?? placeholder
+  }, [includeEmptyOption, options, placeholder, value])
 
   useEffect(() => {
     if (!open) {
@@ -62,7 +57,7 @@ export const ExpandableSelectField = ({
     }
   }, [open])
 
-  const handleSelect = (nextValue: number) => {
+  const handleSelect = (nextValue: number | null) => {
     onChange(nextValue)
     setOpen(false)
   }
@@ -101,10 +96,10 @@ export const ExpandableSelectField = ({
             <button
               type="button"
               role="option"
-              aria-selected={value <= 0}
-              onClick={() => handleSelect(0)}
+              aria-selected={value === null}
+              onClick={() => handleSelect(null)}
               className={`w-full px-3 py-2 text-left text-xl transition ${
-                value <= 0
+                value === null
                   ? 'bg-[#D6B897] font-semibold text-text-main'
                   : 'text-text-main hover:bg-surface-2'
               }`}
@@ -112,7 +107,7 @@ export const ExpandableSelectField = ({
               {placeholder}
             </button>
           ) : null}
-          {selectableOptions.map((item) => {
+          {options.map((item) => {
             const selected = item.id === value
             return (
               <button

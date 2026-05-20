@@ -243,26 +243,34 @@ export const EditListingPage = () => {
                 label="分類"
                 value={form.categoryCode}
                 options={categories}
-                onChange={(next) => setForm((current) => (current ? { ...current, categoryCode: next } : current))}
+                onChange={(next) =>
+                  setForm((current) => (current && next !== null ? { ...current, categoryCode: next } : current))
+                }
               />
               <ExpandableSelectField
                 label="品況"
                 value={form.conditionCode}
                 options={conditions}
-                onChange={(next) => setForm((current) => (current ? { ...current, conditionCode: next } : current))}
+                onChange={(next) =>
+                  setForm((current) => (current && next !== null ? { ...current, conditionCode: next } : current))
+                }
               />
               <ExpandableSelectField
                 label="社宅"
                 value={form.residenceCode}
                 options={residences}
-                onChange={(next) => setForm((current) => (current ? { ...current, residenceCode: next } : current))}
+                onChange={(next) =>
+                  setForm((current) => (current && next !== null ? { ...current, residenceCode: next } : current))
+                }
               />
               <ExpandableSelectField
                 label="面交地點"
                 value={form.pickupLocationCode}
                 options={pickupLocations}
                 onChange={(next) =>
-                  setForm((current) => (current ? { ...current, pickupLocationCode: next } : current))
+                  setForm((current) =>
+                    current && next !== null ? { ...current, pickupLocationCode: next } : current,
+                  )
                 }
               />
             </div>

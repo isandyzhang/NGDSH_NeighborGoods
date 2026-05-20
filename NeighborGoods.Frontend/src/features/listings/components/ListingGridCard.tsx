@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Rocket } from 'lucide-react'
 import { type ListingItem } from '@/features/listings/api/listingApi'
+import { canPurchaseListing, LISTING_STATUS } from '@/features/listings/constants/listingStatus'
 import { Button } from '@/shared/ui/Button'
 
 const formatPrice = (item: ListingItem) => {
@@ -73,8 +74,13 @@ export const ListingGridCard = memo(({
     pendingRemainingFromNow ?? (pendingRemainingFromServer == null ? null : Math.max(0, pendingRemainingFromServer))
   const hasPendingPurchaseRequest = pendingRemainingSeconds != null && pendingRemainingSeconds > 0
   const hasInProgressTrade = item.inProgress && !hasPendingPurchaseRequest
-  const isReservedListing = item.statusCode === 1
-  const hidePurchaseButton = !isOwnListing && (hasPendingPurchaseRequest || hasInProgressTrade || isReservedListing)
+  const isReservedListing = item.statusCode === LISTING_STATUS.Reserved
+  const hidePurchaseButton =
+    !isOwnListing &&
+    !canPurchaseListing(item.statusCode, {
+      hasPendingPurchaseRequest,
+      hasInProgressTrade,
+    })
 
   return (
     <motion.div

@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listingApi, type MyListingItem } from '@/features/listings/api/listingApi'
+import {
+  canEditListing,
+  isTerminalListingStatus,
+  LISTING_STATUS_LABEL,
+} from '@/features/listings/constants/listingStatus'
 import { ApiClientError } from '@/shared/types/api'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
 
-const statusText: Record<number, string> = {
-  0: '上架中',
-  1: '保留中',
-  2: '已售出',
-  3: '已捐贈',
-  4: '已下架',
-  5: '已易物',
-}
 const SKELETON_CARD_COUNT = 6
 
 type StatusActionKey = 'inactive' | 'sold' | 'activate' | 'reactivate' | 'donated' | 'given-or-traded'
@@ -40,10 +37,6 @@ const getSecondaryActions = (item: MyListingItem): { key: StatusActionKey; label
       return []
   }
 }
-
-const isTerminalStatus = (statusCode: number) => statusCode === 2 || statusCode === 3 || statusCode === 5
-
-const canShowEditLink = (statusCode: number) => statusCode === 0 || statusCode === 4
 
 export const MyListingsPage = () => {
   const [items, setItems] = useState<MyListingItem[]>([])
@@ -215,9 +208,11 @@ export const MyListingsPage = () => {
                       {item.isFree ? '免費' : `NT$ ${item.price.toLocaleString()}`}
                     </span>
                   </div>
-                  <p className="text-lg text-text-subtle">狀態：{statusText[item.statusCode] ?? `狀態 ${item.statusCode}`}</p>
+                  <p className="text-lg text-text-subtle">
+                    狀態：{LISTING_STATUS_LABEL[item.statusCode] ?? `狀態 ${item.statusCode}`}
+                  </p>
 
-                  {isTerminalStatus(item.statusCode) ? (
+                  {isTerminalListingStatus(item.statusCode) ? (
                     <div className="space-y-2 rounded-xl border border-border bg-surface-2 px-3 py-3 text-base text-text-main">
                       {item.buyerDisplayName ? (
                         <p>
@@ -252,7 +247,7 @@ export const MyListingsPage = () => {
                   ) : null}
 
                   <div className="grid grid-cols-1 gap-2 pt-1">
-                    {canShowEditLink(item.statusCode) ? (
+                    {canEditListing(item.statusCode) ? (
                       <Link
                         to={`/listings/${item.id}/edit`}
                         className={getButtonClassName({
