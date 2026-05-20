@@ -541,9 +541,9 @@ export const ListingDetailPage = () => {
                     onClick={() => void handleShareFlexOnly()}
                     disabled={!canShare || flexShareBusy}
                     variant="secondary"
-                    className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
+                    className="ml-auto min-h-[1.9rem] w-auto self-end rounded-md border border-border/40 bg-surface-2/40 px-2 py-1 text-xs font-normal text-text-muted opacity-40 transition hover:opacity-70 focus-visible:opacity-70 md:text-xs"
                   >
-                    {flexShareBusy ? '前往中...' : '在 LINE 內分享 Flex Message'}
+                    {flexShareBusy ? '處理中...' : 'LINE Flex（測試）'}
                   </Button>
                 </div>
               </section>
