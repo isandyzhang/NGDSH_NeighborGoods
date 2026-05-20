@@ -81,6 +81,7 @@ export const ListingDetailPage = () => {
   const [liffRuntimeStatus, setLiffRuntimeStatus] = useState<LiffShareRuntimeStatus | null>(null)
   const [copyDebugBusy, setCopyDebugBusy] = useState(false)
   const [copyDebugNotice, setCopyDebugNotice] = useState<string | null>(null)
+  const [copyDebugPayload, setCopyDebugPayload] = useState<string | null>(null)
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -396,6 +397,7 @@ export const ListingDetailPage = () => {
   const handleCopyLiffDebug = async () => {
     setCopyDebugBusy(true)
     setCopyDebugNotice(null)
+    setCopyDebugPayload(null)
     try {
       const status = await getLiffShareRuntimeStatus()
       setLiffRuntimeStatus(status)
@@ -410,10 +412,30 @@ export const ListingDetailPage = () => {
         `ERROR_MESSAGE=${status.errorMessage ?? '-'}`,
         `CURRENT_URL=${window.location.href}`,
       ].join('\n')
+      if (!navigator.clipboard?.writeText) {
+        setCopyDebugPayload(debugPayload)
+        setCopyDebugNotice('此環境不支援自動複製，請手動複製下方診斷內容')
+        return
+      }
       await navigator.clipboard.writeText(debugPayload)
       setCopyDebugNotice('已複製 LIFF 診斷資訊')
     } catch {
-      setCopyDebugNotice('複製失敗，請稍後再試')
+      const status = liffRuntimeStatus
+      if (status) {
+        const fallbackPayload = [
+          `LIFF_ID_CONFIGURED=${status.liffIdConfigured}`,
+          `LIFF_READY=${status.liffReady}`,
+          `LIFF_LOGGED_IN=${status.isLoggedIn}`,
+          `LIFF_IN_CLIENT=${status.isInClient}`,
+          `SHARE_TARGET_PICKER_AVAILABLE=${status.shareTargetPickerAvailable}`,
+          `CONTEXT_TYPE=${status.contextType ?? '-'}`,
+          `ERROR_CODE=${status.errorCode ?? '-'}`,
+          `ERROR_MESSAGE=${status.errorMessage ?? '-'}`,
+          `CURRENT_URL=${window.location.href}`,
+        ].join('\n')
+        setCopyDebugPayload(fallbackPayload)
+      }
+      setCopyDebugNotice('自動複製失敗，請手動複製下方診斷內容')
     } finally {
       setCopyDebugBusy(false)
     }
@@ -642,6 +664,13 @@ export const ListingDetailPage = () => {
                     {copyDebugBusy ? '複製中...' : '複製 LIFF 診斷資訊'}
                   </Button>
                   {copyDebugNotice ? <p className="text-xs text-text-subtle">{copyDebugNotice}</p> : null}
+                  {copyDebugPayload ? (
+                    <textarea
+                      readOnly
+                      value={copyDebugPayload}
+                      className="min-h-[10rem] w-full rounded-lg border border-border bg-surface-2 p-2 text-xs leading-5 text-text-main"
+                    />
+                  ) : null}
                 </div>
               </section>
             </Card>
