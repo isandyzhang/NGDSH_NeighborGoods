@@ -28,16 +28,40 @@ const parseLiffStateTarget = (liffState: string): string | null => {
   return null
 }
 
-export const resolveLiffEntryTarget = (pathname: string, search: string): string | null => {
+/** LIFF Endpoint is site root; binding must run on `/` (not `/liff/line-notify`) for liff.init. */
+export const isLineNotifyBindingEntry = (pathname: string, search: string): boolean => {
   const params = new URLSearchParams(search)
-  const bindToken = params.get('bindToken')
-  const botLink = params.get('botLink') ?? ''
-
-  // Binding: outer bindToken first (LINE may truncate liff.state).
-  if (bindToken && (pathname === '/' || pathname === '/liff')) {
-    return buildLineNotifyTarget(bindToken, botLink)
+  if (
+    params.get('bindToken') &&
+    (pathname === '/' || pathname === '/liff' || pathname === '/liff/line-notify')
+  ) {
+    return true
   }
 
+  const liffState = params.get('liff.state')
+  if (!liffState) {
+    return false
+  }
+
+  const target = parseLiffStateTarget(liffState)
+  return target?.startsWith('/liff/line-notify') ?? false
+}
+
+/** Redirect URI for liff.login — must match LIFF Endpoint (`/`) and LINE Login callback allowlist. */
+export const buildLineNotifyBindingLoginRedirectUri = (bindToken: string, botLink: string) => {
+  const params = new URLSearchParams({ bindToken })
+  if (botLink) {
+    params.set('botLink', botLink)
+  }
+  return `${typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'}/?${params.toString()}`
+}
+
+export const resolveLiffEntryTarget = (pathname: string, search: string): string | null => {
+  if (isLineNotifyBindingEntry(pathname, search)) {
+    return null
+  }
+
+  const params = new URLSearchParams(search)
   const liffState = params.get('liff.state')
   if (liffState) {
     const target = parseLiffStateTarget(liffState)

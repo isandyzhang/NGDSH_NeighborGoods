@@ -1,6 +1,7 @@
 import liff from '@line/liff'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { buildLineNotifyBindingLoginRedirectUri } from '@/app/liffRoute'
 import { env } from '@/shared/config/env'
 import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -18,6 +19,10 @@ export const LineNotifyLiffPage = () => {
     : null
   const bindToken = searchParams.get('bindToken') ?? liffStateParams?.get('bindToken') ?? ''
   const botLink = searchParams.get('botLink') ?? liffStateParams?.get('botLink') ?? ''
+  const loginRedirectUri = useMemo(
+    () => (bindToken ? buildLineNotifyBindingLoginRedirectUri(bindToken, botLink) : ''),
+    [bindToken, botLink],
+  )
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorText, setErrorText] = useState<string | null>(null)
@@ -26,7 +31,7 @@ export const LineNotifyLiffPage = () => {
   const postComplete = useCallback(async () => {
     const idToken = liff.getIDToken()
     if (!idToken) {
-      liff.login({ redirectUri: window.location.href })
+      liff.login({ redirectUri: loginRedirectUri || window.location.href })
       return
     }
 
@@ -37,7 +42,7 @@ export const LineNotifyLiffPage = () => {
     })
     const json = (await res.json()) as ApiResponse<{ bound: boolean }>
     unwrapApiResponse(json)
-  }, [bindToken])
+  }, [bindToken, loginRedirectUri])
 
   const finishAndClose = useCallback(async () => {
     setPhase('done')
@@ -129,7 +134,7 @@ export const LineNotifyLiffPage = () => {
         }
 
         if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href })
+          liff.login({ redirectUri: loginRedirectUri || window.location.href })
           return
         }
 
@@ -145,7 +150,7 @@ export const LineNotifyLiffPage = () => {
     return () => {
       disposed = true
     }
-  }, [bindToken, refreshFriendship])
+  }, [bindToken, loginRedirectUri, refreshFriendship])
 
   useEffect(() => {
     if (phase !== 'needFriend') {

@@ -5,7 +5,7 @@ import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
 import { SellerPage } from '@/features/seller/pages/SellerPage'
 import { AppLayout } from '@/app/AppLayout'
-import { resolveLiffEntryTarget } from '@/app/liffRoute'
+import { isLineNotifyBindingEntry, resolveLiffEntryTarget } from '@/app/liffRoute'
 
 const LineLoginCallbackPage = lazy(() =>
   import('@/features/auth/pages/LineLoginCallbackPage').then((module) => ({ default: module.LineLoginCallbackPage })),
@@ -63,6 +63,13 @@ const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">
 
 const RootEntry = () => {
   const location = useLocation()
+  if (isLineNotifyBindingEntry(location.pathname, location.search)) {
+    if (location.pathname !== '/') {
+      return <Navigate to={{ pathname: '/', search: location.search }} replace />
+    }
+    return <LineNotifyLiffPage />
+  }
+
   const target = resolveLiffEntryTarget(location.pathname, location.search)
   if (target) {
     return <Navigate to={target} replace />
@@ -73,12 +80,21 @@ const RootEntry = () => {
 
 const LiffPathEntry = () => {
   const location = useLocation()
+  if (isLineNotifyBindingEntry(location.pathname, location.search)) {
+    return <Navigate to={{ pathname: '/', search: location.search }} replace />
+  }
+
   const target = resolveLiffEntryTarget(location.pathname, location.search)
   if (target) {
     return <Navigate to={target} replace />
   }
 
   return <Navigate to="/listings" replace />
+}
+
+const LineNotifyLiffCanonicalRedirect = () => {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '/', search }} replace />
 }
 
 export const AppRouter = () => {
@@ -91,7 +107,7 @@ export const AppRouter = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
-          <Route path="/liff/line-notify" element={<LineNotifyLiffPage />} />
+          <Route path="/liff/line-notify" element={<LineNotifyLiffCanonicalRedirect />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/error" element={<ErrorPage />} />
