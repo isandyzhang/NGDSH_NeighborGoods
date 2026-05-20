@@ -132,12 +132,15 @@ export const ListingHomePage = () => {
   const [topPinTargetId, setTopPinTargetId] = useState<string | null>(null)
   const [topPinSkipIntro, setTopPinSkipIntro] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadedItems, setLoadedItems] = useState<ListingItem[]>([])
+  const [knownTotalPages, setKnownTotalPages] = useState(1)
   const listingSectionRef = useRef<HTMLElement | null>(null)
   const desktopFilterRowRef = useRef<HTMLDivElement | null>(null)
   const desktopFilterAreaRef = useRef<HTMLDivElement | null>(null)
   const quickFilterHoverTimerRef = useRef<number | null>(null)
   const marqueeRef = useRef<HTMLElement | null>(null)
   const marqueePointerXRef = useRef<number | null>(null)
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
 
   const listingFiltersPayload = useMemo(
     () => ({
@@ -150,6 +153,25 @@ export const ListingHomePage = () => {
       isTradeable,
     }),
     [page, selectedCategoryCodes, selectedConditionCodes, selectedResidenceCodes, isFree, isCharity, isTradeable],
+  )
+  const listingFilterSignature = useMemo(
+    () =>
+      JSON.stringify({
+        categoryCodes: listingFiltersPayload.categoryCodes,
+        conditionCodes: listingFiltersPayload.conditionCodes,
+        residenceCodes: listingFiltersPayload.residenceCodes,
+        isFree: listingFiltersPayload.isFree,
+        isCharity: listingFiltersPayload.isCharity,
+        isTradeable: listingFiltersPayload.isTradeable,
+      }),
+    [
+      listingFiltersPayload.categoryCodes,
+      listingFiltersPayload.conditionCodes,
+      listingFiltersPayload.residenceCodes,
+      listingFiltersPayload.isFree,
+      listingFiltersPayload.isCharity,
+      listingFiltersPayload.isTradeable,
+    ],
   )
 
   const lookupsQuery = useQuery({
@@ -185,10 +207,11 @@ export const ListingHomePage = () => {
   const categories: LookupItem[] = lookupsQuery.data?.categories ?? []
   const conditions: LookupItem[] = lookupsQuery.data?.conditions ?? []
   const residences: LookupItem[] = lookupsQuery.data?.residences ?? []
-  const items: ListingItem[] = listQuery.data?.items ?? []
-  const totalPages = listQuery.data?.pagination.totalPages || 1
+  const items = loadedItems
+  const totalPages = knownTotalPages
+  const hasMorePages = page < totalPages
   const loading = listQuery.isFetching
-  const showLoadingSkeleton = listQuery.isPending
+  const showLoadingSkeleton = listQuery.isPending && page === 1 && !loadedItems.length
 
   const prefetchListingDetail = useCallback(
     (id: ListingItem['id']) => {
@@ -224,6 +247,34 @@ export const ListingHomePage = () => {
     const message = listQuery.error instanceof ApiClientError ? listQuery.error.message : '讀取商品列表失敗'
     setError(message)
   }, [listQuery.isError, listQuery.error])
+
+  useEffect(() => {
+    setPage(1)
+    setLoadedItems([])
+    setKnownTotalPages(1)
+  }, [listingFilterSignature])
+
+  useEffect(() => {
+    const response = listQuery.data
+    if (!response) {
+      return
+    }
+
+    setKnownTotalPages(response.pagination.totalPages || 1)
+    setLoadedItems((current) => {
+      if (page <= 1) {
+        return response.items
+      }
+
+      const merged = [...current]
+      response.items.forEach((item) => {
+        if (!merged.some((existing) => existing.id === item.id)) {
+          merged.push(item)
+        }
+      })
+      return merged
+    })
+  }, [listQuery.data, page])
 
   useEffect(() => {
     setFavoriteStateById(() => {
@@ -297,6 +348,29 @@ export const ListingHomePage = () => {
       document.removeEventListener('pointerdown', closeOnOutsideClick, true)
     }
   }, [expandedFilter])
+
+  useEffect(() => {
+    const target = loadMoreSentinelRef.current
+    if (!target) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return
+        }
+        if (listQuery.isFetching || listQuery.isPending || page >= totalPages) {
+          return
+        }
+        setPage((current) => current + 1)
+      },
+      { rootMargin: '280px 0px', threshold: 0.1 },
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [listQuery.isFetching, listQuery.isPending, page, totalPages])
 
   const toggleMultiCode = (
     value: number,
@@ -1230,20 +1304,13 @@ export const ListingHomePage = () => {
               })}
             </AnimatePresence>
           </motion.section>
-          <footer className="mt-6 flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
-              上一頁
-            </Button>
+          <footer className="mt-6 flex flex-col items-center gap-2">
+            <div ref={loadMoreSentinelRef} className="h-1 w-full" aria-hidden="true" />
             <span className="text-sm text-text-subtle">
-              第 {page} / {totalPages} 頁
+              已載入第 {page} / {totalPages} 頁
             </span>
-            <Button
-              variant="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              下一頁
-            </Button>
+            {loading && hasMorePages ? <span className="text-sm text-text-subtle">載入更多商品中...</span> : null}
+            {!hasMorePages ? <span className="text-sm text-text-subtle">已經到底囉</span> : null}
           </footer>
         </>
       ) : null}
