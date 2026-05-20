@@ -17,6 +17,7 @@ import {
 } from '@/features/listings/constants/listingStatus'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
+  detectLiffInClient,
   getLiffShareDiagnostics,
   shareListingToLineFlexOnly,
   shareListingToLine,
@@ -200,19 +201,16 @@ export const ListingDetailPage = () => {
 
   useEffect(() => {
     let disposed = false
-    setIsLiffShareEnvReady(null)
-    void getLiffShareDiagnostics()
-      .then((diagnostics) => {
+    void detectLiffInClient()
+      .then((inClient) => {
         if (disposed) {
           return
         }
-        const envReady =
-          diagnostics.liffReady && diagnostics.isInClient && diagnostics.shareTargetPickerAvailable
-        setIsLiffShareEnvReady(envReady)
+        setIsLiffShareEnvReady(inClient)
       })
       .catch(() => {
         if (!disposed) {
-          setIsLiffShareEnvReady(false)
+          setIsLiffShareEnvReady(null)
         }
       })
 
@@ -350,15 +348,21 @@ export const ListingDetailPage = () => {
     setFlexShareBusy(true)
     setError(null)
     try {
-      const diagnostics = await getLiffShareDiagnostics()
-      const envReady = diagnostics.liffReady && diagnostics.isInClient && diagnostics.shareTargetPickerAvailable
-      setIsLiffShareEnvReady(envReady)
-      if (!envReady) {
+      const result = await shareListingToLineFlexOnly(getShareOptions(item))
+      if (result.reason === 'SENT') {
+        setIsLiffShareEnvReady(true)
+      } else if (result.reason === 'NOT_IN_LINE_CLIENT' || result.reason === 'LIFF_UNAVAILABLE') {
+        setIsLiffShareEnvReady(false)
+      }
+
+      if (result.reason === 'NOT_IN_LINE_CLIENT' || result.reason === 'LIFF_UNAVAILABLE') {
         setError('目前不是 LIFF 可分享 Flex 的環境，請改在 LINE App 內開啟。')
         return
       }
-
-      const result = await shareListingToLineFlexOnly(getShareOptions(item))
+      if (result.reason === 'SHARE_TARGET_PICKER_UNAVAILABLE') {
+        setError('目前 LIFF 環境不支援 shareTargetPicker，暫時無法發送 Flex Message。')
+        return
+      }
       if (!result.sent && result.reason !== 'USER_CANCELLED_OR_CLOSED') {
         setError('Flex Message 發送失敗，請稍後再試。')
       }
@@ -369,7 +373,7 @@ export const ListingDetailPage = () => {
     }
   }
 
-  const liffEnvText = isLiffShareEnvReady == null ? '檢查中' : isLiffShareEnvReady ? '是' : '否'
+  const liffEnvText = isLiffShareEnvReady == null ? '未知' : isLiffShareEnvReady ? '是' : '否'
 
   const handleShareDebugConfirm = async () => {
     if (!item) {

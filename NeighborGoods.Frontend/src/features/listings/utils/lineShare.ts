@@ -45,6 +45,15 @@ export type LiffShareDiagnostics = {
   errorMessage: string | null
 }
 
+export const detectLiffInClient = async (): Promise<boolean | null> => {
+  try {
+    const liffMod = await import('@line/liff')
+    return liffMod.default.isInClient()
+  } catch {
+    return null
+  }
+}
+
 export const buildListingUrl = (listingId: string, origin: string = window.location.origin) =>
   `${origin}/listings/${listingId}`
 
