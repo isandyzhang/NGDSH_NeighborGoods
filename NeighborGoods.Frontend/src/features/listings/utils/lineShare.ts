@@ -30,10 +30,14 @@ export type ShareListingFlexOnlyResult = {
   reason:
     | 'SENT'
     | 'LIFF_UNAVAILABLE'
+    | 'NOT_LOGGED_IN'
     | 'NOT_IN_LINE_CLIENT'
     | 'SHARE_TARGET_PICKER_UNAVAILABLE'
     | 'USER_CANCELLED_OR_CLOSED'
     | 'LIFF_ERROR'
+  errorCode?: string
+  errorMessage?: string
+  contextType?: string | null
 }
 
 export type LiffShareDiagnostics = {
@@ -217,22 +221,29 @@ export const shareListingToLineFlexOnly = async (
     if (!liff) {
       return { sent: false, reason: 'LIFF_UNAVAILABLE' }
     }
+    const contextType = liff.getContext()?.type ?? null
+    if (!liff.isLoggedIn()) {
+      return { sent: false, reason: 'NOT_LOGGED_IN', contextType }
+    }
     if (!liff.isInClient()) {
-      return { sent: false, reason: 'NOT_IN_LINE_CLIENT' }
+      return { sent: false, reason: 'NOT_IN_LINE_CLIENT', contextType }
     }
     if (!liff.isApiAvailable('shareTargetPicker')) {
-      return { sent: false, reason: 'SHARE_TARGET_PICKER_UNAVAILABLE' }
+      return { sent: false, reason: 'SHARE_TARGET_PICKER_UNAVAILABLE', contextType }
     }
 
     const flexMessage = buildListingFlexMessage(options)
     const result = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
     if (result === null) {
-      return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED' }
+      return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED', contextType }
     }
 
-    return { sent: true, reason: 'SENT' }
-  } catch {
-    return { sent: false, reason: 'LIFF_ERROR' }
+    return { sent: true, reason: 'SENT', contextType }
+  } catch (err) {
+    const errorCode = typeof err === 'object' && err && 'code' in err ? String((err as { code: unknown }).code) : undefined
+    const errorMessage =
+      typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message) : undefined
+    return { sent: false, reason: 'LIFF_ERROR', errorCode, errorMessage }
   }
 }
 

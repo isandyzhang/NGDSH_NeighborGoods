@@ -355,6 +355,10 @@ export const ListingDetailPage = () => {
         setIsLiffShareEnvReady(false)
       }
 
+      if (result.reason === 'NOT_LOGGED_IN') {
+        setError('LIFF 尚未登入，請先完成 LINE 登入後再發送 Flex Message。')
+        return
+      }
       if (result.reason === 'NOT_IN_LINE_CLIENT' || result.reason === 'LIFF_UNAVAILABLE') {
         setError('目前不是 LIFF 可分享 Flex 的環境，請改在 LINE App 內開啟。')
         return
@@ -364,7 +368,8 @@ export const ListingDetailPage = () => {
         return
       }
       if (!result.sent && result.reason !== 'USER_CANCELLED_OR_CLOSED') {
-        setError('Flex Message 發送失敗，請稍後再試。')
+        const details = [result.errorCode, result.errorMessage, result.contextType].filter(Boolean).join(' | ')
+        setError(details ? `Flex Message 發送失敗：${details}` : 'Flex Message 發送失敗，請稍後再試。')
       }
     } catch {
       setError('Flex Message 發送失敗，請稍後再試。')
