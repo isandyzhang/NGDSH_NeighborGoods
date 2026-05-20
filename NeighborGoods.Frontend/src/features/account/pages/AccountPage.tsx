@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { accountApi, type AccountMe, type LinePreferences, type StartLineBindingResponse } from '@/features/account/api/accountApi'
+import { saveLineBindingPending } from '@/features/account/lineBindingSession'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -134,6 +135,7 @@ export const AccountPage = () => {
     setError(null)
     try {
       const result = await accountApi.startLineBinding()
+      saveLineBindingPending(result.bindingToken, result.botLink)
       setBindingStart(result)
       await openLineBindingWindow(result)
     } catch (err) {

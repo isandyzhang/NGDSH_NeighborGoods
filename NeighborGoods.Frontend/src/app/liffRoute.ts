@@ -1,3 +1,5 @@
+import { hasLineBindingPending } from '@/features/account/lineBindingSession'
+
 const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
 
 const buildLineNotifyTarget = (bindToken: string, botLink: string) =>
@@ -39,21 +41,21 @@ export const isLineNotifyBindingEntry = (pathname: string, search: string): bool
   }
 
   const liffState = params.get('liff.state')
-  if (!liffState) {
-    return false
+  if (liffState) {
+    const target = parseLiffStateTarget(liffState)
+    if (target?.startsWith('/liff/line-notify')) {
+      return true
+    }
   }
 
-  const target = parseLiffStateTarget(liffState)
-  return target?.startsWith('/liff/line-notify') ?? false
+  // OAuth return (?code=...) drops bindToken from URL; session keeps binding on `/`.
+  return pathname === '/' && hasLineBindingPending()
 }
 
-/** Redirect URI for liff.login — must match LIFF Endpoint (`/`) and LINE Login callback allowlist. */
-export const buildLineNotifyBindingLoginRedirectUri = (bindToken: string, botLink: string) => {
-  const params = new URLSearchParams({ bindToken })
-  if (botLink) {
-    params.set('botLink', botLink)
-  }
-  return `${typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'}/?${params.toString()}`
+/** Redirect URI for liff.login — root only; bindToken lives in sessionStorage across OAuth. */
+export const buildLineNotifyBindingLoginRedirectUri = () => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
+  return `${origin}/`
 }
 
 export const resolveLiffEntryTarget = (pathname: string, search: string): string | null => {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
+import { saveLineBindingPending } from '@/features/account/lineBindingSession'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { ListingImageCarousel } from '@/features/listings/components/ListingImageCarousel'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
@@ -244,6 +245,7 @@ export const ListingDetailPage = () => {
     setError(null)
     try {
       const binding = await accountApi.startLineBinding()
+      saveLineBindingPending(binding.bindingToken, binding.botLink)
       const targetUrl = binding.liffUrl || binding.botLink
       if (!targetUrl) {
         setError('目前無法啟動 LINE 綁定，請稍後再試')

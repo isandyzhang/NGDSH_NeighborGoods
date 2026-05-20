@@ -2,6 +2,11 @@ import liff from '@line/liff'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { buildLineNotifyBindingLoginRedirectUri } from '@/app/liffRoute'
+import {
+  clearLineBindingPending,
+  resolveLineBindingParams,
+  saveLineBindingPending,
+} from '@/features/account/lineBindingSession'
 import { env } from '@/shared/config/env'
 import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -13,16 +18,12 @@ const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
 
 export const LineNotifyLiffPage = () => {
   const [searchParams] = useSearchParams()
-  const liffStateRaw = searchParams.get('liff.state') ?? ''
-  const liffStateParams = liffStateRaw
-    ? new URLSearchParams(liffStateRaw.startsWith('?') ? liffStateRaw.slice(1) : liffStateRaw)
-    : null
-  const bindToken = searchParams.get('bindToken') ?? liffStateParams?.get('bindToken') ?? ''
-  const botLink = searchParams.get('botLink') ?? liffStateParams?.get('botLink') ?? ''
-  const loginRedirectUri = useMemo(
-    () => (bindToken ? buildLineNotifyBindingLoginRedirectUri(bindToken, botLink) : ''),
-    [bindToken, botLink],
+  const search = searchParams.toString()
+  const { bindToken, botLink } = useMemo(
+    () => resolveLineBindingParams(search ? `?${search}` : window.location.search),
+    [search],
   )
+  const loginRedirectUri = useMemo(() => buildLineNotifyBindingLoginRedirectUri(), [])
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorText, setErrorText] = useState<string | null>(null)
@@ -31,7 +32,8 @@ export const LineNotifyLiffPage = () => {
   const postComplete = useCallback(async () => {
     const idToken = liff.getIDToken()
     if (!idToken) {
-      liff.login({ redirectUri: loginRedirectUri || window.location.href })
+      saveLineBindingPending(bindToken, botLink)
+      liff.login({ redirectUri: loginRedirectUri })
       return
     }
 
@@ -42,10 +44,11 @@ export const LineNotifyLiffPage = () => {
     })
     const json = (await res.json()) as ApiResponse<{ bound: boolean }>
     unwrapApiResponse(json)
-  }, [bindToken, loginRedirectUri])
+  }, [bindToken, botLink, loginRedirectUri])
 
   const finishAndClose = useCallback(async () => {
     setPhase('done')
+    clearLineBindingPending()
     sessionStorage.setItem(LINE_BINDING_COMPLETED_FLAG, '1')
     const accountUrl = `${window.location.origin}/account?lineBound=1`
     if (liff.isInClient()) {
@@ -134,7 +137,8 @@ export const LineNotifyLiffPage = () => {
         }
 
         if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: loginRedirectUri || window.location.href })
+          saveLineBindingPending(bindToken, botLink)
+          liff.login({ redirectUri: loginRedirectUri })
           return
         }
 
@@ -150,7 +154,7 @@ export const LineNotifyLiffPage = () => {
     return () => {
       disposed = true
     }
-  }, [bindToken, loginRedirectUri, refreshFriendship])
+  }, [bindToken, botLink, loginRedirectUri, refreshFriendship])
 
   useEffect(() => {
     if (phase !== 'needFriend') {
