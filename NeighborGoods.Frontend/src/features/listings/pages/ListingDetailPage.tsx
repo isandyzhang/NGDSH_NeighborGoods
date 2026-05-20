@@ -82,6 +82,8 @@ export const ListingDetailPage = () => {
   const [copyDebugBusy, setCopyDebugBusy] = useState(false)
   const [copyDebugNotice, setCopyDebugNotice] = useState<string | null>(null)
   const [copyDebugPayload, setCopyDebugPayload] = useState<string | null>(null)
+  const debugPayloadStorageKey = useMemo(() => `neighborGoods.liffDebugPayload.${id || 'unknown'}`, [id])
+  const debugNoticeStorageKey = useMemo(() => `neighborGoods.liffDebugNotice.${id || 'unknown'}`, [id])
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -224,6 +226,29 @@ export const ListingDetailPage = () => {
       disposed = true
     }
   }, [id])
+
+  useEffect(() => {
+    const savedPayload = sessionStorage.getItem(debugPayloadStorageKey)
+    const savedNotice = sessionStorage.getItem(debugNoticeStorageKey)
+    setCopyDebugPayload(savedPayload && savedPayload.trim().length > 0 ? savedPayload : null)
+    setCopyDebugNotice(savedNotice && savedNotice.trim().length > 0 ? savedNotice : null)
+  }, [debugPayloadStorageKey, debugNoticeStorageKey])
+
+  useEffect(() => {
+    if (copyDebugPayload && copyDebugPayload.trim().length > 0) {
+      sessionStorage.setItem(debugPayloadStorageKey, copyDebugPayload)
+    } else {
+      sessionStorage.removeItem(debugPayloadStorageKey)
+    }
+  }, [copyDebugPayload, debugPayloadStorageKey])
+
+  useEffect(() => {
+    if (copyDebugNotice && copyDebugNotice.trim().length > 0) {
+      sessionStorage.setItem(debugNoticeStorageKey, copyDebugNotice)
+    } else {
+      sessionStorage.removeItem(debugNoticeStorageKey)
+    }
+  }, [copyDebugNotice, debugNoticeStorageKey])
 
   const handleChat = async () => {
     if (!item || conversationBusy) {
@@ -419,6 +444,7 @@ export const ListingDetailPage = () => {
       }
       await navigator.clipboard.writeText(debugPayload)
       setCopyDebugNotice('已複製 LIFF 診斷資訊')
+      setCopyDebugPayload(debugPayload)
     } catch {
       const status = liffRuntimeStatus
       if (status) {
