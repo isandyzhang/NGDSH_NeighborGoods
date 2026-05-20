@@ -36,6 +36,9 @@ const EditListingPage = lazy(() =>
 const ListingDetailPage = lazy(() =>
   import('@/features/listings/pages/ListingDetailPage').then((module) => ({ default: module.ListingDetailPage })),
 )
+const ListingShareLiffPage = lazy(() =>
+  import('@/features/listings/pages/ListingShareLiffPage').then((module) => ({ default: module.ListingShareLiffPage })),
+)
 const MyListingsPage = lazy(() =>
   import('@/features/listings/pages/MyListingsPage').then((module) => ({ default: module.MyListingsPage })),
 )
@@ -108,6 +111,7 @@ export const AppRouter = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
           <Route path="/liff/line-notify" element={<LineNotifyLiffCanonicalRedirect />} />
+          <Route path="/liff/share-listing" element={<ListingShareLiffPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/error" element={<ErrorPage />} />

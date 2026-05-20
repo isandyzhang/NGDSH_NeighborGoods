@@ -17,13 +17,9 @@ import {
 } from '@/features/listings/constants/listingStatus'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
-  detectLiffInClient,
   getLiffShareDiagnostics,
-  getLiffShareRuntimeStatus,
-  shareListingToLineFlexOnly,
   shareListingToLine,
   type LiffShareDiagnostics,
-  type LiffShareRuntimeStatus,
   type ShareListingResult,
 } from '@/features/listings/utils/lineShare'
 import { useAuth } from '@/features/auth/components/AuthProvider'
@@ -77,13 +73,6 @@ export const ListingDetailPage = () => {
   const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
   const [flexShareBusy, setFlexShareBusy] = useState(false)
-  const [isLiffShareEnvReady, setIsLiffShareEnvReady] = useState<boolean | null>(null)
-  const [liffRuntimeStatus, setLiffRuntimeStatus] = useState<LiffShareRuntimeStatus | null>(null)
-  const [copyDebugBusy, setCopyDebugBusy] = useState(false)
-  const [copyDebugNotice, setCopyDebugNotice] = useState<string | null>(null)
-  const [copyDebugPayload, setCopyDebugPayload] = useState<string | null>(null)
-  const debugPayloadStorageKey = useMemo(() => `neighborGoods.liffDebugPayload.${id || 'unknown'}`, [id])
-  const debugNoticeStorageKey = useMemo(() => `neighborGoods.liffDebugNotice.${id || 'unknown'}`, [id])
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -206,49 +195,6 @@ export const ListingDetailPage = () => {
       disposed = true
     }
   }, [isAuthenticated, source])
-
-  useEffect(() => {
-    let disposed = false
-    void detectLiffInClient()
-      .then((inClient) => {
-        if (disposed) {
-          return
-        }
-        setIsLiffShareEnvReady(inClient)
-      })
-      .catch(() => {
-        if (!disposed) {
-          setIsLiffShareEnvReady(null)
-        }
-      })
-
-    return () => {
-      disposed = true
-    }
-  }, [id])
-
-  useEffect(() => {
-    const savedPayload = sessionStorage.getItem(debugPayloadStorageKey)
-    const savedNotice = sessionStorage.getItem(debugNoticeStorageKey)
-    setCopyDebugPayload(savedPayload && savedPayload.trim().length > 0 ? savedPayload : null)
-    setCopyDebugNotice(savedNotice && savedNotice.trim().length > 0 ? savedNotice : null)
-  }, [debugPayloadStorageKey, debugNoticeStorageKey])
-
-  useEffect(() => {
-    if (copyDebugPayload && copyDebugPayload.trim().length > 0) {
-      sessionStorage.setItem(debugPayloadStorageKey, copyDebugPayload)
-    } else {
-      sessionStorage.removeItem(debugPayloadStorageKey)
-    }
-  }, [copyDebugPayload, debugPayloadStorageKey])
-
-  useEffect(() => {
-    if (copyDebugNotice && copyDebugNotice.trim().length > 0) {
-      sessionStorage.setItem(debugNoticeStorageKey, copyDebugNotice)
-    } else {
-      sessionStorage.removeItem(debugNoticeStorageKey)
-    }
-  }, [copyDebugNotice, debugNoticeStorageKey])
 
   const handleChat = async () => {
     if (!item || conversationBusy) {
@@ -377,94 +323,15 @@ export const ListingDetailPage = () => {
     }
 
     setFlexShareBusy(true)
-    setError(null)
-    try {
-      const result = await shareListingToLineFlexOnly(getShareOptions(item))
-      if (result.reason === 'SENT') {
-        setIsLiffShareEnvReady(true)
-      } else if (result.reason === 'NOT_IN_LINE_CLIENT' || result.reason === 'LIFF_UNAVAILABLE') {
-        setIsLiffShareEnvReady(false)
-      }
-
-      if (result.reason === 'NOT_LOGGED_IN') {
-        setError('LIFF 尚未登入，請先完成 LINE 登入後再發送 Flex Message。')
-        return
-      }
-      if (result.reason === 'NOT_IN_LINE_CLIENT' || result.reason === 'LIFF_UNAVAILABLE') {
-        setError('目前不是 LIFF 可分享 Flex 的環境，請改在 LINE App 內開啟。')
-        return
-      }
-      if (result.reason === 'SHARE_TARGET_PICKER_UNAVAILABLE') {
-        setError('目前 LIFF 環境不支援 shareTargetPicker，暫時無法發送 Flex Message。')
-        return
-      }
-      if (result.reason === 'USER_CANCELLED_OR_CLOSED') {
-        setError('你已取消分享。')
-        return
-      }
-      if (!result.sent) {
-        const details = [result.errorCode, result.errorMessage, result.contextType].filter(Boolean).join(' | ')
-        setError(details ? `Flex Message 發送失敗：${details}` : 'Flex Message 發送失敗，請稍後再試。')
-      }
-    } catch {
-      setError('Flex Message 發送失敗，請稍後再試。')
-    } finally {
-      setFlexShareBusy(false)
-    }
-  }
-
-  const liffEnvText = isLiffShareEnvReady == null ? '未知' : isLiffShareEnvReady ? '是' : '否'
-  const yn = (value: boolean) => (value ? 'Y' : 'N')
-  const liffDebugText = liffRuntimeStatus
-    ? `ID:${yn(liffRuntimeStatus.liffIdConfigured)} Init:${yn(liffRuntimeStatus.liffReady)} Login:${yn(liffRuntimeStatus.isLoggedIn)} Client:${yn(liffRuntimeStatus.isInClient)} Picker:${yn(liffRuntimeStatus.shareTargetPickerAvailable)} Ctx:${liffRuntimeStatus.contextType ?? '-'}`
-    : 'ID:... Init:... Login:... Client:... Picker:... Ctx:...'
-
-  const handleCopyLiffDebug = async () => {
-    setCopyDebugBusy(true)
-    setCopyDebugNotice(null)
-    setCopyDebugPayload(null)
-    try {
-      const status = await getLiffShareRuntimeStatus()
-      setLiffRuntimeStatus(status)
-      const debugPayload = [
-        `LIFF_ID_CONFIGURED=${status.liffIdConfigured}`,
-        `LIFF_READY=${status.liffReady}`,
-        `LIFF_LOGGED_IN=${status.isLoggedIn}`,
-        `LIFF_IN_CLIENT=${status.isInClient}`,
-        `SHARE_TARGET_PICKER_AVAILABLE=${status.shareTargetPickerAvailable}`,
-        `CONTEXT_TYPE=${status.contextType ?? '-'}`,
-        `ERROR_CODE=${status.errorCode ?? '-'}`,
-        `ERROR_MESSAGE=${status.errorMessage ?? '-'}`,
-        `CURRENT_URL=${window.location.href}`,
-      ].join('\n')
-      if (!navigator.clipboard?.writeText) {
-        setCopyDebugPayload(debugPayload)
-        setCopyDebugNotice('此環境不支援自動複製，請手動複製下方診斷內容')
-        return
-      }
-      await navigator.clipboard.writeText(debugPayload)
-      setCopyDebugNotice('已複製 LIFF 診斷資訊')
-      setCopyDebugPayload(debugPayload)
-    } catch {
-      const status = liffRuntimeStatus
-      if (status) {
-        const fallbackPayload = [
-          `LIFF_ID_CONFIGURED=${status.liffIdConfigured}`,
-          `LIFF_READY=${status.liffReady}`,
-          `LIFF_LOGGED_IN=${status.isLoggedIn}`,
-          `LIFF_IN_CLIENT=${status.isInClient}`,
-          `SHARE_TARGET_PICKER_AVAILABLE=${status.shareTargetPickerAvailable}`,
-          `CONTEXT_TYPE=${status.contextType ?? '-'}`,
-          `ERROR_CODE=${status.errorCode ?? '-'}`,
-          `ERROR_MESSAGE=${status.errorMessage ?? '-'}`,
-          `CURRENT_URL=${window.location.href}`,
-        ].join('\n')
-        setCopyDebugPayload(fallbackPayload)
-      }
-      setCopyDebugNotice('自動複製失敗，請手動複製下方診斷內容')
-    } finally {
-      setCopyDebugBusy(false)
-    }
+    const params = new URLSearchParams({
+      listingId: item.id,
+      title: item.title,
+      price: formatPrice(item),
+      category: item.categoryName,
+      condition: item.conditionName,
+      returnTo: `${window.location.pathname}${window.location.search}`,
+    })
+    navigate(`/liff/share-listing?${params.toString()}`)
   }
 
   const handleShareDebugConfirm = async () => {
@@ -674,29 +541,10 @@ export const ListingDetailPage = () => {
                     onClick={() => void handleShareFlexOnly()}
                     disabled={!canShare || flexShareBusy}
                     variant="secondary"
-                    className="min-h-[3.2rem] w-full whitespace-pre-line break-all px-3 py-2 text-left text-sm font-semibold leading-5 md:text-base"
+                    className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
                   >
-                    {flexShareBusy
-                      ? '發送中...'
-                      : `發送 Flex Message（LIFF環境：${liffEnvText}）\n${liffDebugText}`}
+                    {flexShareBusy ? '前往中...' : '在 LINE 內分享 Flex Message'}
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={() => void handleCopyLiffDebug()}
-                    disabled={copyDebugBusy}
-                    variant="secondary"
-                    className="min-h-[2.8rem] w-full text-sm font-semibold md:text-base"
-                  >
-                    {copyDebugBusy ? '複製中...' : '複製 LIFF 診斷資訊'}
-                  </Button>
-                  {copyDebugNotice ? <p className="text-xs text-text-subtle">{copyDebugNotice}</p> : null}
-                  {copyDebugPayload ? (
-                    <textarea
-                      readOnly
-                      value={copyDebugPayload}
-                      className="min-h-[10rem] w-full rounded-lg border border-border bg-surface-2 p-2 text-xs leading-5 text-text-main"
-                    />
-                  ) : null}
                 </div>
               </section>
             </Card>
