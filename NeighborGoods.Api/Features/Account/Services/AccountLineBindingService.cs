@@ -119,6 +119,7 @@ public sealed class AccountLineBindingService(
     }
 
     public async Task<(bool Ok, string? ErrorCode, string? ErrorMessage)> CompleteLiffBindingAsync(
+        string currentUserId,
         string bindingToken,
         string idToken,
         CancellationToken cancellationToken = default)
@@ -141,6 +142,11 @@ public sealed class AccountLineBindingService(
             dbContext.LineBindingPendings.Remove(pending);
             await dbContext.SaveChangesAsync(cancellationToken);
             return (false, "LINE_BIND_TOKEN_EXPIRED", "綁定連結已過期，請回網站重新開始。");
+        }
+
+        if (!string.Equals(pending.UserId, currentUserId, StringComparison.Ordinal))
+        {
+            return (false, "LINE_BIND_USER_MISMATCH", "綁定連結與目前登入帳號不一致，請回網站重新開始。");
         }
 
         var (sub, verifyCode, verifyMessage) = await liffIdTokenVerifier.VerifyAsync(idToken, cancellationToken);

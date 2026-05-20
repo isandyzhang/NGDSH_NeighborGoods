@@ -267,7 +267,7 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
     }
 
     [Fact]
-    public async Task LineBinding_LiffCompleteAndUnbind_WorksEndToEnd()
+    public async Task LineBinding_LiffComplete_WithoutAuth_ReturnsUnauthorized()
     {
         using var factory = new ListingApiFactory(fixture.ConnectionString);
         using var client = factory.CreateClient();
@@ -289,6 +289,64 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
 
         using var anon = factory.CreateClient();
         var completeResponse = await anon.PostAsJsonAsync(
+            "/api/v1/account/line/bind/liff-complete",
+            new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
+        Assert.Equal(HttpStatusCode.Unauthorized, completeResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task LineBinding_LiffComplete_ForDifferentUser_ReturnsForbidden()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var ownerClient = factory.CreateClient();
+        await AuthenticateAsAsync(ownerClient, "other@example.com", UserPassword);
+
+        var startResponse = await ownerClient.PostAsync("/api/v1/account/line/bind/start", null);
+        startResponse.EnsureSuccessStatusCode();
+        var startBody = await startResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var bindingToken = startBody.GetProperty("data").GetProperty("bindingToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(bindingToken));
+
+        using var wrongUserClient = factory.CreateClient();
+        await AuthenticateAsAsync(wrongUserClient, "tester@example.com", UserPassword);
+        var completeResponse = await wrongUserClient.PostAsJsonAsync(
+            "/api/v1/account/line/bind/liff-complete",
+            new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
+        Assert.Equal(HttpStatusCode.Forbidden, completeResponse.StatusCode);
+
+        var body = await completeResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("LINE_BIND_USER_MISMATCH", body.GetProperty("error").GetProperty("code").GetString());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var owner = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
+        var wrongUser = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "TESTER");
+        Assert.Null(owner.LineMessagingApiUserId);
+        Assert.Null(wrongUser.LineMessagingApiUserId);
+    }
+
+    [Fact]
+    public async Task LineBinding_LiffCompleteAndUnbind_WorksEndToEnd()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, "other@example.com", UserPassword);
+
+        var startResponse = await client.PostAsync("/api/v1/account/line/bind/start", null);
+        startResponse.EnsureSuccessStatusCode();
+        var startBody = await startResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var data = startBody.GetProperty("data");
+        var bindingToken = data.GetProperty("bindingToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(bindingToken));
+        var liffUrl = data.GetProperty("liffUrl").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(liffUrl));
+        Assert.Contains("bindToken=", liffUrl!, StringComparison.Ordinal);
+        Assert.Contains("liff.state=", liffUrl!, StringComparison.Ordinal);
+        Assert.Contains("%2Fliff%2Fline-notify", liffUrl!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("%3FbindToken", liffUrl!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(bindingToken!, liffUrl!, StringComparison.Ordinal);
+
+        var completeResponse = await client.PostAsJsonAsync(
             "/api/v1/account/line/bind/liff-complete",
             new { bindingToken, idToken = FakeLineLiffIdTokenVerifier.ValidTestIdToken });
         completeResponse.EnsureSuccessStatusCode();

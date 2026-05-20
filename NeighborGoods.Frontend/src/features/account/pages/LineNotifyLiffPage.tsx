@@ -2,6 +2,7 @@ import liff from '@line/liff'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { buildLineNotifyBindingLoginRedirectUri } from '@/app/liffRoute'
+import { accountApi } from '@/features/account/api/accountApi'
 import {
   clearLineBindingPending,
   resolveLineBindingParams,
@@ -13,8 +14,6 @@ import {
   isLineBindDebugEnabled,
   type LineNotifyLiffDiagnostics,
 } from '@/features/account/lineNotifyLiffDiagnostics'
-import { env } from '@/shared/config/env'
-import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 
 type Phase = 'loading' | 'debug' | 'needLineApp' | 'submitting' | 'done' | 'error'
@@ -40,7 +39,7 @@ const LineNotifyLiffDebugPanel = ({
       {formatLineNotifyLiffDiagnosticsLog(diagnostics)}
     </pre>
     <p className="text-xs text-amber-800">
-      加好友由 LINE Console「Add friend option」處理；綁定只依 idToken + bindToken 寫入 DB。friendFlag 僅供參考。
+      加好友由 LINE Console「Add friend option」處理；綁定依目前登入帳號、idToken 與 bindToken 寫入 DB。friendFlag 僅供參考。
     </p>
     <div className="flex flex-col gap-2">
       <Button type="button" variant="secondary" className="w-full" disabled={refreshing} onClick={onRefresh}>
@@ -85,13 +84,7 @@ export const LineNotifyLiffPage = () => {
       return
     }
 
-    const res = await fetch(`${env.apiBaseUrl}/api/v1/account/line/bind/liff-complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bindingToken: bindToken, idToken }),
-    })
-    const json = (await res.json()) as ApiResponse<{ bound: boolean }>
-    unwrapApiResponse(json)
+    await accountApi.completeLineBinding({ bindingToken: bindToken, idToken })
   }, [bindToken, botLink, loginRedirectUri])
 
   const finishAndClose = useCallback(async () => {

@@ -239,11 +239,14 @@ public static class AccountEndpoints
 
         app.MapPost("/api/v1/account/line/bind/liff-complete", async (
             HttpContext httpContext,
+            ICurrentUserContext currentUser,
             CompleteLineLiffBindingRequest request,
             AccountLineBindingService lineBindingService,
             CancellationToken ct = default) =>
         {
+            var userId = currentUser.GetRequiredUserId();
             var (ok, errorCode, errorMessage) = await lineBindingService.CompleteLiffBindingAsync(
+                userId,
                 request.BindingToken,
                 request.IdToken,
                 ct);
@@ -255,7 +258,7 @@ public static class AccountEndpoints
             return Results.Ok(ApiResponseFactory.Success(new { bound = true }, httpContext));
         })
         .WithName("AccountLineBindLiffCompleteV1")
-        .AllowAnonymous()
+        .RequireAuthorization()
         .RequireRateLimiting("AccountWrite");
 
         app.MapPost("/api/v1/account/line/bind/unbind", async (
@@ -346,6 +349,7 @@ public static class AccountEndpoints
             "LINE_BIND_LIFF_NOT_CONFIGURED" => StatusCodes.Status503ServiceUnavailable,
             "LINE_OAUTH_MISCONFIGURED" => StatusCodes.Status503ServiceUnavailable,
             "LINE_BIND_TOKEN_EXPIRED" => StatusCodes.Status400BadRequest,
+            "LINE_BIND_USER_MISMATCH" => StatusCodes.Status403Forbidden,
             _ => StatusCodes.Status400BadRequest
         };
 

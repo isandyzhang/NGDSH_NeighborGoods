@@ -68,6 +68,11 @@ export type StartLineBindingResponse = {
   botLink: string
 }
 
+type CompleteLineBindingPayload = {
+  bindingToken: string
+  idToken: string
+}
+
 export const accountApi = {
   async me(): Promise<AccountMe> {
     const response = await http.get<ApiResponse<AccountMe>>('/api/v1/account/me')
@@ -106,6 +111,11 @@ export const accountApi = {
 
   async startLineBinding(): Promise<StartLineBindingResponse> {
     const response = await http.post<ApiResponse<StartLineBindingResponse>>('/api/v1/account/line/bind/start')
+    return unwrapApiResponse(response.data)
+  },
+
+  async completeLineBinding(payload: CompleteLineBindingPayload): Promise<{ bound: boolean }> {
+    const response = await http.post<ApiResponse<{ bound: boolean }>>('/api/v1/account/line/bind/liff-complete', payload)
     return unwrapApiResponse(response.data)
   },
 
