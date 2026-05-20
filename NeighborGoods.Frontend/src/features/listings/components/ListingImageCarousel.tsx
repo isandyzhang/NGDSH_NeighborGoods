@@ -1,21 +1,55 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ListingImageLightbox } from '@/features/listings/components/ListingImageLightbox'
+
+const EMBEDDED_IMAGE_CLASS =
+  'aspect-[16/10] w-full object-cover lg:aspect-[4/3]'
+const FULLSCREEN_IMAGE_CLASS =
+  'max-h-[min(85dvh,900px)] w-full object-contain'
 
 type ListingImageCarouselProps = {
   urls: string[]
   title: string
   imageClassName?: string
+  variant?: 'embedded' | 'fullscreen'
+  enableLightbox?: boolean
+  initialIndex?: number
 }
 
 export const ListingImageCarousel = ({
   urls,
   title,
-  imageClassName = 'aspect-[16/10] w-full object-cover lg:aspect-[4/3]',
+  imageClassName,
+  variant = 'embedded',
+  enableLightbox = true,
+  initialIndex,
 }: ListingImageCarouselProps) => {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxStartIndex, setLightboxStartIndex] = useState(0)
   const total = urls.length
   const trackKey = urls.join('|')
+  const isFullscreen = variant === 'fullscreen'
+  const resolvedImageClassName =
+    imageClassName ?? (isFullscreen ? FULLSCREEN_IMAGE_CLASS : EMBEDDED_IMAGE_CLASS)
+
+  const scrollToIndex = useCallback(
+    (index: number, behavior: ScrollBehavior = 'auto') => {
+      const el = scrollRef.current
+      if (!el) {
+        return
+      }
+      const pageWidth = el.clientWidth
+      if (pageWidth <= 0) {
+        return
+      }
+      const clamped = Math.min(Math.max(0, index), total - 1)
+      el.scrollTo({ left: clamped * pageWidth, behavior })
+      setActiveIndex(clamped)
+    },
+    [total],
+  )
 
   useEffect(() => {
     const el = scrollRef.current
@@ -24,6 +58,13 @@ export const ListingImageCarousel = ({
     }
     setActiveIndex(0)
   }, [trackKey])
+
+  useEffect(() => {
+    if (initialIndex == null) {
+      return
+    }
+    scrollToIndex(initialIndex)
+  }, [initialIndex, trackKey, scrollToIndex])
 
   const syncActiveFromScroll = useCallback(() => {
     const el = scrollRef.current
@@ -67,42 +108,66 @@ export const ListingImageCarousel = ({
 
   const goToIndex = useCallback(
     (index: number) => {
-      const el = scrollRef.current
-      if (!el) {
-        return
-      }
-      const pageWidth = el.clientWidth
-      if (pageWidth <= 0) {
-        return
-      }
-      const clamped = Math.min(Math.max(0, index), total - 1)
-      el.scrollTo({ left: clamped * pageWidth, behavior: 'smooth' })
+      scrollToIndex(index, 'smooth')
     },
-    [total],
+    [scrollToIndex],
+  )
+
+  const openLightbox = useCallback(
+    (index: number) => {
+      if (!enableLightbox || variant !== 'embedded') {
+        return
+      }
+      setLightboxStartIndex(index)
+      setLightboxOpen(true)
+    },
+    [enableLightbox, variant],
   )
 
   if (total === 0) {
     return null
   }
 
-  return (
-    <div className="relative">
+  const carousel = (
+    <div className={isFullscreen ? 'relative w-full' : 'relative'}>
       <div
         ref={scrollRef}
         role="region"
         aria-roledescription="carousel"
-        aria-label="商品照片"
+        aria-label={isFullscreen ? '商品照片放大檢視' : '商品照片'}
         className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
         {urls.map((url, index) => (
-          <div key={`${url}-${index.toString()}`} className="w-full min-w-full shrink-0 snap-center snap-always">
-            <img
-              src={url}
-              alt={`${title}（${(index + 1).toString()}/${total.toString()}）`}
-              className={imageClassName}
-              draggable={false}
-              loading={index === 0 ? 'eager' : 'lazy'}
-            />
+          <div
+            key={`${url}-${index.toString()}`}
+            className={`w-full min-w-full shrink-0 snap-center snap-always ${
+              isFullscreen ? 'flex items-center justify-center' : ''
+            }`}
+          >
+            {enableLightbox && variant === 'embedded' ? (
+              <button
+                type="button"
+                className="block w-full cursor-zoom-in border-0 bg-transparent p-0"
+                aria-label={`放大檢視第 ${(index + 1).toString()} 張照片`}
+                onClick={() => openLightbox(index)}
+              >
+                <img
+                  src={url}
+                  alt={`${title}（${(index + 1).toString()}/${total.toString()}）`}
+                  className={resolvedImageClassName}
+                  draggable={false}
+                  loading={index === 0 ? 'eager' : 'lazy'}
+                />
+              </button>
+            ) : (
+              <img
+                src={url}
+                alt={`${title}（${(index + 1).toString()}/${total.toString()}）`}
+                className={resolvedImageClassName}
+                draggable={false}
+                loading={index === 0 ? 'eager' : 'lazy'}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -151,5 +216,22 @@ export const ListingImageCarousel = ({
         </>
       ) : null}
     </div>
+  )
+
+  return (
+    <>
+      {carousel}
+      {enableLightbox && variant === 'embedded' ? (
+        <ListingImageLightbox open={lightboxOpen} onClose={() => setLightboxOpen(false)}>
+          <ListingImageCarousel
+            urls={urls}
+            title={title}
+            variant="fullscreen"
+            enableLightbox={false}
+            initialIndex={lightboxStartIndex}
+          />
+        </ListingImageLightbox>
+      ) : null}
+    </>
   )
 }
