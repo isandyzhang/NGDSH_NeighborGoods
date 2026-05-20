@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { accountApi, type AccountMe, type LinePreferences, type StartLineBindingResponse } from '@/features/account/api/accountApi'
 import { saveLineBindingPending } from '@/features/account/lineBindingSession'
+import {
+  appendLiffDebugToUrl,
+  enableLineBindDebugSession,
+  isLineBindDebugEnabled,
+} from '@/features/account/lineNotifyLiffDiagnostics'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -108,17 +113,24 @@ export const AccountPage = () => {
   }, [linePreferences])
 
   const openLineBindingWindow = useCallback(async (result: StartLineBindingResponse) => {
+    if (isLineBindDebugEnabled(window.location.search)) {
+      enableLineBindDebugSession()
+    }
+    const targetUrl = isLineBindDebugEnabled(window.location.search)
+      ? appendLiffDebugToUrl(result.liffUrl)
+      : result.liffUrl
+
     try {
       const liffMod = await import('@line/liff')
       if (liffMod.default.isInClient()) {
         // Full navigation — do not open liff.line.me inside the current LIFF webview (nested LIFF).
-        window.location.assign(result.liffUrl)
+        window.location.assign(targetUrl)
         return
       }
     } catch {
       // fall through
     }
-    window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+    window.open(targetUrl, '_blank', 'noopener,noreferrer')
   }, [])
 
   const handleStartLineOfficialBinding = async () => {
@@ -460,6 +472,13 @@ export const AccountPage = () => {
           {!profile.lineNotifyBound ? (
             <p className="text-xs text-text-muted">
               點擊「開始綁定」後會直接開啟 LINE 綁定頁，並在有效期間內重用同一組綁定憑證。
+              {isLineBindDebugEnabled(window.location.search) ? (
+                <span className="mt-1 block text-amber-800">除錯模式已開啟（liffDebug=1）</span>
+              ) : (
+                <span className="mt-1 block">
+                  除錯 LIFF 好友狀態：網址加上 <code className="text-[11px]">?liffDebug=1</code> 後再按開始綁定。
+                </span>
+              )}
             </p>
           ) : null}
         </Card>

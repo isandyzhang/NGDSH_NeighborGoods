@@ -7,18 +7,64 @@ import {
   resolveLineBindingParams,
   saveLineBindingPending,
 } from '@/features/account/lineBindingSession'
+import {
+  collectLineNotifyLiffDiagnostics,
+  formatLineNotifyLiffDiagnosticsLog,
+  isLineBindDebugEnabled,
+  type LineNotifyLiffDiagnostics,
+} from '@/features/account/lineNotifyLiffDiagnostics'
 import { env } from '@/shared/config/env'
 import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 
-type Phase = 'loading' | 'needLineApp' | 'needFriend' | 'submitting' | 'done' | 'error'
+type Phase = 'loading' | 'debug' | 'needLineApp' | 'needFriend' | 'submitting' | 'done' | 'error'
 
 const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
 const LINE_BINDING_COMPLETED_FLAG = 'neighborGoods.lineBindingCompleted'
+const DEBUG_MIN_PAUSE_MS = 4000
+
+const LineNotifyLiffDebugPanel = ({
+  diagnostics,
+  onRefresh,
+  onContinue,
+  onForceComplete,
+  refreshing,
+}: {
+  diagnostics: LineNotifyLiffDiagnostics
+  onRefresh: () => void
+  onContinue: () => void
+  onForceComplete: () => void
+  refreshing: boolean
+}) => (
+  <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-left">
+    <p className="text-sm font-semibold text-amber-900">LIFF 綁定除錯（liffDebug=1）</p>
+    <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-amber-950">
+      {formatLineNotifyLiffDiagnosticsLog(diagnostics)}
+    </pre>
+    <p className="text-xs text-amber-800">
+      friendFlag 須為 true 才會自動綁定。若已加好友仍 false，請查 Login channel 是否 Link a bot。
+    </p>
+    <div className="flex flex-col gap-2">
+      <Button type="button" variant="secondary" className="w-full" disabled={refreshing} onClick={onRefresh}>
+        {refreshing ? '檢測中…' : '重新檢測 getFriendship'}
+      </Button>
+      <Button type="button" className="w-full" onClick={onContinue}>
+        繼續綁定流程
+      </Button>
+      <Button type="button" variant="secondary" className="w-full" onClick={onForceComplete}>
+        略過好友檢查，強制完成綁定
+      </Button>
+    </div>
+  </div>
+)
 
 export const LineNotifyLiffPage = () => {
   const [searchParams] = useSearchParams()
   const search = searchParams.toString()
+  const liffDebug = useMemo(
+    () => isLineBindDebugEnabled(search ? `?${search}` : window.location.search),
+    [search],
+  )
   const { bindToken, botLink } = useMemo(
     () => resolveLineBindingParams(search ? `?${search}` : window.location.search),
     [search],
@@ -27,7 +73,22 @@ export const LineNotifyLiffPage = () => {
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorText, setErrorText] = useState<string | null>(null)
+  const [diagnostics, setDiagnostics] = useState<LineNotifyLiffDiagnostics | null>(null)
+  const [debugRefreshing, setDebugRefreshing] = useState(false)
   const isCheckingFriendshipRef = useRef(false)
+
+  const logDiagnostics = useCallback((d: LineNotifyLiffDiagnostics) => {
+    const text = formatLineNotifyLiffDiagnosticsLog(d)
+    console.info(text)
+    console.info('[LIFF bind debug JSON]', d)
+  }, [])
+
+  const captureDiagnostics = useCallback(async () => {
+    const d = await collectLineNotifyLiffDiagnostics(liffId, bindToken, botLink)
+    setDiagnostics(d)
+    logDiagnostics(d)
+    return d
+  }, [bindToken, botLink, logDiagnostics])
 
   const postComplete = useCallback(async () => {
     const idToken = liff.getIDToken()
@@ -75,30 +136,67 @@ export const LineNotifyLiffPage = () => {
     }
   }, [finishAndClose, postComplete])
 
-  const refreshFriendship = useCallback(async () => {
-    if (isCheckingFriendshipRef.current) {
-      return
-    }
-
-    isCheckingFriendshipRef.current = true
-    try {
-      if (!liff.isApiAvailable('getFriendship')) {
-        setPhase('needFriend')
+  const refreshFriendship = useCallback(
+    async (friendshipErrorHint?: string | null) => {
+      if (isCheckingFriendshipRef.current) {
         return
       }
 
-      const f = await liff.getFriendship()
-      if (f.friendFlag) {
-        await runComplete()
-      } else {
+      isCheckingFriendshipRef.current = true
+      try {
+        if (!liff.isApiAvailable('getFriendship')) {
+          if (friendshipErrorHint) {
+            setErrorText(friendshipErrorHint)
+          }
+          setPhase('needFriend')
+          return
+        }
+
+        const f = await liff.getFriendship()
+        if (f.friendFlag) {
+          await runComplete()
+        } else {
+          if (liffDebug && diagnostics) {
+            setDiagnostics({
+              ...diagnostics,
+              friendFlag: false,
+              friendshipError: friendshipErrorHint ?? 'getFriendship: friendFlag=false',
+              capturedAt: new Date().toISOString(),
+            })
+          }
+          setPhase('needFriend')
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'getFriendship 失敗'
+        if (liffDebug && diagnostics) {
+          setDiagnostics({
+            ...diagnostics,
+            friendFlag: null,
+            friendshipError: msg,
+            capturedAt: new Date().toISOString(),
+          })
+        }
         setPhase('needFriend')
+      } finally {
+        isCheckingFriendshipRef.current = false
       }
-    } catch {
-      setPhase('needFriend')
-    } finally {
-      isCheckingFriendshipRef.current = false
-    }
-  }, [runComplete])
+    },
+    [diagnostics, liffDebug, runComplete],
+  )
+
+  const proceedAfterDebug = useCallback(async () => {
+    await refreshFriendship(diagnostics?.friendshipError ?? null)
+  }, [diagnostics?.friendshipError, refreshFriendship])
+
+  const showDebugPause = useCallback(
+    async (d: LineNotifyLiffDiagnostics) => {
+      setPhase('debug')
+      setDiagnostics(d)
+      logDiagnostics(d)
+      await new Promise((resolve) => window.setTimeout(resolve, DEBUG_MIN_PAUSE_MS))
+    },
+    [logDiagnostics],
+  )
 
   const handleConfirmFriend = useCallback(() => {
     if (liff.isApiAvailable('getFriendship')) {
@@ -108,6 +206,17 @@ export const LineNotifyLiffPage = () => {
 
     void runComplete()
   }, [refreshFriendship, runComplete])
+
+  const handleDebugRefresh = useCallback(async () => {
+    setDebugRefreshing(true)
+    try {
+      const d = await captureDiagnostics()
+      setPhase('debug')
+      setDiagnostics(d)
+    } finally {
+      setDebugRefreshing(false)
+    }
+  }, [captureDiagnostics])
 
   useEffect(() => {
     let disposed = false
@@ -142,7 +251,17 @@ export const LineNotifyLiffPage = () => {
           return
         }
 
-        await refreshFriendship()
+        const d = await collectLineNotifyLiffDiagnostics(liffId, bindToken, botLink)
+        if (disposed) {
+          return
+        }
+
+        if (liffDebug) {
+          await showDebugPause(d)
+          return
+        }
+
+        await refreshFriendship(d.friendshipError)
       } catch (err) {
         if (!disposed) {
           setPhase('error')
@@ -154,7 +273,14 @@ export const LineNotifyLiffPage = () => {
     return () => {
       disposed = true
     }
-  }, [bindToken, botLink, loginRedirectUri, refreshFriendship])
+  }, [
+    bindToken,
+    botLink,
+    liffDebug,
+    loginRedirectUri,
+    refreshFriendship,
+    showDebugPause,
+  ])
 
   useEffect(() => {
     if (phase !== 'needFriend') {
@@ -188,7 +314,21 @@ export const LineNotifyLiffPage = () => {
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4 py-8">
       <h1 className="text-xl font-semibold text-text-main">LINE 官方通知綁定</h1>
 
+      {liffDebug ? (
+        <p className="text-xs text-amber-800">除錯模式：請查看下方狀態與 Console（[LIFF bind debug]）</p>
+      ) : null}
+
       {phase === 'loading' ? <p className="text-text-subtle">載入中…</p> : null}
+
+      {phase === 'debug' && diagnostics ? (
+        <LineNotifyLiffDebugPanel
+          diagnostics={diagnostics}
+          refreshing={debugRefreshing}
+          onRefresh={() => void handleDebugRefresh()}
+          onContinue={() => void proceedAfterDebug()}
+          onForceComplete={() => void runComplete()}
+        />
+      ) : null}
 
       {phase === 'needLineApp' ? (
         <p className="text-text-subtle">請在 LINE App 內開啟此連結，以完成綁定。</p>
@@ -197,12 +337,23 @@ export const LineNotifyLiffPage = () => {
       {phase === 'needFriend' ? (
         <div className="space-y-3">
           <p className="text-text-subtle">請先加入 NeighborGoods 官方帳號為好友，才能接收推播通知。</p>
+          {liffDebug && diagnostics ? (
+            <pre className="max-h-40 overflow-auto rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
+              friendFlag: {diagnostics.friendFlag === null ? 'n/a' : String(diagnostics.friendFlag)}
+              {diagnostics.friendshipError ? `\n${diagnostics.friendshipError}` : ''}
+            </pre>
+          ) : null}
           <Button type="button" className="w-full" onClick={() => void handleOpenAddFriend()}>
             開啟加好友
           </Button>
           <Button type="button" variant="secondary" className="w-full" onClick={() => void handleConfirmFriend()}>
             我已完成加好友
           </Button>
+          {liffDebug ? (
+            <Button type="button" variant="secondary" className="w-full" onClick={() => void runComplete()}>
+              除錯：略過好友檢查綁定
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -213,6 +364,11 @@ export const LineNotifyLiffPage = () => {
       {phase === 'error' && errorText ? (
         <div className="space-y-3">
           <p className="text-danger">{errorText}</p>
+          {liffDebug && diagnostics ? (
+            <pre className="max-h-32 overflow-auto rounded border border-amber-200 bg-amber-50 p-2 text-xs">
+              {formatLineNotifyLiffDiagnosticsLog(diagnostics)}
+            </pre>
+          ) : null}
           <Button
             type="button"
             variant="secondary"
