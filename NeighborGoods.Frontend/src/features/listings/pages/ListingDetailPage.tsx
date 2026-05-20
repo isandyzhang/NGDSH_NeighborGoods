@@ -224,19 +224,6 @@ export const ListingDetailPage = () => {
     }
   }, [id])
 
-  useEffect(() => {
-    let disposed = false
-    void getLiffShareRuntimeStatus().then((status) => {
-      if (!disposed) {
-        setLiffRuntimeStatus(status)
-      }
-    })
-
-    return () => {
-      disposed = true
-    }
-  }, [id])
-
   const handleChat = async () => {
     if (!item || conversationBusy) {
       return
