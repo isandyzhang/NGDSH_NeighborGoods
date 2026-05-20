@@ -82,7 +82,7 @@ export const ListingDetailPage = () => {
     queryFn: () => listingApi.getById(id),
     enabled: Boolean(id),
     staleTime: 15_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   })
 
   const item: ListingDetail | null = detailQuery.data ?? null
