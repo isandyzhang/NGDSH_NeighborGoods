@@ -35,7 +35,7 @@ export const ListingImageLightbox = ({ open, onClose, children }: ListingImageLi
     <AnimatePresence>
       {open ? (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 px-4 py-12"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-12"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

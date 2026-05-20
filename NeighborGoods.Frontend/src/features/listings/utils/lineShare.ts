@@ -25,6 +25,17 @@ export type ShareListingResult = {
   fallbackUrl?: string
 }
 
+export type ShareListingFlexOnlyResult = {
+  sent: boolean
+  reason:
+    | 'SENT'
+    | 'LIFF_UNAVAILABLE'
+    | 'NOT_IN_LINE_CLIENT'
+    | 'SHARE_TARGET_PICKER_UNAVAILABLE'
+    | 'USER_CANCELLED_OR_CLOSED'
+    | 'LIFF_ERROR'
+}
+
 export type LiffShareDiagnostics = {
   liffIdConfigured: boolean
   liffReady: boolean
@@ -186,6 +197,33 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
   } catch {
     openLineUrlShareWindow(fallbackUrl)
     return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
+  }
+}
+
+export const shareListingToLineFlexOnly = async (
+  options: ShareListingOptions
+): Promise<ShareListingFlexOnlyResult> => {
+  try {
+    const liff = await ensureLiffReady()
+    if (!liff) {
+      return { sent: false, reason: 'LIFF_UNAVAILABLE' }
+    }
+    if (!liff.isInClient()) {
+      return { sent: false, reason: 'NOT_IN_LINE_CLIENT' }
+    }
+    if (!liff.isApiAvailable('shareTargetPicker')) {
+      return { sent: false, reason: 'SHARE_TARGET_PICKER_UNAVAILABLE' }
+    }
+
+    const flexMessage = buildListingFlexMessage(options)
+    const result = await liff.shareTargetPicker([flexMessage])
+    if (result === null) {
+      return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED' }
+    }
+
+    return { sent: true, reason: 'SENT' }
+  } catch {
+    return { sent: false, reason: 'LIFF_ERROR' }
   }
 }
 

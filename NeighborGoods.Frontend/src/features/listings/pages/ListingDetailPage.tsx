@@ -18,6 +18,7 @@ import {
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
   getLiffShareDiagnostics,
+  shareListingToLineFlexOnly,
   shareListingToLine,
   type LiffShareDiagnostics,
   type ShareListingResult,
@@ -72,6 +73,8 @@ export const ListingDetailPage = () => {
   const [shareDebugBusy, setShareDebugBusy] = useState(false)
   const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
+  const [flexShareBusy, setFlexShareBusy] = useState(false)
+  const [isLiffShareEnvReady, setIsLiffShareEnvReady] = useState<boolean | null>(null)
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -195,6 +198,29 @@ export const ListingDetailPage = () => {
     }
   }, [isAuthenticated, source])
 
+  useEffect(() => {
+    let disposed = false
+    setIsLiffShareEnvReady(null)
+    void getLiffShareDiagnostics()
+      .then((diagnostics) => {
+        if (disposed) {
+          return
+        }
+        const envReady =
+          diagnostics.liffReady && diagnostics.isInClient && diagnostics.shareTargetPickerAvailable
+        setIsLiffShareEnvReady(envReady)
+      })
+      .catch(() => {
+        if (!disposed) {
+          setIsLiffShareEnvReady(false)
+        }
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [id])
+
   const handleChat = async () => {
     if (!item || conversationBusy) {
       return
@@ -316,6 +342,35 @@ export const ListingDetailPage = () => {
     setShareDebugOpen(true)
   }
 
+  const handleShareFlexOnly = async () => {
+    if (!item || !canShare || flexShareBusy) {
+      return
+    }
+
+    setFlexShareBusy(true)
+    setError(null)
+    try {
+      const diagnostics = await getLiffShareDiagnostics()
+      const envReady = diagnostics.liffReady && diagnostics.isInClient && diagnostics.shareTargetPickerAvailable
+      setIsLiffShareEnvReady(envReady)
+      if (!envReady) {
+        setError('目前不是 LIFF 可分享 Flex 的環境，請改在 LINE App 內開啟。')
+        return
+      }
+
+      const result = await shareListingToLineFlexOnly(getShareOptions(item))
+      if (!result.sent && result.reason !== 'USER_CANCELLED_OR_CLOSED') {
+        setError('Flex Message 發送失敗，請稍後再試。')
+      }
+    } catch {
+      setError('Flex Message 發送失敗，請稍後再試。')
+    } finally {
+      setFlexShareBusy(false)
+    }
+  }
+
+  const liffEnvText = isLiffShareEnvReady == null ? '檢查中' : isLiffShareEnvReady ? '是' : '否'
+
   const handleShareDebugConfirm = async () => {
     if (!item) {
       return
@@ -324,6 +379,30 @@ export const ListingDetailPage = () => {
     await executeShare(item)
     setShareDebugBusy(false)
   }
+
+  const renderImagePanel = (extraClassName?: string) => (
+    <div
+      className={`relative overflow-hidden rounded-2xl border border-border bg-surface-2 lg:w-[44%] lg:shrink-0 ${
+        extraClassName ?? ''
+      }`}
+    >
+      {imageSlides.length > 0 ? (
+        <ListingImageCarousel urls={imageSlides} title={item?.title ?? ''} />
+      ) : (
+        <div className="flex aspect-[16/10] items-center justify-center text-xl text-text-muted lg:aspect-[4/3]">無圖片</div>
+      )}
+      {detailOverlay === 'pending' ? (
+        <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+          <p className="text-xl font-semibold tracking-wide">交易處理中</p>
+          <p className="text-3xl font-bold tabular-nums">{formatCountdown(pendingRemainingSeconds ?? 0)}</p>
+        </motion.div>
+      ) : detailOverlay === 'reserved' ? (
+        <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+          <p className="text-xl font-semibold tracking-wide">已保留</p>
+        </motion.div>
+      ) : null}
+    </div>
+  )
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 md:py-8">
@@ -363,6 +442,7 @@ export const ListingDetailPage = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
             >
+            {renderImagePanel('mb-4 hidden lg:block lg:w-full')}
             <Card className="space-y-4 border-border !bg-[#F5EBDD] p-4 text-text-main md:p-5">
               <section className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -401,35 +481,15 @@ export const ListingDetailPage = () => {
             >
             <Card className="space-y-4 border-border bg-surface p-4 md:p-5 lg:p-4">
               <section className="space-y-4">
-                <motion.div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-2xl font-bold text-text-main md:text-3xl lg:text-2xl">商品資訊</h2>
-                  <span className="rounded-full bg-surface-2 px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
-                    {getListingStatusLabel(item.statusCode)}
-                  </span>
-                </motion.div>
-                <div className="space-y-4 lg:flex lg:items-start lg:gap-4 lg:space-y-0">
-                  <div className="relative overflow-hidden rounded-2xl border border-border bg-surface-2 lg:w-[44%] lg:shrink-0">
-                    {imageSlides.length > 0 ? (
-                      <ListingImageCarousel urls={imageSlides} title={item.title} />
-                    ) : (
-                      <div className="flex aspect-[16/10] items-center justify-center text-xl text-text-muted lg:aspect-[4/3]">
-                        無圖片
-                      </div>
-                    )}
-                    {detailOverlay === 'pending' ? (
-                      <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
-                        <p className="text-xl font-semibold tracking-wide">交易處理中</p>
-                        <p className="text-3xl font-bold tabular-nums">{formatCountdown(pendingRemainingSeconds ?? 0)}</p>
-                      </motion.div>
-                    ) : detailOverlay === 'reserved' ? (
-                      <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
-                        <p className="text-xl font-semibold tracking-wide">已保留</p>
-                      </motion.div>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-4 lg:w-[56%]">
-                    <h3 className="text-3xl font-bold leading-tight text-text-main md:text-5xl lg:text-4xl">{item.title}</h3>
+                <div className="space-y-4">
+                  {renderImagePanel('lg:hidden')}
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-full bg-surface-2 px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                        {getListingStatusLabel(item.statusCode)}
+                      </span>
+                      <h3 className="text-3xl font-bold leading-tight text-text-main md:text-5xl lg:text-4xl">{item.title}</h3>
+                    </div>
                     <div className="flex flex-wrap items-center gap-3">
                       {item.isFree ? (
                         <span className="inline-flex items-center rounded-full bg-[#2f7d4e] px-5 py-1.5 text-xl font-bold text-white md:text-2xl lg:text-xl">
@@ -512,6 +572,15 @@ export const ListingDetailPage = () => {
                     className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
                   >
                     分享到 LINE
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void handleShareFlexOnly()}
+                    disabled={!canShare || flexShareBusy}
+                    variant="secondary"
+                    className="min-h-[3.2rem] w-full text-lg font-semibold md:text-xl"
+                  >
+                    {flexShareBusy ? '發送中...' : `發送 Flex Message（LIFF 環境：${liffEnvText}）`}
                   </Button>
                 </div>
               </section>
