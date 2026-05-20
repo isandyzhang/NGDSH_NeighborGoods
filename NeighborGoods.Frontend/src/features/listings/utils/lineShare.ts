@@ -195,7 +195,7 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
     }
 
     const flexMessage = buildListingFlexMessage(options)
-    const result = await liff.shareTargetPicker([flexMessage])
+    const result = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
     // LIFF may return null/undefined depending on version and user action.
     // Treat an in-client call as handled and avoid forcing fallback text share.
     if (result === null) {
@@ -225,7 +225,7 @@ export const shareListingToLineFlexOnly = async (
     }
 
     const flexMessage = buildListingFlexMessage(options)
-    const result = await liff.shareTargetPicker([flexMessage])
+    const result = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
     if (result === null) {
       return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED' }
     }
