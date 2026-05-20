@@ -49,6 +49,17 @@ export type LiffShareDiagnostics = {
   errorMessage: string | null
 }
 
+export type LiffShareRuntimeStatus = {
+  liffIdConfigured: boolean
+  liffReady: boolean
+  isLoggedIn: boolean
+  isInClient: boolean
+  shareTargetPickerAvailable: boolean
+  contextType: string | null
+  errorCode: string | null
+  errorMessage: string | null
+}
+
 export const detectLiffInClient = async (): Promise<boolean | null> => {
   try {
     const liffMod = await import('@line/liff')
@@ -290,6 +301,60 @@ export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> =
       isInClient: false,
       shareTargetPickerAvailable: false,
       errorCode: 'LIFF_DIAGNOSTIC_EXCEPTION',
+      errorMessage,
+    }
+  }
+}
+
+export const getLiffShareRuntimeStatus = async (): Promise<LiffShareRuntimeStatus> => {
+  if (!LIFF_ID?.trim()) {
+    return {
+      liffIdConfigured: false,
+      liffReady: false,
+      isLoggedIn: false,
+      isInClient: false,
+      shareTargetPickerAvailable: false,
+      contextType: null,
+      errorCode: 'LIFF_ID_MISSING',
+      errorMessage: 'VITE_LINE_LIFF_ID 未設定',
+    }
+  }
+
+  try {
+    const liff = await ensureLiffReady()
+    if (!liff) {
+      return {
+        liffIdConfigured: true,
+        liffReady: false,
+        isLoggedIn: false,
+        isInClient: false,
+        shareTargetPickerAvailable: false,
+        contextType: null,
+        errorCode: 'LIFF_INIT_FAILED',
+        errorMessage: 'LIFF 初始化失敗',
+      }
+    }
+
+    return {
+      liffIdConfigured: true,
+      liffReady: true,
+      isLoggedIn: liff.isLoggedIn(),
+      isInClient: liff.isInClient(),
+      shareTargetPickerAvailable: liff.isApiAvailable('shareTargetPicker'),
+      contextType: liff.getContext()?.type ?? null,
+      errorCode: null,
+      errorMessage: null,
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'LIFF 狀態檢查發生未知錯誤'
+    return {
+      liffIdConfigured: true,
+      liffReady: false,
+      isLoggedIn: false,
+      isInClient: false,
+      shareTargetPickerAvailable: false,
+      contextType: null,
+      errorCode: 'LIFF_RUNTIME_STATUS_EXCEPTION',
       errorMessage,
     }
   }
