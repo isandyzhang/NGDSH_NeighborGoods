@@ -366,9 +366,6 @@ export const ListingDetailPage = () => {
     setFlexShareBusy(true)
     setError(null)
     try {
-      const runtimeStatus = await getLiffShareRuntimeStatus()
-      setLiffRuntimeStatus(runtimeStatus)
-
       const result = await shareListingToLineFlexOnly(getShareOptions(item))
       if (result.reason === 'SENT') {
         setIsLiffShareEnvReady(true)
