@@ -109,17 +109,15 @@ export const AccountPage = () => {
   const openLineBindingWindow = useCallback(async (result: StartLineBindingResponse) => {
     try {
       const liffMod = await import('@line/liff')
-      const liff = liffMod.default
-      const liffId = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
-      if (liffId?.trim() && liff.isInClient()) {
-        await liff.init({ liffId: liffId.trim() })
-        await liff.openWindow({ url: result.liffUrl, external: false })
-      } else {
-        window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+      if (liffMod.default.isInClient()) {
+        // Full navigation — do not open liff.line.me inside the current LIFF webview (nested LIFF).
+        window.location.assign(result.liffUrl)
+        return
       }
     } catch {
-      window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
+      // fall through
     }
+    window.open(result.liffUrl, '_blank', 'noopener,noreferrer')
   }, [])
 
   const handleStartLineOfficialBinding = async () => {
