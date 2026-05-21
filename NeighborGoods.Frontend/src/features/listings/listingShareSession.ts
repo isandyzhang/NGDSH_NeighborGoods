@@ -1,4 +1,5 @@
 import { hasNestedLiffState } from '@/features/admin/liffInitDebug'
+import { clearLineBindingPending } from '@/features/account/lineBindingSession'
 import type { ShareListingOptions } from '@/features/listings/utils/lineShare'
 
 const STORAGE_KEY = 'neighborGoods.listingSharePending'
@@ -76,6 +77,7 @@ export const saveListingSharePending = (options: ShareListingOptions, returnTo: 
     returnTo: returnTo.startsWith('/') ? returnTo : '/listings',
     savedAt: Date.now(),
   }
+  clearLineBindingPending()
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
 }
 
