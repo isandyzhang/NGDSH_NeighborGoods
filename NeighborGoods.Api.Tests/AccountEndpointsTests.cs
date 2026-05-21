@@ -282,8 +282,8 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         var liffUrl = data.GetProperty("liffUrl").GetString();
         Assert.False(string.IsNullOrWhiteSpace(liffUrl));
         Assert.Contains("bindToken=", liffUrl!, StringComparison.Ordinal);
-        Assert.Contains("liff.state=", liffUrl!, StringComparison.Ordinal);
-        Assert.Contains("%2Fliff%2Fline-notify", liffUrl!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/liff/line-notify", liffUrl!, StringComparison.Ordinal);
+        Assert.DoesNotContain("liff.state=", liffUrl!, StringComparison.Ordinal);
         Assert.DoesNotContain("%3FbindToken", liffUrl!, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(bindingToken!, liffUrl!, StringComparison.Ordinal);
 

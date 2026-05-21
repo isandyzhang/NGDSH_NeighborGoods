@@ -21,10 +21,10 @@ public sealed class AccountLineBindingService(
 
     private static string BuildLiffBindingUrl(string liffId, string bindToken, string botLink)
     {
-        // liff.state carries path only; bindToken/botLink stay as outer query params (nested query in liff.state is dropped by LINE).
-        return LineLiffUrlBuilder.BuildDeepLink(liffId, "/liff/line-notify") +
-               $"&bindToken={Uri.EscapeDataString(bindToken)}" +
-               $"&botLink={Uri.EscapeDataString(botLink)}";
+        // bindToken/botLink 放在 path 後 query（勿塞進 liff.state，LINE 易丟參）。
+        var query =
+            $"bindToken={Uri.EscapeDataString(bindToken)}&botLink={Uri.EscapeDataString(botLink)}";
+        return LineLiffUrlBuilder.BuildPathLiffUrl(liffId, "/liff/line-notify", query);
     }
 
     public async Task<(StartLineBindingResponse? Data, string? ErrorCode, string? ErrorMessage)> StartAsync(

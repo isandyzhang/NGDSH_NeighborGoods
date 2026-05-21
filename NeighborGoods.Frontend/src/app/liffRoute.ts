@@ -9,41 +9,50 @@ const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.start
 
 import { resolveLineLiffId } from '@/app/lineLiffId'
 
-/** 在 LINE 內開啟站內路徑（透過 liff.state 深層連結） */
-export const buildLiffDeepLink = (internalTarget: string) => {
+/**
+ * Path 格式：liff.line.me/{liffId}/account?...
+ * 圖文選單、Flex 站內連結；手機實測比 liff.state 穩定。
+ */
+export const buildLiffPathUrl = (internalPath: string, search = '') => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
-  const trimmed = internalTarget.trim()
-  const liffState = (() => {
-    if (trimmed.startsWith('/')) {
-      return trimmed
-    }
-    // query-only（listingId=...）不可加前導 /，否則會變成 /listingId=... 而導向錯誤
-    if (trimmed.includes('=') && !trimmed.includes('/')) {
-      return trimmed
-    }
-    return `/${trimmed}`
-  })()
-  const fallbackPath = liffState.startsWith('/') ? liffState : `/${liffState}`
+  const trimmedPath = internalPath.trim()
+  const path = trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`
+  const normalizedSearch = search.startsWith('?') ? search : search ? `?${search}` : ''
   const trimmedLiffId = resolveLineLiffId()
   if (!trimmedLiffId) {
-    return `${origin}${fallbackPath}`
-  }
-  return `https://liff.line.me/${trimmedLiffId}?liff.state=${encodeURIComponent(liffState)}`
-}
-
-/**
- * 商品詳情 Flex 按鈕用：liff.line.me/{liffId}/listings/{id}?...
- * 手機實測比 ?liff.state=/listings/{id} 穩定（少經 RootEntry 解析）。
- */
-export const buildListingDetailLiffUrl = (listingId: string, search = '?from=listings') => {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
-  const path = `/listings/${listingId.trim()}`
-  const normalizedSearch = search.startsWith('?') ? search : search ? `?${search}` : '?from=listings'
-  const trimmedLiffId = resolveLineLiffId()
-  if (!trimmedLiffId || !listingId.trim()) {
     return `${origin}${path}${normalizedSearch}`
   }
   return `https://liff.line.me/${trimmedLiffId.trim()}${path}${normalizedSearch}`
+}
+
+/** query-only 旗標仍用 liff.state（listingShare、listingId 等，須在 / 做 liff.init） */
+export const buildLiffDeepLink = (internalTarget: string) => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
+  const trimmed = internalTarget.trim()
+  const isQueryOnlyFlag =
+    trimmed.includes('=') && !trimmed.startsWith('/') && !trimmed.includes('/')
+  if (!isQueryOnlyFlag) {
+    const qIndex = trimmed.indexOf('?')
+    if (qIndex >= 0) {
+      return buildLiffPathUrl(trimmed.slice(0, qIndex), trimmed.slice(qIndex))
+    }
+    return buildLiffPathUrl(trimmed.startsWith('/') ? trimmed : `/${trimmed}`)
+  }
+
+  const trimmedLiffId = resolveLineLiffId()
+  const fallbackPath = `/${trimmed}`
+  if (!trimmedLiffId) {
+    return `${origin}${fallbackPath}`
+  }
+  return `https://liff.line.me/${trimmedLiffId}?liff.state=${encodeURIComponent(trimmed)}`
+}
+
+/** 商品詳情 Flex「查看商品」 */
+export const buildListingDetailLiffUrl = (listingId: string, search = '?from=listings') => {
+  if (!listingId.trim()) {
+    return buildLiffPathUrl('/listings', search)
+  }
+  return buildLiffPathUrl(`/listings/${listingId.trim()}`, search)
 }
 
 const buildLineNotifyTarget = (bindToken: string, botLink: string) =>

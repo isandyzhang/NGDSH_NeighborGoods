@@ -89,7 +89,7 @@ function Invoke-LineImageUpload {
   }
 }
 
-function Build-LiffDeepLink {
+function Build-LiffPathLink {
   param(
     [string]$LiffUrl,
     [string]$WebBaseUrl,
@@ -106,8 +106,7 @@ function Build-LiffDeepLink {
     if ($qIndex -ge 0) {
       $liffBase = $liffBase.Substring(0, $qIndex)
     }
-    $encoded = [System.Uri]::EscapeDataString($InternalPath)
-    return "${liffBase}?liff.state=$encoded"
+    return "${liffBase}${InternalPath}"
   }
 
   return "$WebBaseUrl$InternalPath"
@@ -194,15 +193,15 @@ function Get-CurrentDefaultRichMenuId {
 
 Write-Host "[1/4] Creating rich menu..."
 $trimmedLiffUrl = $LiffUrl.Trim()
-$listingsUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings"
-$createListingUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings/create"
-$accountUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/account"
-$favoritesUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/favorites"
+$listingsUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings"
+$createListingUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings/create"
+$accountUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/account"
+$favoritesUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/favorites"
 if ([string]::IsNullOrWhiteSpace($trimmedLiffUrl)) {
   Write-Warning "LiffUrl not set; rich menu URI actions use WebBaseUrl only (LIFF init may fail in LINE in-app browser)."
 }
 else {
-  Write-Host "Using LIFF deep links (liff.state) for all URI menu areas."
+  Write-Host "Using LIFF path links (liff.line.me/{id}/path) for all URI menu areas."
 }
 Write-Host "  listings: $listingsUrl"
 $definition = Build-RichMenuDefinition `
