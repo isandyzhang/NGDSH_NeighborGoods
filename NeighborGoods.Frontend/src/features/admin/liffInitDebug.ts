@@ -2,7 +2,58 @@ import liff from '@line/liff'
 
 export const HARDCODED_LIFF_ID = '2008745853-Ui8PkOGi'
 
+export const ADMIN_LIFF_DEBUG_SESSION_KEY = 'neighborGoods.adminLiffDebug'
+
 export const ENV_LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+
+export const enableAdminLiffDebugSession = () => {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(ADMIN_LIFF_DEBUG_SESSION_KEY, '1')
+  }
+}
+
+export const clearAdminLiffDebugSession = () => {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem(ADMIN_LIFF_DEBUG_SESSION_KEY)
+  }
+}
+
+export const isAdminLiffDebugSessionActive = (): boolean => {
+  if (typeof sessionStorage === 'undefined') {
+    return false
+  }
+  return sessionStorage.getItem(ADMIN_LIFF_DEBUG_SESSION_KEY) === '1'
+}
+
+const liffStateImpliesAdminDebug = (liffState: string): boolean => {
+  try {
+    const decoded = decodeURIComponent(liffState.trim())
+    if (!decoded) {
+      return false
+    }
+    const query = decoded.includes('?') ? decoded.slice(decoded.indexOf('?')) : decoded.startsWith('?') ? decoded : ''
+    if (query) {
+      return new URLSearchParams(query.startsWith('?') ? query.slice(1) : query).get('adminLiffDebug') === '1'
+    }
+    return decoded.includes('adminLiffDebug=1')
+  } catch {
+    return false
+  }
+}
+
+/** 根路徑是否應顯示 LIFF init 除錯頁（session、query、或 liff.state 皆可） */
+export const isAdminLiffDebugEntry = (search: string): boolean => {
+  const normalized = search.startsWith('?') ? search : search ? `?${search}` : ''
+  const params = new URLSearchParams(normalized)
+  if (params.get('adminLiffDebug') === '1') {
+    return true
+  }
+  const liffState = params.get('liff.state')
+  if (liffState && liffStateImpliesAdminDebug(liffState)) {
+    return true
+  }
+  return isAdminLiffDebugSessionActive()
+}
 
 export type LiffInitSource = 'env' | 'hardcoded'
 
@@ -171,8 +222,14 @@ export const collectPostInitSnapshot = async (): Promise<LiffPostInitSnapshot> =
   return base
 }
 
+/** LIFF 入口；liff.state 由按鈕自動帶入，使用者無需手動改網址 */
 export const buildLiffAdminDebugUrl = (liffId: string) =>
   `https://liff.line.me/${liffId.trim()}?liff.state=${encodeURIComponent('/?adminLiffDebug=1')}`
+
+export const openLiffForAdminDebug = (liffId: string) => {
+  enableAdminLiffDebugSession()
+  window.location.assign(buildLiffAdminDebugUrl(liffId))
+}
 
 export const formatPreInitSnapshot = (s: LiffPreInitSnapshot): string =>
   [

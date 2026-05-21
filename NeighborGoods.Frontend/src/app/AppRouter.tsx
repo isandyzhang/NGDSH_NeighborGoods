@@ -5,6 +5,7 @@ import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
 import { SellerPage } from '@/features/seller/pages/SellerPage'
 import { AppLayout } from '@/app/AppLayout'
+import { isAdminLiffDebugEntry } from '@/features/admin/liffInitDebug'
 import { isLineNotifyBindingEntry, resolveLiffEntryTarget } from '@/app/liffRoute'
 
 const LineLoginCallbackPage = lazy(() =>
@@ -69,7 +70,7 @@ const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">
 
 const RootEntry = () => {
   const location = useLocation()
-  if (new URLSearchParams(location.search).get('adminLiffDebug') === '1') {
+  if (isAdminLiffDebugEntry(location.search)) {
     return <LiffDebugPage mode="liffEntry" />
   }
 

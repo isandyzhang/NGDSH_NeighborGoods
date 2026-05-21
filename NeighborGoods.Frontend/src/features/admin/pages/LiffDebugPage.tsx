@@ -4,6 +4,7 @@ import { accountApi } from '@/features/account/api/accountApi'
 import { ADMIN_ROLE_CODE } from '@/features/admin/constants/adminRole'
 import {
   buildLiffAdminDebugUrl,
+  clearAdminLiffDebugSession,
   collectPostInitSnapshot,
   collectPreInitSnapshot,
   ENV_LIFF_ID,
@@ -11,6 +12,8 @@ import {
   formatPostInitSnapshot,
   formatPreInitSnapshot,
   HARDCODED_LIFF_ID,
+  isAdminLiffDebugSessionActive,
+  openLiffForAdminDebug,
   runLiffInitAttempt,
   type LiffInitAttemptResult,
   type LiffInitSource,
@@ -97,11 +100,8 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
   const isAdmin = mode === 'admin' || role === ADMIN_ROLE_CODE
   const canInit = initEnabled && isAdmin && !roleLoading
 
-  const envLiffUrl = useMemo(() => {
-    const id = ENV_LIFF_ID?.trim()
-    return id ? buildLiffAdminDebugUrl(id) : null
-  }, [])
-
+  const envLiffId = ENV_LIFF_ID?.trim() ?? ''
+  const envLiffUrl = useMemo(() => (envLiffId ? buildLiffAdminDebugUrl(envLiffId) : null), [envLiffId])
   const hardcodedLiffUrl = useMemo(() => buildLiffAdminDebugUrl(HARDCODED_LIFF_ID), [])
 
   const handleInit = useCallback(
@@ -145,6 +145,15 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
     window.setTimeout(() => setCopyMessage(null), 2000)
   }, [])
 
+  const handleEndDebug = useCallback(() => {
+    clearAdminLiffDebugSession()
+    if (mode === 'liffEntry') {
+      window.location.replace('/listings')
+      return
+    }
+    window.location.assign('/admin/liff-debug')
+  }, [mode])
+
   const diagnosticText = [
     preSnapshot ? formatPreInitSnapshot(preSnapshot) : null,
     initAttempt ? formatInitAttempt(initAttempt) : null,
@@ -165,7 +174,9 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
     return (
       <main className="mx-auto max-w-lg space-y-4 px-4 py-8">
         <h1 className="text-xl font-semibold text-text-main">LIFF init 除錯</h1>
-        <p className="text-danger">僅管理員可使用此除錯入口。請先登入管理員帳號後，從後台開啟 LIFF 測試連結。</p>
+        <p className="text-danger">
+          僅管理員可使用。請先在電腦瀏覽器登入後台，按「在 LINE App 內開啟測試」再於 LINE 內操作。
+        </p>
         <Link to="/login">
           <Button type="button" variant="secondary">
             前往登入
@@ -187,58 +198,74 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
       </div>
 
       <Card className="border-amber-300 bg-amber-50">
-        <p className="text-sm text-amber-900">
-          LINE Console Endpoint 為網站根目錄 <code className="text-xs">/</code>。
-          請在 <strong>LINE App 內</strong> 透過下方 LIFF 連結開啟後，在根路徑{' '}
-          <code className="text-xs">/?adminLiffDebug=1</code> 測試 init。
-        </p>
-        {!initPathOk ? (
+        {mode === 'admin' ? (
+          <p className="text-sm text-amber-900">
+            請先按下方「在 LINE App 內開啟測試」，系統會記住除錯狀態並開啟 LIFF（網址<strong>不用</strong>手動加參數）。
+            進入 LINE 後直接按 init 測試即可。
+          </p>
+        ) : (
+          <p className="text-sm text-amber-900">
+            你已在 LINE 內的除錯模式{isAdminLiffDebugSessionActive() ? '（session 已啟用）' : ''}。
+            請直接按下方 init 按鈕測試。
+          </p>
+        )}
+        {mode === 'admin' && !initPathOk ? (
           <p className="mt-2 text-xs text-amber-800">
-            目前 pathname 為 {location.pathname}，init 按鈕已停用。請改用 LIFF 連結開啟根路徑。
+            在電腦瀏覽器無法在此路徑執行 init；請用「在 LINE App 內開啟測試」。
           </p>
         ) : null}
       </Card>
 
-      <Card className="space-y-2">
-        <p className="text-sm font-semibold text-text-main">LIFF 測試連結（在 LINE 內開啟）</p>
-        {envLiffUrl ? (
-          <div className="space-y-1">
-            <p className="text-xs text-text-muted">環境變數 ID</p>
-            <p className="break-all text-xs text-text-main">{envLiffUrl}</p>
-            <Button type="button" variant="secondary" className="w-full" onClick={() => void handleCopy(envLiffUrl, 'env LIFF URL')}>
-              複製 env LIFF 連結
+      {mode === 'admin' ? (
+        <Card className="space-y-3">
+          <p className="text-sm font-semibold text-text-main">步驟 1：在 LINE 內開啟（一鍵）</p>
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              className="w-full"
+              disabled={!envLiffId}
+              onClick={() => openLiffForAdminDebug(envLiffId)}
+            >
+              在 LINE App 內開啟測試（VITE_LINE_LIFF_ID）
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => openLiffForAdminDebug(HARDCODED_LIFF_ID)}>
+              在 LINE App 內開啟測試（硬編碼 prod）
             </Button>
           </div>
-        ) : (
-          <p className="text-xs text-danger">VITE_LINE_LIFF_ID 未設定，無法產生 env LIFF 連結。</p>
-        )}
-        <div className="space-y-1">
-          <p className="text-xs text-text-muted">硬編碼 prod ID（{HARDCODED_LIFF_ID.slice(-12)}）</p>
-          <p className="break-all text-xs text-text-main">{hardcodedLiffUrl}</p>
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={() => void handleCopy(hardcodedLiffUrl, 'hardcoded LIFF URL')}
-          >
-            複製 hardcoded LIFF 連結
-          </Button>
-        </div>
-        {copyMessage ? <p className="text-xs text-[#2F7D4E]">{copyMessage}</p> : null}
-      </Card>
+          {!envLiffId ? <p className="text-xs text-danger">VITE_LINE_LIFF_ID 未設定，env 按鈕無法使用。</p> : null}
+          <details className="text-xs text-text-muted">
+            <summary className="cursor-pointer">進階：複製 LIFF 連結</summary>
+            <div className="mt-2 space-y-2">
+              {envLiffUrl ? (
+                <>
+                  <p className="break-all">{envLiffUrl}</p>
+                  <Button type="button" variant="secondary" className="w-full" onClick={() => void handleCopy(envLiffUrl, 'env LIFF URL')}>
+                    複製 env 連結
+                  </Button>
+                </>
+              ) : null}
+              <p className="break-all">{hardcodedLiffUrl}</p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={() => void handleCopy(hardcodedLiffUrl, 'hardcoded LIFF URL')}
+              >
+                複製 hardcoded 連結
+              </Button>
+            </div>
+          </details>
+          {copyMessage ? <p className="text-xs text-[#2F7D4E]">{copyMessage}</p> : null}
+        </Card>
+      ) : null}
 
       <Card className="space-y-3">
-        <p className="text-sm font-semibold text-text-main">手動 liff.init()</p>
-        <p className="text-xs text-text-muted">
-          若已 init 過，第二次可能失敗；請按「重新整理頁面」後再測。
+        <p className="text-sm font-semibold text-text-main">
+          {mode === 'admin' ? '步驟 2：手動 liff.init()' : '手動 liff.init()'}
         </p>
+        <p className="text-xs text-text-muted">若已 init 過，第二次可能失敗；請按「重新整理頁面」後再測。</p>
         <div className="flex flex-col gap-2">
-          <Button
-            type="button"
-            className="w-full"
-            disabled={!canInit || initLoading !== null}
-            onClick={() => void handleInit('env')}
-          >
+          <Button type="button" className="w-full" disabled={!canInit || initLoading !== null} onClick={() => void handleInit('env')}>
             {initLoading === 'env' ? 'init 中…' : 'init（VITE_LINE_LIFF_ID）'}
           </Button>
           <Button
@@ -250,32 +277,23 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
           >
             {initLoading === 'hardcoded' ? 'init 中…' : 'init（硬編碼 prod）'}
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={() => window.location.reload()}
-          >
+          <Button type="button" variant="secondary" className="w-full" onClick={() => window.location.reload()}>
             重新整理頁面
           </Button>
+          <Button type="button" variant="secondary" className="w-full" onClick={handleEndDebug}>
+            結束除錯
+          </Button>
         </div>
-        {!canInit && isAdmin && !initPathOk ? (
-          <p className="text-xs text-text-subtle">init 僅能在 pathname=/ 時執行（請用上方 LIFF 連結）。</p>
+        {!canInit && isAdmin && mode === 'admin' ? (
+          <p className="text-xs text-text-subtle">init 按鈕會在 LINE 內開啟後自動可用（根路徑 /）。</p>
         ) : null}
       </Card>
 
       {diagnosticText ? (
         <Card className="border-amber-200 bg-amber-50/80">
           <p className="mb-2 text-sm font-semibold text-amber-900">診斷輸出</p>
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs text-amber-950">
-            {diagnosticText}
-          </pre>
-          <Button
-            type="button"
-            variant="secondary"
-            className="mt-2 w-full"
-            onClick={() => void handleCopy(diagnosticText, '診斷輸出')}
-          >
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs text-amber-950">{diagnosticText}</pre>
+          <Button type="button" variant="secondary" className="mt-2 w-full" onClick={() => void handleCopy(diagnosticText, '診斷輸出')}>
             複製全部診斷
           </Button>
         </Card>
