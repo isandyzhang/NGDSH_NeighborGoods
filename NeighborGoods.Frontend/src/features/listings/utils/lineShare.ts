@@ -7,10 +7,21 @@ const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
 const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
 const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
-const FLEX_HERO_IMAGE_URL = `${window.location.origin}/logo.png`
 const FLEX_ALT_TEXT_PREFIX = '我在NeighborGoods-社宅二手交易平台看到一個好物：'
+const FLEX_TEXT_PRIMARY = '#333333'
+const FLEX_TEXT_SECONDARY = '#666666'
+const FLEX_BODY_BG = '#FFFFFF'
 const MAX_TITLE_LENGTH = 40
 const MAX_META_LENGTH = 24
+const MAX_BADGE_LENGTH = 8
+
+const resolveFlexHeroImage = (imageUrl: string | undefined, origin: string) => {
+  const trimmed = imageUrl?.trim()
+  if (trimmed) {
+    return trimmed
+  }
+  return `${origin}/logo.png`
+}
 
 type ListingFlexPayload = {
   listingId: string
@@ -18,6 +29,8 @@ type ListingFlexPayload = {
   priceLabel?: string
   categoryName?: string
   conditionName?: string
+  residenceName?: string
+  imageUrl?: string
 }
 
 export type ShareListingOptions = ListingFlexPayload & {
@@ -110,50 +123,100 @@ export const buildListingFlexMessage = ({
   priceLabel,
   categoryName,
   conditionName,
+  residenceName,
+  imageUrl,
   origin,
 }: ListingFlexPayload & { origin?: string }) => {
-  const listingUrl = buildListingUrl(listingId, origin)
+  const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
+  const listingUrl = buildListingUrl(listingId, siteOrigin)
+  const listingsUrl = `${siteOrigin}/listings`
+  const chatUrl = `${listingUrl}?lineAction=chat`
+  const purchaseUrl = `${listingUrl}?lineAction=purchase`
   const title = trimText(listingTitle, MAX_TITLE_LENGTH, '好物分享')
-  const category = trimText(categoryName, MAX_META_LENGTH, '未分類')
+  const categoryBadge = trimText(categoryName, MAX_BADGE_LENGTH, '好物')
+  const residence = trimText(residenceName, MAX_META_LENGTH, '社宅')
   const condition = trimText(conditionName, MAX_META_LENGTH, '未提供')
   const price = trimText(priceLabel, MAX_META_LENGTH, '歡迎查看商品詳情')
+  const heroImage = resolveFlexHeroImage(imageUrl, siteOrigin)
 
   return {
     type: 'flex' as const,
     altText: `${FLEX_ALT_TEXT_PREFIX}${title}`,
     contents: {
       type: 'bubble' as const,
-      hero: {
-        type: 'image' as const,
-        url: FLEX_HERO_IMAGE_URL,
-        size: 'full' as const,
-        aspectRatio: '20:13' as const,
-        aspectMode: 'cover' as const,
+      header: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        paddingAll: '0px',
+        contents: [
+          {
+            type: 'box' as const,
+            layout: 'horizontal' as const,
+            contents: [
+              {
+                type: 'image' as const,
+                url: heroImage,
+                size: 'full' as const,
+                aspectMode: 'cover' as const,
+                aspectRatio: '20:13' as const,
+                gravity: 'center' as const,
+                flex: 1,
+              },
+              {
+                type: 'box' as const,
+                layout: 'horizontal' as const,
+                contents: [
+                  {
+                    type: 'text' as const,
+                    text: categoryBadge,
+                    size: 'xs' as const,
+                    color: '#ffffff',
+                    align: 'center' as const,
+                    gravity: 'center' as const,
+                  },
+                ],
+                backgroundColor: '#06C755',
+                paddingAll: '4px',
+                paddingStart: '8px',
+                paddingEnd: '8px',
+                flex: 0,
+                position: 'absolute' as const,
+                offsetStart: '12px',
+                offsetTop: '12px',
+                cornerRadius: '100px',
+              },
+            ],
+          },
+        ],
       },
       body: {
         type: 'box' as const,
         layout: 'vertical' as const,
         spacing: 'md' as const,
+        paddingAll: '16px',
+        backgroundColor: FLEX_BODY_BG,
         contents: [
           {
             type: 'text' as const,
             text: title,
             weight: 'bold' as const,
-            size: 'lg' as const,
+            size: 'xl' as const,
+            wrap: true,
+            color: FLEX_TEXT_PRIMARY,
+          },
+          {
+            type: 'text' as const,
+            text: `${residence} · ${condition}`,
+            size: 'sm' as const,
+            color: FLEX_TEXT_SECONDARY,
             wrap: true,
           },
           {
             type: 'text' as const,
-            text: `價格：${price}`,
-            size: 'sm' as const,
-            color: '#666666',
-            wrap: true,
-          },
-          {
-            type: 'text' as const,
-            text: `分類：${category} ｜ 品況：${condition}`,
-            size: 'sm' as const,
-            color: '#666666',
+            text: price,
+            size: 'md' as const,
+            color: FLEX_TEXT_PRIMARY,
+            weight: 'bold' as const,
             wrap: true,
           },
         ],
@@ -161,15 +224,52 @@ export const buildListingFlexMessage = ({
       footer: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'sm' as const,
+        spacing: 'md' as const,
+        paddingAll: '12px',
+        paddingTop: '0px',
+        backgroundColor: FLEX_BODY_BG,
         contents: [
           {
-            type: 'button' as const,
-            style: 'primary' as const,
+            type: 'box' as const,
+            layout: 'horizontal' as const,
+            spacing: 'sm' as const,
+            contents: [
+              {
+                type: 'button' as const,
+                style: 'secondary' as const,
+                height: 'sm' as const,
+                flex: 1,
+                action: {
+                  type: 'uri' as const,
+                  label: '我想聊聊',
+                  uri: chatUrl,
+                },
+              },
+              {
+                type: 'button' as const,
+                style: 'primary' as const,
+                height: 'sm' as const,
+                flex: 1,
+                color: '#06C755',
+                action: {
+                  type: 'uri' as const,
+                  label: '直接購買',
+                  uri: purchaseUrl,
+                },
+              },
+            ],
+          },
+          {
+            type: 'text' as const,
+            text: '想逛逛商城嗎？點這邊前往商城尋寶 ✨',
+            size: 'xs' as const,
+            color: FLEX_TEXT_SECONDARY,
+            wrap: true,
+            align: 'center' as const,
             action: {
               type: 'uri' as const,
-              label: '查看商品',
-              uri: listingUrl,
+              label: '前往商城',
+              uri: listingsUrl,
             },
           },
         ],
@@ -177,6 +277,23 @@ export const buildListingFlexMessage = ({
     },
   }
 }
+
+/** 供 LINE Flex Simulator 貼上測試（範例資料） */
+export const buildListingFlexSimulatorSample = () =>
+  JSON.stringify(
+    buildListingFlexMessage({
+      listingId: '00000000-0000-0000-0000-000000000001',
+      listingTitle: '二手書桌＋椅組',
+      priceLabel: 'NT$ 800',
+      categoryName: '家具',
+      residenceName: '台北社宅',
+      conditionName: '狀況良好',
+      imageUrl: 'https://developers-resource.landpress.line.me/fx/clip/clip4.jpg',
+      origin: 'https://www.neighborgoodstw.com',
+    }).contents,
+    null,
+    2,
+  )
 
 let liffReadyPromise: Promise<boolean> | null = null
 
@@ -196,17 +313,21 @@ const safeSharePickerAvailable = (liff: { isApiAvailable: (api: string) => boole
   }
 }
 
-const ensureLiffReady = async () => {
+export const ensureLiffReady = async () => {
   if (!LIFF_ID?.trim()) {
-    return null
-  }
-
-  if (!isLiffEndpointPath()) {
     return null
   }
 
   const liffMod = await import('@line/liff')
   const liff = liffMod.default
+
+  try {
+    liff.getVersion()
+    return liff
+  } catch {
+    // not initialized yet
+  }
+
   if (!liffReadyPromise) {
     liffReadyPromise = liff
       .init({ liffId: LIFF_ID.trim() })
@@ -235,18 +356,6 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
   const fallbackUrl = buildLineTextShareUrl(options.listingId, options.listingTitle, options.origin)
 
   try {
-    const liffMod = await import('@line/liff')
-    const liffProbe = liffMod.default
-    const returnTo =
-      typeof window !== 'undefined'
-        ? `${window.location.pathname}${window.location.search}`
-        : `/listings/${options.listingId}`
-
-    if (liffProbe.isInClient() && !isLiffEndpointPath()) {
-      redirectToRootListingShare(options, returnTo)
-      return { usedLiffFlex: false, usedFallbackUrlShare: false }
-    }
-
     const liff = await ensureLiffReady()
     if (!liff || !liff.isInClient() || !safeSharePickerAvailable(liff)) {
       openLineUrlShareWindow(fallbackUrl)

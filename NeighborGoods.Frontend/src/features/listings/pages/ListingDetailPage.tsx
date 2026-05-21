@@ -17,8 +17,8 @@ import {
 } from '@/features/listings/constants/listingStatus'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
+  ensureLiffReady,
   getLiffShareDiagnostics,
-  redirectToRootListingShare,
   shareListingToLine,
   type LiffShareDiagnostics,
   type ShareListingResult,
@@ -73,7 +73,7 @@ export const ListingDetailPage = () => {
   const [shareDebugBusy, setShareDebugBusy] = useState(false)
   const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
-  const [flexShareBusy, setFlexShareBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -281,13 +281,19 @@ export const ListingDetailPage = () => {
     }
   }
 
-  const getShareOptions = (targetItem: ListingDetail) => ({
-    listingId: targetItem.id,
-    listingTitle: targetItem.title,
-    priceLabel: formatPrice(targetItem),
-    categoryName: targetItem.categoryName,
-    conditionName: targetItem.conditionName,
-  })
+  const getShareOptions = (targetItem: ListingDetail) => {
+    const firstImage =
+      targetItem.imageUrls.find((url) => url.trim().length > 0) ?? targetItem.mainImageUrl ?? undefined
+    return {
+      listingId: targetItem.id,
+      listingTitle: targetItem.title,
+      priceLabel: formatPrice(targetItem),
+      categoryName: targetItem.categoryName,
+      conditionName: targetItem.conditionName,
+      residenceName: targetItem.residenceName,
+      imageUrl: firstImage,
+    }
+  }
 
   const executeShare = async (targetItem: ListingDetail) => {
     const result = await shareListingToLine(getShareOptions(targetItem))
@@ -299,34 +305,60 @@ export const ListingDetailPage = () => {
     }
   }
 
+  useEffect(() => {
+    if (!item) {
+      return
+    }
+
+    void (async () => {
+      try {
+        const liffMod = await import('@line/liff')
+        if (liffMod.default.isInClient()) {
+          await ensureLiffReady()
+        }
+      } catch {
+        // ignore
+      }
+    })()
+  }, [item?.id])
+
+  useEffect(() => {
+    const lineAction = searchParams.get('lineAction')
+    if (!item || !lineAction) {
+      return
+    }
+    if (lineAction === 'chat') {
+      void handleChat()
+      return
+    }
+    if (lineAction === 'purchase' && canPurchase) {
+      openPurchaseConfirm()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link from FLEX 按鈕
+  }, [item?.id, searchParams.get('lineAction'), canPurchase])
+
   const handleShareToLine = async () => {
-    if (!item || !canShare) {
+    if (!item || !canShare || shareBusy) {
       return
     }
 
+    setShareBusy(true)
     setError(null)
-    if (!shareDebugEnabled) {
-      await executeShare(item)
-      return
+    try {
+      if (!shareDebugEnabled) {
+        await executeShare(item)
+        return
+      }
+
+      setShareDebugBusy(true)
+      setShareDebugResult(null)
+      const diagnostics = await getLiffShareDiagnostics()
+      setShareDebugInfo(diagnostics)
+      setShareDebugBusy(false)
+      setShareDebugOpen(true)
+    } finally {
+      setShareBusy(false)
     }
-
-    setShareDebugBusy(true)
-    setShareDebugResult(null)
-    const diagnostics = await getLiffShareDiagnostics()
-    setShareDebugInfo(diagnostics)
-    setShareDebugBusy(false)
-    setShareDebugOpen(true)
-  }
-
-  const handleShareFlexOnly = async () => {
-    if (!item || !canShare || flexShareBusy) {
-      return
-    }
-
-    setFlexShareBusy(true)
-    const options = getShareOptions(item)
-    const returnTo = `${window.location.pathname}${window.location.search}`
-    redirectToRootListingShare(options, returnTo)
   }
 
   const handleShareDebugConfirm = async () => {
@@ -525,20 +557,11 @@ export const ListingDetailPage = () => {
                   <Button
                     type="button"
                     onClick={() => void handleShareToLine()}
-                    disabled={!canShare}
+                    disabled={!canShare || shareBusy}
                     variant="secondary"
                     className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
                   >
-                    分享到 LINE
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => void handleShareFlexOnly()}
-                    disabled={!canShare || flexShareBusy}
-                    variant="secondary"
-                    className="ml-auto min-h-[1.9rem] w-auto self-end rounded-md border border-border/40 bg-surface-2/40 px-2 py-1 text-xs font-normal text-text-muted opacity-40 transition hover:opacity-70 focus-visible:opacity-70 md:text-xs"
-                  >
-                    {flexShareBusy ? '處理中...' : 'LINE Flex（測試）'}
+                    {shareBusy ? '開啟選人中…' : '分享到 LINE'}
                   </Button>
                 </div>
               </section>

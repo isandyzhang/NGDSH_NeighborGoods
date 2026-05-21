@@ -96,6 +96,8 @@ export const resolveListingShareParams = (
     listingId: listingId.trim(),
     listingTitle: listingTitle.trim(),
     priceLabel: params.get('price') ?? liffStateParams?.get('price') ?? undefined,
+    residenceName: params.get('residence') ?? liffStateParams?.get('residence') ?? undefined,
+    imageUrl: params.get('imageUrl') ?? liffStateParams?.get('imageUrl') ?? undefined,
     categoryName: params.get('category') ?? liffStateParams?.get('category') ?? undefined,
     conditionName: params.get('condition') ?? liffStateParams?.get('condition') ?? undefined,
     returnTo: params.get('returnTo')?.startsWith('/')
@@ -124,6 +126,12 @@ export const buildListingShareRootSearch = (options: ShareListingOptions, return
   }
   if (options.conditionName) {
     params.set('condition', options.conditionName)
+  }
+  if (options.residenceName) {
+    params.set('residence', options.residenceName)
+  }
+  if (options.imageUrl) {
+    params.set('imageUrl', options.imageUrl)
   }
   return `?${params.toString()}`
 }
