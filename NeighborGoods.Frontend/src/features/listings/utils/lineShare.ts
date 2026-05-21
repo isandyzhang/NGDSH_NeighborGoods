@@ -1,3 +1,4 @@
+import { resolveLineLiffId } from '@/app/lineLiffId'
 import { buildLiffDeepLink } from '@/app/liffRoute'
 import {
   buildListingShareRootSearch,
@@ -7,7 +8,8 @@ import {
 const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
 const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
-const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+
+const getLineLiffId = () => resolveLineLiffId()
 const FLEX_ALT_TEXT_PREFIX = '我在NeighborGoods-社宅二手交易平台看到一個好物：'
 const FLEX_TEXT_PRIMARY = '#333333'
 const FLEX_TEXT_SECONDARY = '#666666'
@@ -318,7 +320,8 @@ const safeSharePickerAvailable = (liff: { isApiAvailable: (api: string) => boole
 }
 
 export const ensureLiffReady = async () => {
-  if (!LIFF_ID?.trim()) {
+  const liffId = getLineLiffId()
+  if (!liffId) {
     return null
   }
 
@@ -337,7 +340,7 @@ export const ensureLiffReady = async () => {
 
   if (!liffReadyPromise) {
     liffReadyPromise = liff
-      .init({ liffId: LIFF_ID.trim() })
+      .init({ liffId })
       .then(() => true)
       .catch(() => false)
   }
@@ -349,10 +352,15 @@ export const ensureLiffReady = async () => {
   return liff
 }
 
-/** 在 LINE 內從商品頁等非根路徑改走根路徑分享（與 LIFF Endpoint 一致） */
+/** 在 LINE 內改走 liff.line.me 根路徑分享（保留 LIFF context；一般 HTTPS 無法從 URL 推得 liffId） */
 export const redirectToRootListingShare = (options: ShareListingOptions, returnTo: string) => {
   saveListingSharePending(options, returnTo)
-  window.location.assign(`${window.location.origin}${buildListingShareRootSearch(options, returnTo)}`)
+  const search = buildListingShareRootSearch(options, returnTo)
+  const liffId = getLineLiffId()
+  const target = liffId
+    ? `https://liff.line.me/${liffId}${search}`
+    : `${typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'}${search}`
+  window.location.assign(target)
 }
 
 const openLineUrlShareWindow = (shareUrl: string) => {
@@ -387,7 +395,7 @@ export const startListingFlexShare = async (
   options: ShareListingOptions,
   returnTo: string,
 ): Promise<StartListingFlexShareResult> => {
-  if (!LIFF_ID?.trim()) {
+  if (!getLineLiffId()) {
     return { started: false, reason: 'LIFF_ID_MISSING' }
   }
 
@@ -408,13 +416,14 @@ export const startListingFlexShare = async (
 export const shareListingToLineFlexOnly = async (
   options: ShareListingOptions
 ): Promise<ShareListingFlexOnlyResult> => {
-  if (!LIFF_ID?.trim()) {
+  const liffId = getLineLiffId()
+  if (!liffId) {
     return {
       sent: false,
       reason: 'LIFF_UNAVAILABLE',
       contextType: null,
       errorCode: 'LIFF_ID_MISSING',
-      errorMessage: 'VITE_LINE_LIFF_ID 未設定',
+      errorMessage: 'VITE_LINE_LIFF_ID 未設定（本機請設 .env.local）',
     }
   }
 
@@ -438,10 +447,9 @@ export const shareListingToLineFlexOnly = async (
         reason: 'LIFF_ERROR',
         contextType: null,
         errorCode: 'LIFF_INIT_FAILED',
-        errorMessage: 'LIFF 初始化失敗，請關閉後從 LINE 重新開啟',
+        errorMessage: `LIFF 初始化失敗（liffId: ${liffId}）。請從 LINE 圖文選單或 liff.line.me 重新開啟`,
       }
     }
-
     const contextType = ready.getContext()?.type ?? null
     if (!safeSharePickerAvailable(ready)) {
       return {
@@ -472,7 +480,7 @@ export const shareListingToLineFlexOnly = async (
 }
 
 export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> => {
-  if (!LIFF_ID?.trim()) {
+  if (!getLineLiffId()) {
     return {
       liffIdConfigured: false,
       liffReady: false,
@@ -520,7 +528,7 @@ export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> =
 }
 
 export const getLiffShareRuntimeStatus = async (): Promise<LiffShareRuntimeStatus> => {
-  if (!LIFF_ID?.trim()) {
+  if (!getLineLiffId()) {
     return {
       liffIdConfigured: false,
       liffReady: false,
