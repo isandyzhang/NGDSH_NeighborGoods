@@ -1,6 +1,6 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { shareListingToLine } from '@/features/listings/utils/lineShare'
+import { detectLiffInClient, shareListingAsLineText, startListingFlexShare } from '@/features/listings/utils/lineShare'
 import { AppModal } from '@/shared/ui/modal/AppModal'
 import { Button } from '@/shared/ui/Button'
 
@@ -25,32 +25,59 @@ const formatSharePrice = (listing: CreatedListingSummary) =>
 export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateListingSuccessModalProps) => {
   const navigate = useNavigate()
   const [shareBusy, setShareBusy] = useState(false)
+  const [flexShareBusy, setFlexShareBusy] = useState(false)
+  const [lineInApp, setLineInApp] = useState(false)
   const [shareNotice, setShareNotice] = useState<string | null>(null)
 
-  const handleShareToLine = async () => {
-    if (!listing || shareBusy) {
+  useEffect(() => {
+    void detectLiffInClient().then((value) => setLineInApp(value === true))
+  }, [])
+
+  const shareOptions = () =>
+    listing
+      ? {
+          listingId: listing.id,
+          listingTitle: listing.title,
+          priceLabel: formatSharePrice(listing),
+          categoryName: listing.categoryName,
+          conditionName: listing.conditionName,
+        }
+      : null
+
+  const handleShareToLine = () => {
+    const options = shareOptions()
+    if (!options || shareBusy) {
       return
     }
 
     setShareBusy(true)
     setShareNotice(null)
     try {
-      const result = await shareListingToLine({
-        listingId: listing.id,
-        listingTitle: listing.title,
-        priceLabel: formatSharePrice(listing),
-        categoryName: listing.categoryName,
-        conditionName: listing.conditionName,
-      })
-      if (result.shareMode === 'text') {
-        setShareNotice('已改以 LINE 文字訊息分享（非 LINE App 內時無法使用 Flex 選人）。')
-      } else if (result.shareMode === 'cancelled') {
-        setShareNotice(null)
-      } else {
-        setShareNotice(null)
-      }
+      shareListingAsLineText(options)
     } finally {
       setShareBusy(false)
+    }
+  }
+
+  const handleFlexShareToLine = async () => {
+    const options = shareOptions()
+    if (!options || flexShareBusy) {
+      return
+    }
+
+    setFlexShareBusy(true)
+    setShareNotice(null)
+    try {
+      const result = await startListingFlexShare(options, `/listings/${options.listingId}`)
+      if (result.started === false) {
+        setShareNotice(
+          result.reason === 'LIFF_ID_MISSING'
+            ? 'Flex 分享尚未設定（LIFF ID）。'
+            : 'Flex 卡片分享請在 LINE App 內使用。',
+        )
+      }
+    } finally {
+      setFlexShareBusy(false)
     }
   }
 
@@ -83,15 +110,27 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
         </div>
 
         <div className="flex flex-col gap-3">
-          <Button
-            type="button"
-            fullWidth
-            className="min-h-[3.2rem] text-lg font-semibold"
-            disabled={!listing || shareBusy}
-            onClick={() => void handleShareToLine()}
-          >
-            {shareBusy ? '分享中...' : '分享到 LINE'}
-          </Button>
+          <div className="space-y-1">
+            <Button
+              type="button"
+              fullWidth
+              className="min-h-[3.2rem] text-lg font-semibold"
+              disabled={!listing || shareBusy}
+              onClick={handleShareToLine}
+            >
+              {shareBusy ? '分享中...' : '分享到 LINE'}
+            </Button>
+            {lineInApp ? (
+              <button
+                type="button"
+                disabled={!listing || flexShareBusy}
+                onClick={() => void handleFlexShareToLine()}
+                className="w-full text-xs text-text-subtle underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
+              >
+                {flexShareBusy ? '準備 Flex 分享…' : '以 Flex 卡片分享（選人）'}
+              </button>
+            ) : null}
+          </div>
           <Button
             type="button"
             variant="secondary"

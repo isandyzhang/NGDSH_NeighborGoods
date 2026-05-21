@@ -17,8 +17,10 @@ import {
 } from '@/features/listings/constants/listingStatus'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
+  detectLiffInClient,
   getLiffShareDiagnostics,
-  shareListingToLine,
+  shareListingAsLineText,
+  startListingFlexShare,
   type LiffShareDiagnostics,
   type ShareListingResult,
 } from '@/features/listings/utils/lineShare'
@@ -74,6 +76,8 @@ export const ListingDetailPage = () => {
   const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
+  const [flexShareBusy, setFlexShareBusy] = useState(false)
+  const [lineInApp, setLineInApp] = useState(false)
   const [lineActionMessage, setLineActionMessage] = useState<string | null>(null)
   const lineActionHandledRef = useRef(false)
 
@@ -299,21 +303,16 @@ export const ListingDetailPage = () => {
     }
   }
 
-  const executeShare = async (targetItem: ListingDetail) => {
-    const result = await shareListingToLine(getShareOptions(targetItem))
+  useEffect(() => {
+    void detectLiffInClient().then((value) => setLineInApp(value === true))
+  }, [])
+
+  const executeTextShare = (targetItem: ListingDetail) => {
+    const result = shareListingAsLineText(getShareOptions(targetItem))
     if (shareDebugEnabled) {
       setShareDebugResult(result)
     }
-    if (result.shareMode === 'cancelled' || result.shareMode === 'redirect') {
-      return
-    }
-    if (result.shareMode === 'text') {
-      setError(null)
-      return
-    }
-    if (result.shareMode === 'flex') {
-      setError(null)
-    }
+    setError(null)
   }
 
   useEffect(() => {
@@ -350,7 +349,7 @@ export const ListingDetailPage = () => {
     setError(null)
     try {
       if (!shareDebugEnabled) {
-        await executeShare(item)
+        executeTextShare(item)
         return
       }
 
@@ -365,12 +364,34 @@ export const ListingDetailPage = () => {
     }
   }
 
+  const handleFlexShareToLine = async () => {
+    if (!item || !canShare || flexShareBusy) {
+      return
+    }
+
+    setFlexShareBusy(true)
+    setError(null)
+    try {
+      const returnTo = `${location.pathname}${location.search}${location.hash}`
+      const result = await startListingFlexShare(getShareOptions(item), returnTo)
+      if (result.started === false) {
+        if (result.reason === 'LIFF_ID_MISSING') {
+          setError('Flex 分享尚未設定（LIFF ID）')
+        } else {
+          setError('Flex 卡片分享請在 LINE App 內使用')
+        }
+      }
+    } finally {
+      setFlexShareBusy(false)
+    }
+  }
+
   const handleShareDebugConfirm = async () => {
     if (!item) {
       return
     }
     setShareDebugBusy(true)
-    await executeShare(item)
+    executeTextShare(item)
     setShareDebugBusy(false)
   }
 
@@ -566,15 +587,27 @@ export const ListingDetailPage = () => {
                     </>
                   )}
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => void handleShareToLine()}
-                    disabled={!canShare || shareBusy}
-                    variant="secondary"
-                    className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
-                  >
-                    {shareBusy ? '開啟選人中…' : '分享到 LINE'}
-                  </Button>
+                  <div className="space-y-1">
+                    <Button
+                      type="button"
+                      onClick={() => void handleShareToLine()}
+                      disabled={!canShare || shareBusy}
+                      variant="secondary"
+                      className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
+                    >
+                      {shareBusy ? '分享中…' : '分享到 LINE'}
+                    </Button>
+                    {lineInApp ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleFlexShareToLine()}
+                        disabled={!canShare || flexShareBusy}
+                        className="w-full text-center text-xs text-text-subtle underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
+                      >
+                        {flexShareBusy ? '準備 Flex 分享…' : '以 Flex 卡片分享（選人）'}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </section>
             </Card>

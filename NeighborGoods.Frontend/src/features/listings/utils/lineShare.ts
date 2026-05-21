@@ -370,63 +370,105 @@ const openLineTextShare = (options: ShareListingOptions): ShareListingResult => 
   }
 }
 
-/** 單一分享入口：LINE 內 → FLEX + 選人；否則 → 文字訊息分享 */
-export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> => {
+/** 文字／連結分享（不依 LIFF init，適合主按鈕） */
+export const shareListingAsLineText = (options: ShareListingOptions): ShareListingResult =>
+  openLineTextShare(options)
+
+/** @deprecated 請改用 shareListingAsLineText 或 startListingFlexShare */
+export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> =>
+  shareListingAsLineText(options)
+
+export type StartListingFlexShareResult =
+  | { started: true }
+  | { started: false; reason: 'NOT_IN_LINE_CLIENT' | 'LIFF_ID_MISSING' }
+
+/** FLEX 選人分享：在 LINE 內一律導向 `/` 分享頁（僅該路徑可 liff.init） */
+export const startListingFlexShare = async (
+  options: ShareListingOptions,
+  returnTo: string,
+): Promise<StartListingFlexShareResult> => {
+  if (!LIFF_ID?.trim()) {
+    return { started: false, reason: 'LIFF_ID_MISSING' }
+  }
+
+  try {
+    const liffMod = await import('@line/liff')
+    if (!liffMod.default.isInClient()) {
+      return { started: false, reason: 'NOT_IN_LINE_CLIENT' }
+    }
+  } catch {
+    return { started: false, reason: 'NOT_IN_LINE_CLIENT' }
+  }
+
+  redirectToRootListingShare(options, returnTo)
+  return { started: true }
+}
+
+/** 僅在根路徑分享頁呼叫；不 fallback 文字分享 */
+export const shareListingToLineFlexOnly = async (
+  options: ShareListingOptions
+): Promise<ShareListingFlexOnlyResult> => {
+  if (!LIFF_ID?.trim()) {
+    return {
+      sent: false,
+      reason: 'LIFF_UNAVAILABLE',
+      contextType: null,
+      errorCode: 'LIFF_ID_MISSING',
+      errorMessage: 'VITE_LINE_LIFF_ID 未設定',
+    }
+  }
+
   try {
     const liffMod = await import('@line/liff')
     const liff = liffMod.default
 
     if (!liff.isInClient()) {
-      return openLineTextShare(options)
+      return {
+        sent: false,
+        reason: 'NOT_IN_LINE_CLIENT',
+        contextType: null,
+        errorMessage: '請在 LINE App 內開啟後再使用 Flex 分享',
+      }
     }
 
-    let ready = await ensureLiffReady()
-    if (!ready && !isLiffEndpointPath()) {
-      const returnTo =
-        typeof window !== 'undefined'
-          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-          : `/listings/${options.listingId}`
-      redirectToRootListingShare(options, returnTo)
-      return { usedLiffFlex: false, usedFallbackUrlShare: false, shareMode: 'redirect' }
+    const ready = await ensureLiffReady()
+    if (!ready) {
+      return {
+        sent: false,
+        reason: 'LIFF_ERROR',
+        contextType: null,
+        errorCode: 'LIFF_INIT_FAILED',
+        errorMessage: 'LIFF 初始化失敗，請關閉後從 LINE 重新開啟',
+      }
     }
 
-    if (!ready || !safeSharePickerAvailable(ready)) {
-      return openLineTextShare(options)
+    const contextType = ready.getContext()?.type ?? null
+    if (!safeSharePickerAvailable(ready)) {
+      return {
+        sent: false,
+        reason: 'SHARE_TARGET_PICKER_UNAVAILABLE',
+        contextType,
+        errorMessage: `此環境不支援 shareTargetPicker（context: ${contextType ?? '-'}）`,
+      }
     }
 
     const flexMessage = buildListingFlexMessage(options)
     const pickerResult = await ready.shareTargetPicker([flexMessage], { isMultiple: true })
     if (pickerResult === null) {
-      return { usedLiffFlex: false, usedFallbackUrlShare: false, shareMode: 'cancelled' }
+      return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED', contextType }
     }
 
-    return { usedLiffFlex: true, usedFallbackUrlShare: false, shareMode: 'flex' }
-  } catch {
-    return openLineTextShare(options)
-  }
-}
-
-export const shareListingToLineFlexOnly = async (
-  options: ShareListingOptions
-): Promise<ShareListingFlexOnlyResult> => {
-  const result = await shareListingToLine(options)
-
-  if (result.shareMode === 'flex') {
-    return { sent: true, reason: 'SENT', contextType: null }
-  }
-  if (result.shareMode === 'cancelled') {
-    return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED', contextType: null }
-  }
-  if (result.shareMode === 'text') {
+    return { sent: true, reason: 'SENT', contextType }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Flex 分享發生未知錯誤'
     return {
       sent: false,
-      reason: 'NOT_IN_LINE_CLIENT',
+      reason: 'LIFF_ERROR',
       contextType: null,
-      errorMessage: '非 LINE App 內開啟，已改用文字連結分享',
+      errorCode: 'LIFF_SHARE_EXCEPTION',
+      errorMessage,
     }
   }
-
-  return { sent: false, reason: 'LIFF_ERROR', contextType: null }
 }
 
 export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> => {
