@@ -155,7 +155,7 @@ export const buildListingFlexMessage = ({
   origin,
 }: ListingFlexPayload & { origin?: string }): ListingLiffFlexMessage => {
   const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
-  const detailUrl = buildLiffDeepLink(`listingId=${listingId}`)
+  const detailUrl = buildLiffDeepLink(`/listings/${listingId}`)
   const listingsUrl = buildLiffDeepLink('/listings')
   const title = trimText(listingTitle, MAX_TITLE_LENGTH, '好物分享')
   const categoryBadge = trimText(categoryName, MAX_BADGE_LENGTH, '好物')
@@ -226,7 +226,7 @@ export const buildListingFlexMessage = ({
             type: 'text' as const,
             text: title,
             weight: 'bold' as const,
-            size: 'lg' as const,
+            size: 'xl' as const,
             wrap: true,
             color: FLEX_TEXT_PRIMARY,
           },
@@ -279,7 +279,7 @@ export const buildListingFlexMessage = ({
                 color: '#06C755',
                 action: {
                   type: 'uri' as const,
-                  label: '查看商品詳情',
+                  label: '查看商品',
                   uri: detailUrl,
                 },
               },
@@ -287,7 +287,7 @@ export const buildListingFlexMessage = ({
           },
           {
             type: 'text' as const,
-            text: '還沒有加官方帳號嗎？馬上加入！',
+            text: '還沒有加官方帳號嗎？馬上加入！(๑•̀ㅂ•́)و✧',
             size: 'xs' as const,
             color: FLEX_TEXT_SECONDARY,
             wrap: true,

@@ -1,5 +1,9 @@
 import { hasLineBindingPending } from '@/features/account/lineBindingSession'
-import { hasListingSharePending, resolveListingShareParams } from '@/features/listings/listingShareSession'
+import {
+  hasListingSharePending,
+  liffStateImpliesListingShare,
+  resolveListingShareParams,
+} from '@/features/listings/listingShareSession'
 
 const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
 
@@ -8,12 +12,23 @@ import { resolveLineLiffId } from '@/app/lineLiffId'
 /** 在 LINE 內開啟站內路徑（透過 liff.state 深層連結） */
 export const buildLiffDeepLink = (internalTarget: string) => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
-  const path = internalTarget.startsWith('/') ? internalTarget : `/${internalTarget}`
+  const trimmed = internalTarget.trim()
+  const liffState = (() => {
+    if (trimmed.startsWith('/')) {
+      return trimmed
+    }
+    // query-only（listingId=...）不可加前導 /，否則會變成 /listingId=... 而導向錯誤
+    if (trimmed.includes('=') && !trimmed.includes('/')) {
+      return trimmed
+    }
+    return `/${trimmed}`
+  })()
+  const fallbackPath = liffState.startsWith('/') ? liffState : `/${liffState}`
   const trimmedLiffId = resolveLineLiffId()
   if (!trimmedLiffId) {
-    return `${origin}${path}`
+    return `${origin}${fallbackPath}`
   }
-  return `https://liff.line.me/${trimmedLiffId}?liff.state=${encodeURIComponent(path)}`
+  return `https://liff.line.me/${trimmedLiffId}?liff.state=${encodeURIComponent(liffState)}`
 }
 
 const buildLineNotifyTarget = (bindToken: string, botLink: string) =>
@@ -79,6 +94,14 @@ const parseLiffStateTarget = (liffState: string): string | null => {
   const query = qIndex >= 0 ? normalized.slice(qIndex) : ''
 
   const pathOnly = path.startsWith('/') ? path : path.startsWith('listings') ? `/${path}` : path
+
+  if (pathOnly.startsWith('/listingId=')) {
+    const mistaken = buildListingTargetFromParams(new URLSearchParams(pathOnly.slice(1)))
+    if (mistaken) {
+      return mistaken
+    }
+  }
+
   if (isSafeInternalPath(pathOnly)) {
     if (pathOnly === '/listings' || pathOnly.startsWith('/listings/')) {
       return `${pathOnly}${query}`
@@ -121,6 +144,13 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
   if (liffState) {
     const deepLinkTarget = parseLiffStateTarget(liffState)
     if (deepLinkTarget?.includes('lineAction=')) {
+      return false
+    }
+    // 僅 listingId / 商品 path 的深連結 → 商品詳情，不是 Flex 分享頁
+    if (deepLinkTarget?.startsWith('/listings/') && deepLinkTarget !== '/listings') {
+      return false
+    }
+    if (!shareFlag && !liffStateImpliesListingShare(liffState)) {
       return false
     }
     const resolved = resolveListingShareParams(`?liff.state=${encodeURIComponent(liffState)}`)
