@@ -522,14 +522,20 @@ export const ListingDetailPage = () => {
                         <span className="text-3xl font-bold text-text-main md:text-4xl lg:text-3xl">{formatPrice(item)}</span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xl font-medium text-text-subtle md:text-2xl lg:text-xl">
-                      <span>分類：{item.categoryName}</span>
-                      <span>・</span>
-                      <span>品況：{item.conditionName}</span>
-                      <span>・</span>
-                      <span>社宅：{item.residenceName}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                        {item.categoryName}
+                      </span>
+                      <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                        {item.conditionName}
+                      </span>
+                      <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                        {item.residenceName}
+                      </span>
+                      <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                        {item.pickupLocationName}
+                      </span>
                     </div>
-                    <p className="text-xl font-medium text-text-subtle md:text-2xl lg:text-xl">面交地點：{item.pickupLocationName}</p>
                     <p className="whitespace-pre-wrap text-lg leading-8 text-text-main md:text-2xl md:leading-9 lg:text-lg lg:leading-7">
                       {item.description || '賣家尚未提供描述。'}
                     </p>

@@ -4,6 +4,8 @@ import {
   CreateListingSuccessModal,
   type CreatedListingSummary,
 } from '@/features/listings/components/CreateListingSuccessModal'
+import { FirstListingSellerWelcomeModal } from '@/features/listings/components/FirstListingSellerWelcomeModal'
+import { hasSeenFirstListingSellerWelcome } from '@/features/listings/constants/firstListingSellerWelcome'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -68,6 +70,7 @@ export const CreateListingPage = () => {
   const [submitting, setSubmitting] = useState(false)
   const [createdListing, setCreatedListing] = useState<CreatedListingSummary | null>(null)
   const [successModalOpen, setSuccessModalOpen] = useState(false)
+  const [sellerWelcomeOpen, setSellerWelcomeOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightField, setHighlightField] = useState<ValidationField | null>(null)
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
@@ -257,6 +260,8 @@ export const CreateListingPage = () => {
         ...mutationPayload,
         price: form.isFree ? 0 : form.price,
       }
+      const mineBeforeCreate = await listingApi.listMine(1, 1)
+      const isFirstListing = mineBeforeCreate.pagination.totalCount === 0
       const result = await listingApi.create(payload, images)
       setCreatedListing({
         id: result.id,
@@ -266,7 +271,11 @@ export const CreateListingPage = () => {
         isFree: payload.isFree,
         price: payload.price,
       })
-      setSuccessModalOpen(true)
+      if (isFirstListing && !hasSeenFirstListingSellerWelcome()) {
+        setSellerWelcomeOpen(true)
+      } else {
+        setSuccessModalOpen(true)
+      }
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '建立商品失敗')
     } finally {
@@ -472,6 +481,15 @@ export const CreateListingPage = () => {
           </Button>
         </form>
       </Card>
+
+      <FirstListingSellerWelcomeModal
+        open={sellerWelcomeOpen}
+        onAcknowledge={() => {
+          setSellerWelcomeOpen(false)
+          setSuccessModalOpen(true)
+        }}
+        onClose={() => setSellerWelcomeOpen(false)}
+      />
 
       <CreateListingSuccessModal
         open={successModalOpen}
