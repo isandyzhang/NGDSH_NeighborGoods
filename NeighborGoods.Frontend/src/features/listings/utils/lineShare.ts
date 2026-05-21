@@ -1,9 +1,13 @@
+import type { SendMessagesParams } from '@liff/send-messages'
 import { resolveLineLiffId } from '@/app/lineLiffId'
 import { buildLiffDeepLink } from '@/app/liffRoute'
 import {
   buildListingShareRootSearch,
   saveListingSharePending,
 } from '@/features/listings/listingShareSession'
+
+/** LIFF shareTargetPicker 接受的 Flex 訊息型別 */
+type ListingLiffFlexMessage = Extract<SendMessagesParams[number], { type: 'flex' }>
 
 const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
@@ -132,7 +136,7 @@ export const buildListingFlexMessage = ({
   residenceName,
   imageUrl,
   origin,
-}: ListingFlexPayload & { origin?: string }) => {
+}: ListingFlexPayload & { origin?: string }): ListingLiffFlexMessage => {
   const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
   const listingPath = `/listings/${listingId}`
   const listingsUrl = buildLiffDeepLink('/listings')
@@ -281,7 +285,7 @@ export const buildListingFlexMessage = ({
         ],
       },
     },
-  }
+  } as ListingLiffFlexMessage
 }
 
 /** 供 LINE Flex Simulator 貼上測試（範例資料） */
