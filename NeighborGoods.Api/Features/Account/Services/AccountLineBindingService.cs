@@ -19,13 +19,8 @@ public sealed class AccountLineBindingService(
 
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
 
-    private static string BuildLiffBindingUrl(string liffId, string bindToken, string botLink)
-    {
-        // bindToken/botLink 放在 path 後 query（勿塞進 liff.state，LINE 易丟參）。
-        var query =
-            $"bindToken={Uri.EscapeDataString(bindToken)}&botLink={Uri.EscapeDataString(botLink)}";
-        return LineLiffUrlBuilder.BuildPathLiffUrl(liffId, "/liff/line-notify", query);
-    }
+    private static string BuildLiffBindingUrl(string liffId, string bindToken, string botLink) =>
+        LineLiffUrlBuilder.BuildBindingUrl(liffId, bindToken, botLink);
 
     public async Task<(StartLineBindingResponse? Data, string? ErrorCode, string? ErrorMessage)> StartAsync(
         string userId,

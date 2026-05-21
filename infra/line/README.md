@@ -19,12 +19,12 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 ## Actions configured in this script
 
 - Row 1, Area 1: open listings entry (`uri`)
-  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all four URI areas use path links `liff.line.me/{LiffId}/listings` 等
+  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all four URI areas use path links `liff.line.me/{LiffId}/listings` etc.
   - Otherwise fallback to `$WebBaseUrl` + path
 - Row 1, Area 2: postback `action=myListings`
 - Row 1, Area 3: postback `action=myMessages`
 - Row 2, Area 1: open `$WebBaseUrl/listings/create` (`uri`)
-- Row 2, Area 2: open `$WebBaseUrl/account` (`uri`, or LIFF `liff.line.me/{LiffId}/account`)
+- Row 2, Area 2: open `$WebBaseUrl/account` (`uri`, or LIFF path `/account`)
 - Row 2, Area 3: open `$WebBaseUrl/favorites` (`uri`)
 
 Postback values are aligned with current backend webhook routing.
@@ -120,8 +120,8 @@ Optional GitHub Actions variables (set in `production` Environment):
 「我的帳號」綁定官方通知改為在 LINE 內開 LIFF 完成，不再依 webhook follow 自動寫入 pending。
 
 - **LIFF**：在 **LINE Login channel**（與網站 LINE 登入同一個）建立 LIFF，Endpoint URL 為 `{WebBaseUrl}/`（網站根目錄；須 HTTPS；本機可用 tunnel）。同一 LIFF 兼用深層連結與綁定流程。
-- **深層連結**：圖文選單、Flex 站內按鈕、未綁定提示卡皆用 path 格式 `liff.line.me/{liffId}/account`（商品詳情：`.../listings/{id}?from=listings`）。舊 `?liff.state=` 連結仍可由 `RootEntry` 解析。
-- **綁定 URL**：後端產生 `https://liff.line.me/{LiffId}/liff/line-notify?bindToken=...&botLink=...`（`bindToken`/`botLink` 在 path 後 query，勿用 `liff.state`）。
+- **深層連結**：圖文選單、官方 Flex 按鈕（含未綁定提示「前往個人設定」）使用 path 格式 `liff.line.me/{liffId}/account` 等；`RootEntry` 仍支援舊 `?liff.state=`。商品 Flex「查看商品」：`liff.line.me/{liffId}/listings/{id}?from=listings`。
+- **綁定 URL**：`https://liff.line.me/{LiffId}/?bindToken=...&botLink=...`（根路徑 + 外層 query，在 `/` 完成 liff.init）。
 - **後端**：Container App 環境變數 `LineMessagingApi__WebBaseUrl`、`LineMessagingApi__LiffId`（與前端 `VITE_LINE_LIFF_ID` 一致）；`id_token` 驗證使用 `Line__ChannelId`（Login channel）。
 - **Console**：Login channel 與官方帳號 **Link a bot**；LIFF **Add friend option**（建議 On aggressive）由 LINE 引導加好友。綁定頁只以 `id_token` 寫入 DB，不再以 `getFriendship()` 阻擋綁定。
 

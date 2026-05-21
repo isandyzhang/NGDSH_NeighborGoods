@@ -201,7 +201,7 @@ if ([string]::IsNullOrWhiteSpace($trimmedLiffUrl)) {
   Write-Warning "LiffUrl not set; rich menu URI actions use WebBaseUrl only (LIFF init may fail in LINE in-app browser)."
 }
 else {
-  Write-Host "Using LIFF path links (liff.line.me/{id}/path) for all URI menu areas."
+  Write-Host "Using LIFF path links for all URI menu areas."
 }
 Write-Host "  listings: $listingsUrl"
 $definition = Build-RichMenuDefinition `

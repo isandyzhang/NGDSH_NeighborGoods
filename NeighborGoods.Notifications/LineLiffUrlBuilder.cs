@@ -3,11 +3,8 @@ namespace NeighborGoods.Notifications;
 /// <summary>組 LINE 內開啟站內路徑的 LIFF 連結；LIFF Endpoint 須為網站根 /。</summary>
 public static class LineLiffUrlBuilder
 {
-    /// <summary>
-    /// Path 格式：liff.line.me/{liffId}/account（圖文選單、Flex 按鈕；手機實測較穩）。
-    /// query 可為 "?from=listings" 或 "bindToken=...&botLink=..."（勿含前導 ? 亦可）。
-    /// </summary>
-    public static string BuildPathLiffUrl(string liffId, string internalPath, string? query = null)
+    /// <summary>path 格式：liff.line.me/{liffId}/account（圖文選單、Flex 按鈕等，手機實測較穩）。</summary>
+    public static string BuildPathLink(string liffId, string internalPath, string? query = null)
     {
         if (string.IsNullOrWhiteSpace(liffId))
         {
@@ -19,7 +16,16 @@ public static class LineLiffUrlBuilder
         return $"https://liff.line.me/{liffId.Trim()}{path}{normalizedQuery}";
     }
 
-    /// <summary>舊版 liff.state 深連結；僅保留給需相容的場合，新程式請用 BuildPathLiffUrl。</summary>
+    /// <summary>綁定流程：根路徑 + 外層 bindToken/botLink（須在 / 完成 liff.init）。</summary>
+    public static string BuildBindingUrl(string liffId, string bindToken, string botLink)
+    {
+        var query =
+            $"?bindToken={Uri.EscapeDataString(bindToken.Trim())}" +
+            $"&botLink={Uri.EscapeDataString(botLink.Trim())}";
+        return BuildPathLink(liffId, "/", query);
+    }
+
+    /// <summary>liff.state 深連結（僅保留需 query-only 旗標的舊流程）。</summary>
     public static string BuildDeepLink(string liffId, string internalPath)
     {
         if (string.IsNullOrWhiteSpace(liffId))
@@ -46,7 +52,7 @@ public static class LineLiffUrlBuilder
     {
         if (!string.IsNullOrWhiteSpace(options.LiffId))
         {
-            return BuildPathLiffUrl(options.LiffId, internalPath, query);
+            return BuildPathLink(options.LiffId, internalPath, query);
         }
 
         return BuildAppUrl(options.WebBaseUrl, internalPath, query);
@@ -69,7 +75,6 @@ public static class LineLiffUrlBuilder
             return string.Empty;
         }
 
-        var trimmed = query.Trim();
-        return trimmed.StartsWith('?') ? trimmed : "?" + trimmed;
+        return query.StartsWith('?') ? query : "?" + query;
     }
 }

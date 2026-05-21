@@ -1,6 +1,6 @@
 import type { SendMessagesParams } from '@liff/send-messages'
 import { resolveLineLiffId } from '@/app/lineLiffId'
-import { buildLiffDeepLink, buildListingDetailLiffUrl } from '@/app/liffRoute'
+import { buildLiffPathUrl, buildListingDetailLiffUrl } from '@/app/liffRoute'
 import {
   buildListingShareRootSearch,
   saveListingSharePending,
@@ -177,7 +177,7 @@ export const buildListingFlexMessage = ({
 }: ListingFlexPayload & { origin?: string }): ListingLiffFlexMessage => {
   const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
   const detailUrl = buildListingDetailLiffUrl(listingId)
-  const listingsUrl = buildLiffDeepLink('/listings')
+  const listingsUrl = buildLiffPathUrl('/listings')
   const title = trimText(listingTitle, MAX_TITLE_LENGTH, '好物分享')
   const categoryBadge = trimText(categoryName, MAX_BADGE_LENGTH, '好物')
   const residence = trimText(residenceName, MAX_META_LENGTH, '社宅')
