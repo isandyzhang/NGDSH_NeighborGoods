@@ -356,15 +356,54 @@ export const ensureLiffReady = async () => {
   return liff
 }
 
-/** 在 LINE 內改走 liff.line.me 根路徑分享（保留 LIFF context；一般 HTTPS 無法從 URL 推得 liffId） */
+/**
+ * 與 admin LIFF 除錯頁相同：分享參數放在 liff.state（query-only），避免 LINE 重複包裝或丟失外層 query。
+ * @see buildLiffAdminDebugUrl in liffInitDebug.ts
+ */
+export const buildListingShareLiffEntryUrl = (options: ShareListingOptions, returnTo: string) => {
+  const liffId = getLineLiffId()
+  if (!liffId) {
+    return null
+  }
+  const query = buildListingShareRootSearch(options, returnTo).slice(1)
+  return `https://liff.line.me/${liffId}?liff.state=${encodeURIComponent(query)}`
+}
+
+/** 在 LINE 內改走 liff.line.me 根路徑分享（保留 LIFF context） */
 export const redirectToRootListingShare = (options: ShareListingOptions, returnTo: string) => {
   saveListingSharePending(options, returnTo)
   const search = buildListingShareRootSearch(options, returnTo)
-  const liffId = getLineLiffId()
-  const target = liffId
-    ? `https://liff.line.me/${liffId}${search}`
-    : `${typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'}${search}`
+  const liffEntry = buildListingShareLiffEntryUrl(options, returnTo)
+  const target =
+    liffEntry ??
+    `${typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'}${search}`
   window.location.assign(target)
+}
+
+const buildListingShareLoginRedirectUri = () => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
+  return `${origin}/`
+}
+
+/** 分享頁專用：一律明確 init（對齊 LiffDebugPage.runLiffInitAttempt / LineNotifyLiffPage） */
+export const initLiffForFlexShare = async () => {
+  const liffId = getLineLiffId()
+  if (!liffId || !isLiffEndpointPath()) {
+    return null
+  }
+
+  resetLiffReadyCache()
+  const liffMod = await import('@line/liff')
+  const liff = liffMod.default
+  try {
+    await liff.init({ liffId })
+    liffReadyPromise = Promise.resolve(true)
+    return liff
+  } catch (err) {
+    liffReadyPromise = Promise.resolve(false)
+    console.warn('[listing flex share] liff.init failed', err)
+    return null
+  }
 }
 
 const openLineUrlShareWindow = (shareUrl: string) => {
@@ -416,9 +455,10 @@ export const startListingFlexShare = async (
   return { started: true }
 }
 
-/** 僅在根路徑分享頁呼叫；不 fallback 文字分享 */
+/** 僅在根路徑分享頁呼叫；流程對齊 admin LIFF 除錯（init → 登入 → shareTargetPicker） */
 export const shareListingToLineFlexOnly = async (
-  options: ShareListingOptions
+  options: ShareListingOptions,
+  returnTo?: string,
 ): Promise<ShareListingFlexOnlyResult> => {
   const liffId = getLineLiffId()
   if (!liffId) {
@@ -431,9 +471,27 @@ export const shareListingToLineFlexOnly = async (
     }
   }
 
+  if (!isLiffEndpointPath()) {
+    return {
+      sent: false,
+      reason: 'LIFF_ERROR',
+      contextType: null,
+      errorCode: 'WRONG_PATH',
+      errorMessage: 'Flex 分享須在網站根路徑 / 執行，請從商品頁重新點 Flex 分享',
+    }
+  }
+
   try {
-    const liffMod = await import('@line/liff')
-    const liff = liffMod.default
+    const liff = await initLiffForFlexShare()
+    if (!liff) {
+      return {
+        sent: false,
+        reason: 'LIFF_ERROR',
+        contextType: null,
+        errorCode: 'LIFF_INIT_FAILED',
+        errorMessage: `LIFF 初始化失敗（liffId: ${liffId}）。請比照除錯頁從 liff.line.me 開啟`,
+      }
+    }
 
     if (!liff.isInClient()) {
       return {
@@ -444,18 +502,22 @@ export const shareListingToLineFlexOnly = async (
       }
     }
 
-    const ready = await ensureLiffReady()
-    if (!ready) {
+    const contextType = liff.getContext()?.type ?? null
+
+    if (!liff.isLoggedIn()) {
+      const back =
+        returnTo?.startsWith('/') ? returnTo : `/listings/${options.listingId}`
+      saveListingSharePending(options, back)
+      liff.login({ redirectUri: buildListingShareLoginRedirectUri() })
       return {
         sent: false,
-        reason: 'LIFF_ERROR',
-        contextType: null,
-        errorCode: 'LIFF_INIT_FAILED',
-        errorMessage: `LIFF 初始化失敗（liffId: ${liffId}）。請從 LINE 圖文選單或 liff.line.me 重新開啟`,
+        reason: 'NOT_LOGGED_IN',
+        contextType,
+        errorMessage: '需要 LINE 登入，已導向登入；完成後會繼續分享',
       }
     }
-    const contextType = ready.getContext()?.type ?? null
-    if (!safeSharePickerAvailable(ready)) {
+
+    if (!safeSharePickerAvailable(liff)) {
       return {
         sent: false,
         reason: 'SHARE_TARGET_PICKER_UNAVAILABLE',
@@ -465,7 +527,7 @@ export const shareListingToLineFlexOnly = async (
     }
 
     const flexMessage = buildListingFlexMessage(options)
-    const pickerResult = await ready.shareTargetPicker([flexMessage], { isMultiple: true })
+    const pickerResult = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
     if (pickerResult === null) {
       return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED', contextType }
     }

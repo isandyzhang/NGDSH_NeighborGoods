@@ -34,13 +34,18 @@ export const ListingShareLiffPage = () => {
         return
       }
 
-      const result = await shareListingToLineFlexOnly({
-        listingId: shareParams.listingId,
-        listingTitle: shareParams.listingTitle,
-        priceLabel: shareParams.priceLabel,
-        categoryName: shareParams.categoryName,
-        conditionName: shareParams.conditionName,
-      })
+      const result = await shareListingToLineFlexOnly(
+        {
+          listingId: shareParams.listingId,
+          listingTitle: shareParams.listingTitle,
+          priceLabel: shareParams.priceLabel,
+          categoryName: shareParams.categoryName,
+          conditionName: shareParams.conditionName,
+          imageUrl: shareParams.imageUrl,
+          residenceName: shareParams.residenceName,
+        },
+        shareParams.returnTo,
+      )
 
       if (disposed) {
         return
@@ -58,8 +63,8 @@ export const ListingShareLiffPage = () => {
         return
       }
       if (result.reason === 'NOT_LOGGED_IN') {
-        setPhase('error')
-        setMessage('LIFF 尚未登入，請先完成 LINE 登入後再試。')
+        setPhase('loading')
+        setMessage(result.errorMessage ?? '正在導向 LINE 登入…')
         return
       }
       if (result.reason === 'NOT_IN_LINE_CLIENT' || result.reason === 'LIFF_UNAVAILABLE') {
@@ -73,8 +78,9 @@ export const ListingShareLiffPage = () => {
         return
       }
       setPhase('error')
+      const href = typeof window !== 'undefined' ? window.location.href : ''
       setMessage(
-        `分享失敗：${[result.errorCode, result.errorMessage, result.contextType].filter(Boolean).join(' | ') || '未知錯誤'}`,
+        `分享失敗：${[result.errorCode, result.errorMessage, result.contextType].filter(Boolean).join(' | ') || '未知錯誤'}${href ? `\n\n網址：${href}` : ''}`,
       )
     })()
 
@@ -86,7 +92,7 @@ export const ListingShareLiffPage = () => {
   return (
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4 py-8">
       <h1 className="text-xl font-semibold text-text-main">LINE 商品分享</h1>
-      <p className="text-sm text-text-subtle">{message}</p>
+      <p className="whitespace-pre-wrap break-all text-sm text-text-subtle">{message}</p>
       <div className="grid grid-cols-1 gap-2">
         <Button type="button" variant="secondary" onClick={() => navigate(returnTo)}>
           返回商品頁
