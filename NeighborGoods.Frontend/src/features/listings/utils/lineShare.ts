@@ -1,3 +1,4 @@
+import { buildLiffDeepLink } from '@/app/liffRoute'
 import {
   buildListingShareRootSearch,
   saveListingSharePending,
@@ -128,10 +129,10 @@ export const buildListingFlexMessage = ({
   origin,
 }: ListingFlexPayload & { origin?: string }) => {
   const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
-  const listingUrl = buildListingUrl(listingId, siteOrigin)
-  const listingsUrl = `${siteOrigin}/listings`
-  const chatUrl = `${listingUrl}?lineAction=chat`
-  const purchaseUrl = `${listingUrl}?lineAction=purchase`
+  const listingPath = `/listings/${listingId}`
+  const listingsUrl = buildLiffDeepLink('/listings')
+  const chatUrl = buildLiffDeepLink(`${listingPath}?lineAction=chat`)
+  const purchaseUrl = buildLiffDeepLink(`${listingPath}?lineAction=purchase`)
   const title = trimText(listingTitle, MAX_TITLE_LENGTH, '好物分享')
   const categoryBadge = trimText(categoryName, MAX_BADGE_LENGTH, '好物')
   const residence = trimText(residenceName, MAX_META_LENGTH, '社宅')

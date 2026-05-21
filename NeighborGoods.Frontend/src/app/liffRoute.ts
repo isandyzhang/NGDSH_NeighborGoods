@@ -3,6 +3,19 @@ import { hasListingSharePending, resolveListingShareParams } from '@/features/li
 
 const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
 
+const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID as string | undefined
+
+/** 在 LINE 內開啟站內路徑（透過 liff.state 深層連結） */
+export const buildLiffDeepLink = (internalTarget: string) => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
+  const path = internalTarget.startsWith('/') ? internalTarget : `/${internalTarget}`
+  const trimmedLiffId = LIFF_ID?.trim()
+  if (!trimmedLiffId) {
+    return `${origin}${path}`
+  }
+  return `https://liff.line.me/${trimmedLiffId}?liff.state=${encodeURIComponent(path)}`
+}
+
 const buildLineNotifyTarget = (bindToken: string, botLink: string) =>
   `/liff/line-notify?bindToken=${encodeURIComponent(bindToken)}&botLink=${encodeURIComponent(botLink)}`
 

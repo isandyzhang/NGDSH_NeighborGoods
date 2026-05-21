@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
 import { saveLineBindingPending } from '@/features/account/lineBindingSession'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
@@ -59,6 +59,7 @@ const parseApiDateToMs = (value: string) => {
 
 export const ListingDetailPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isAuthenticated, tokens } = useAuth()
   const { id = '' } = useParams()
   const [searchParams] = useSearchParams()
@@ -74,6 +75,8 @@ export const ListingDetailPage = () => {
   const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
+  const [lineActionMessage, setLineActionMessage] = useState<string | null>(null)
+  const lineActionHandledRef = useRef(false)
 
   const detailQuery = useQuery({
     queryKey: ['listings', 'detail', id],
@@ -197,12 +200,14 @@ export const ListingDetailPage = () => {
     }
   }, [isAuthenticated, source])
 
-  const handleChat = async () => {
+  const loginRedirectPath = `${location.pathname}${location.search}`
+
+  const handleChat = useCallback(async () => {
     if (!item || conversationBusy) {
       return
     }
     if (!isAuthenticated) {
-      navigate('/login')
+      navigate(`/login?from=${encodeURIComponent(loginRedirectPath)}`, { state: { from: loginRedirectPath } })
       return
     }
     if (isOwnListing) {
@@ -220,9 +225,9 @@ export const ListingDetailPage = () => {
     } finally {
       setConversationBusy(false)
     }
-  }
+  }, [conversationBusy, isAuthenticated, isOwnListing, item, loginRedirectPath, navigate])
 
-  const openPurchaseConfirm = () => {
+  const openPurchaseConfirm = useCallback(() => {
     if (!item) {
       return
     }
@@ -230,7 +235,7 @@ export const ListingDetailPage = () => {
       return
     }
     if (!isAuthenticated) {
-      navigate('/login')
+      navigate(`/login?from=${encodeURIComponent(loginRedirectPath)}`, { state: { from: loginRedirectPath } })
       return
     }
     if (isOwnListing) {
@@ -238,7 +243,7 @@ export const ListingDetailPage = () => {
       return
     }
     setPurchaseConfirmOpen(true)
-  }
+  }, [canPurchase, isAuthenticated, isOwnListing, item, loginRedirectPath, navigate])
 
   const handlePurchase = async () => {
     if (!item || purchaseBusy || !canPurchase) {
@@ -323,19 +328,29 @@ export const ListingDetailPage = () => {
   }, [item?.id])
 
   useEffect(() => {
+    lineActionHandledRef.current = false
+  }, [id])
+
+  useEffect(() => {
     const lineAction = searchParams.get('lineAction')
-    if (!item || !lineAction) {
+    if (!item || !lineAction || lineActionHandledRef.current) {
       return
     }
+    lineActionHandledRef.current = true
+
     if (lineAction === 'chat') {
-      void handleChat()
+      setLineActionMessage('正在開啟聊天室…')
+      void handleChat().finally(() => setLineActionMessage(null))
       return
     }
-    if (lineAction === 'purchase' && canPurchase) {
+    if (lineAction === 'purchase') {
+      if (!canPurchase) {
+        setError('此商品目前無法購買')
+        return
+      }
       openPurchaseConfirm()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link from FLEX 按鈕
-  }, [item?.id, searchParams.get('lineAction'), canPurchase])
+  }, [canPurchase, handleChat, item, openPurchaseConfirm, searchParams])
 
   const handleShareToLine = async () => {
     if (!item || !canShare || shareBusy) {
@@ -395,7 +410,15 @@ export const ListingDetailPage = () => {
   )
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 md:py-8">
+    <main className="relative mx-auto w-full max-w-7xl px-4 py-6 md:py-8">
+      {lineActionMessage ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <p className="rounded-xl bg-surface px-6 py-4 text-lg font-medium text-text-main shadow-lg">
+            {lineActionMessage}
+          </p>
+        </div>
+      ) : null}
+
       <Link to={backTarget.to} className="text-lg font-medium text-text-subtle hover:text-text-main">
         {backTarget.label}
       </Link>
