@@ -54,6 +54,9 @@ const NotificationCenterPage = lazy(() =>
 const AdminHomePage = lazy(() =>
   import('@/features/admin/pages/AdminHomePage').then((module) => ({ default: module.AdminHomePage })),
 )
+const LiffDebugPage = lazy(() =>
+  import('@/features/admin/pages/LiffDebugPage').then((module) => ({ default: module.LiffDebugPage })),
+)
 const CreateReviewPage = lazy(() =>
   import('@/features/reviews/pages/CreateReviewPage').then((module) => ({ default: module.CreateReviewPage })),
 )
@@ -66,6 +69,10 @@ const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">
 
 const RootEntry = () => {
   const location = useLocation()
+  if (new URLSearchParams(location.search).get('adminLiffDebug') === '1') {
+    return <LiffDebugPage mode="liffEntry" />
+  }
+
   if (isLineNotifyBindingEntry(location.pathname, location.search)) {
     if (location.pathname !== '/') {
       return <Navigate to={{ pathname: '/', search: location.search }} replace />
@@ -123,6 +130,7 @@ export const AppRouter = () => {
           <Route element={<RequireAuth />}>
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminHomePage />} />
+              <Route path="/admin/liff-debug" element={<LiffDebugPage mode="admin" />} />
             </Route>
             <Route path="/account" element={<AccountPage />} />
             <Route path="/profile" element={<Navigate to="/account" replace />} />

@@ -162,10 +162,15 @@ export const AdminHomePage = () => {
         ))}
       </div>
 
-      <Card>
+      <Card className="flex flex-wrap gap-3">
         <Link to="/listings">
           <Button type="button" variant="secondary">
             回到商品列表
+          </Button>
+        </Link>
+        <Link to="/admin/liff-debug">
+          <Button type="button" variant="secondary">
+            LIFF init 除錯
           </Button>
         </Link>
       </Card>
