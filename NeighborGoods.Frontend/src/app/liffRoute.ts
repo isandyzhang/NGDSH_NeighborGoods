@@ -31,6 +31,21 @@ export const buildLiffDeepLink = (internalTarget: string) => {
   return `https://liff.line.me/${trimmedLiffId}?liff.state=${encodeURIComponent(liffState)}`
 }
 
+/**
+ * 商品詳情 Flex 按鈕用：liff.line.me/{liffId}/listings/{id}?...
+ * 手機實測比 ?liff.state=/listings/{id} 穩定（少經 RootEntry 解析）。
+ */
+export const buildListingDetailLiffUrl = (listingId: string, search = '?from=listings') => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
+  const path = `/listings/${listingId.trim()}`
+  const normalizedSearch = search.startsWith('?') ? search : search ? `?${search}` : '?from=listings'
+  const trimmedLiffId = resolveLineLiffId()
+  if (!trimmedLiffId || !listingId.trim()) {
+    return `${origin}${path}${normalizedSearch}`
+  }
+  return `https://liff.line.me/${trimmedLiffId.trim()}${path}${normalizedSearch}`
+}
+
 const buildLineNotifyTarget = (bindToken: string, botLink: string) =>
   `/liff/line-notify?bindToken=${encodeURIComponent(bindToken)}&botLink=${encodeURIComponent(botLink)}`
 

@@ -1,6 +1,6 @@
 import type { SendMessagesParams } from '@liff/send-messages'
 import { resolveLineLiffId } from '@/app/lineLiffId'
-import { buildLiffDeepLink } from '@/app/liffRoute'
+import { buildLiffDeepLink, buildListingDetailLiffUrl } from '@/app/liffRoute'
 import {
   buildListingShareRootSearch,
   saveListingSharePending,
@@ -23,10 +23,30 @@ const LINE_OFFICIAL_ADD_FRIEND_URL = 'https://lin.ee/6ZqrGei'
 const MAX_TITLE_LENGTH = 40
 const MAX_META_LENGTH = 24
 const MAX_BADGE_LENGTH = 8
-/** 視覺縮放約 50%（bubble nano + 內距／字級） */
-const FLEX_CARD_SCALE = 0.5
 const FLEX_OFFICIAL_FOOTER_TEXT = '還沒加官方帳號？馬上加入♪(๑ᵔ◡ᵔ๑)'
-const flexPx = (value: number) => `${Math.round(value * FLEX_CARD_SCALE)}px`
+
+/**
+ * 商品分享 Flex 卡片版面常數（明確設計值，非縮放係數）。
+ * 寬度由 LINE `bubble.size` 決定；高度主要由 hero 比例 + 內距 + 字級堆疊。
+ * 在上一版 nano 基礎上整體放大约 25% → 改用 micro + 較大內距／字級。
+ */
+const LISTING_FLEX_LAYOUT = {
+  bubbleSize: 'micro' as const,
+  heroAspectRatio: '5:3' as const,
+  bodyPadding: '10px',
+  footerPadding: '8px',
+  sectionSpacing: 'sm' as const,
+  buttonRowSpacing: 'sm' as const,
+  badgePadding: '3px',
+  badgePaddingX: '6px',
+  badgeOffset: '8px',
+  titleSize: 'lg' as const,
+  metaSize: 'sm' as const,
+  footerTextSize: 'xs' as const,
+  badgeTextSize: 'xs' as const,
+  buttonHeight: 'sm' as const,
+  footerTextMargin: 'sm' as const,
+} as const
 
 const resolveFlexHeroImage = (imageUrl: string | undefined, origin: string) => {
   const trimmed = imageUrl?.trim()
@@ -156,7 +176,7 @@ export const buildListingFlexMessage = ({
   origin,
 }: ListingFlexPayload & { origin?: string }): ListingLiffFlexMessage => {
   const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
-  const detailUrl = buildLiffDeepLink(`/listings/${listingId}`)
+  const detailUrl = buildListingDetailLiffUrl(listingId)
   const listingsUrl = buildLiffDeepLink('/listings')
   const title = trimText(listingTitle, MAX_TITLE_LENGTH, '好物分享')
   const categoryBadge = trimText(categoryName, MAX_BADGE_LENGTH, '好物')
@@ -170,7 +190,7 @@ export const buildListingFlexMessage = ({
     altText: `${FLEX_ALT_TEXT_PREFIX}${title}`,
     contents: {
       type: 'bubble' as const,
-      size: 'nano' as const,
+      size: LISTING_FLEX_LAYOUT.bubbleSize,
       header: {
         type: 'box' as const,
         layout: 'vertical' as const,
@@ -185,7 +205,7 @@ export const buildListingFlexMessage = ({
                 url: heroImage,
                 size: 'full' as const,
                 aspectMode: 'cover' as const,
-                aspectRatio: '2:1' as const,
+                aspectRatio: LISTING_FLEX_LAYOUT.heroAspectRatio,
                 gravity: 'center' as const,
                 flex: 1,
               },
@@ -196,20 +216,20 @@ export const buildListingFlexMessage = ({
                   {
                     type: 'text' as const,
                     text: categoryBadge,
-                    size: 'xs' as const,
+                    size: LISTING_FLEX_LAYOUT.badgeTextSize,
                     color: '#ffffff',
                     align: 'center' as const,
                     gravity: 'center' as const,
                   },
                 ],
                 backgroundColor: '#06C755',
-                paddingAll: flexPx(4),
-                paddingStart: flexPx(8),
-                paddingEnd: flexPx(8),
+                paddingAll: LISTING_FLEX_LAYOUT.badgePadding,
+                paddingStart: LISTING_FLEX_LAYOUT.badgePaddingX,
+                paddingEnd: LISTING_FLEX_LAYOUT.badgePaddingX,
                 flex: 0,
                 position: 'absolute' as const,
-                offsetStart: flexPx(12),
-                offsetTop: flexPx(12),
+                offsetStart: LISTING_FLEX_LAYOUT.badgeOffset,
+                offsetTop: LISTING_FLEX_LAYOUT.badgeOffset,
                 cornerRadius: '100px',
               },
             ],
@@ -219,15 +239,15 @@ export const buildListingFlexMessage = ({
       body: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'xs' as const,
-        paddingAll: flexPx(12),
+        spacing: LISTING_FLEX_LAYOUT.sectionSpacing,
+        paddingAll: LISTING_FLEX_LAYOUT.bodyPadding,
         backgroundColor: FLEX_BODY_BG,
         contents: [
           {
             type: 'text' as const,
             text: title,
             weight: 'bold' as const,
-            size: 'md' as const,
+            size: LISTING_FLEX_LAYOUT.titleSize,
             wrap: true,
             maxLines: 2,
             color: FLEX_TEXT_PRIMARY,
@@ -235,7 +255,7 @@ export const buildListingFlexMessage = ({
           {
             type: 'text' as const,
             text: `${residence} · ${condition}`,
-            size: 'xs' as const,
+            size: LISTING_FLEX_LAYOUT.metaSize,
             color: FLEX_TEXT_SECONDARY,
             wrap: true,
             maxLines: 1,
@@ -243,7 +263,7 @@ export const buildListingFlexMessage = ({
           {
             type: 'text' as const,
             text: price,
-            size: 'xs' as const,
+            size: LISTING_FLEX_LAYOUT.metaSize,
             color: FLEX_TEXT_PRIMARY,
             weight: 'bold' as const,
             wrap: true,
@@ -254,20 +274,20 @@ export const buildListingFlexMessage = ({
       footer: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'xs' as const,
-        paddingAll: flexPx(8),
+        spacing: LISTING_FLEX_LAYOUT.sectionSpacing,
+        paddingAll: LISTING_FLEX_LAYOUT.footerPadding,
         paddingTop: '0px',
         backgroundColor: FLEX_BODY_BG,
         contents: [
           {
             type: 'box' as const,
             layout: 'horizontal' as const,
-            spacing: 'xs' as const,
+            spacing: LISTING_FLEX_LAYOUT.buttonRowSpacing,
             contents: [
               {
                 type: 'button' as const,
                 style: 'secondary' as const,
-                height: 'sm' as const,
+                height: LISTING_FLEX_LAYOUT.buttonHeight,
                 flex: 1,
                 action: {
                   type: 'uri' as const,
@@ -278,7 +298,7 @@ export const buildListingFlexMessage = ({
               {
                 type: 'button' as const,
                 style: 'primary' as const,
-                height: 'sm' as const,
+                height: LISTING_FLEX_LAYOUT.buttonHeight,
                 flex: 1,
                 color: '#06C755',
                 action: {
@@ -292,12 +312,12 @@ export const buildListingFlexMessage = ({
           {
             type: 'text' as const,
             text: FLEX_OFFICIAL_FOOTER_TEXT,
-            size: 'xxs' as const,
+            size: LISTING_FLEX_LAYOUT.footerTextSize,
             color: FLEX_TEXT_SECONDARY,
             wrap: false,
             maxLines: 1,
             align: 'center' as const,
-            margin: 'sm' as const,
+            margin: LISTING_FLEX_LAYOUT.footerTextMargin,
             action: {
               type: 'uri' as const,
               label: '加入官方帳號',
