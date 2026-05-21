@@ -14,12 +14,15 @@ import {
   HARDCODED_LIFF_ID,
   hasNestedLiffState,
   isAdminLiffDebugSessionActive,
+  formatShareTargetPickerTest,
   openLiffForAdminDebug,
   runLiffInitAttempt,
+  runShareTargetPickerTest,
   type LiffInitAttemptResult,
   type LiffInitSource,
   type LiffPostInitSnapshot,
   type LiffPreInitSnapshot,
+  type ShareTargetPickerTestResult,
 } from '@/features/admin/liffInitDebug'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { Button } from '@/shared/ui/Button'
@@ -47,6 +50,8 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
   const [initAttempt, setInitAttempt] = useState<LiffInitAttemptResult | null>(null)
   const [postSnapshot, setPostSnapshot] = useState<LiffPostInitSnapshot | null>(null)
   const [initLoading, setInitLoading] = useState<LiffInitSource | null>(null)
+  const [shareTestResult, setShareTestResult] = useState<ShareTargetPickerTestResult | null>(null)
+  const [shareTestLoading, setShareTestLoading] = useState(false)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
 
   const initPathOk = location.pathname === '/'
@@ -100,6 +105,8 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
 
   const isAdmin = mode === 'admin' || role === ADMIN_ROLE_CODE
   const canInit = initEnabled && isAdmin && !roleLoading
+  const liffReadyForShare = Boolean(initAttempt?.ok || postSnapshot?.isLoggedIn)
+  const canShareTest = initEnabled && isAdmin && !roleLoading && liffReadyForShare
 
   const envLiffId = ENV_LIFF_ID?.trim() ?? ''
   const envLiffUrl = useMemo(() => (envLiffId ? buildLiffAdminDebugUrl(envLiffId) : null), [envLiffId])
@@ -146,6 +153,18 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
     window.setTimeout(() => setCopyMessage(null), 2000)
   }, [])
 
+  const handleShareTest = useCallback(async () => {
+    setShareTestLoading(true)
+    setShareTestResult(null)
+    try {
+      const result = await runShareTargetPickerTest()
+      setShareTestResult(result)
+      console.info(formatShareTargetPickerTest(result))
+    } finally {
+      setShareTestLoading(false)
+    }
+  }, [])
+
   const handleEndDebug = useCallback(() => {
     clearAdminLiffDebugSession()
     if (mode === 'liffEntry') {
@@ -159,6 +178,7 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
     preSnapshot ? formatPreInitSnapshot(preSnapshot) : null,
     initAttempt ? formatInitAttempt(initAttempt) : null,
     postSnapshot ? formatPostInitSnapshot(postSnapshot) : null,
+    shareTestResult ? formatShareTargetPickerTest(shareTestResult) : null,
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -297,6 +317,40 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
         </div>
         {!canInit && isAdmin && mode === 'admin' ? (
           <p className="text-xs text-text-subtle">init 按鈕會在 LINE 內開啟後自動可用（根路徑 /）。</p>
+        ) : null}
+      </Card>
+
+      <Card className="space-y-3 border-[#c5e8d4] bg-[#f4fbf6]">
+        <p className="text-sm font-semibold text-text-main">
+          {mode === 'admin' ? '步驟 3：' : ''}測試 FLEX 分享（shareTargetPicker）
+        </p>
+        <p className="text-xs text-text-muted">
+          請先 init 成功。按鈕後會跳出 LINE 對象選擇器，選好友或群組後送出測試 FLEX。
+        </p>
+        <Button
+          type="button"
+          className="w-full"
+          disabled={!canShareTest || shareTestLoading || initLoading !== null}
+          onClick={() => void handleShareTest()}
+        >
+          {shareTestLoading ? '開啟選人中…' : '發送 TEST FLEX（選擇傳送對象）'}
+        </Button>
+        {shareTestResult ? (
+          <p className={`text-sm ${shareTestResult.ok ? 'text-[#2F7D4E]' : 'text-danger'}`}>
+            {shareTestResult.ok
+              ? '已送出測試 FLEX。'
+              : shareTestResult.reason === 'CANCELLED'
+                ? '已取消或未選擇對象。'
+                : `分享未成功：${shareTestResult.errorMessage ?? shareTestResult.reason}`}
+          </p>
+        ) : null}
+        {!liffReadyForShare && initEnabled && isAdmin ? (
+          <p className="text-xs text-text-subtle">請先完成 init（ok: true）後再測分享。</p>
+        ) : null}
+        {postSnapshot && !postSnapshot.apiShareTargetPicker ? (
+          <p className="text-xs text-amber-800">
+            目前 shareTargetPicker 不可用（context: {postSnapshot.contextType ?? '-'}）。若仍要測試可按上方按鈕看詳細錯誤。
+          </p>
         ) : null}
       </Card>
 

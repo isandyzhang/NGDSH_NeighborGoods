@@ -156,7 +156,34 @@ export type LiffPostInitSnapshot = {
   profileError: string | null
 }
 
+export type ShareTargetPickerTestResult = {
+  ok: boolean
+  reason:
+    | 'SENT'
+    | 'CANCELLED'
+    | 'NOT_LOGGED_IN'
+    | 'NOT_IN_CLIENT'
+    | 'PICKER_UNAVAILABLE'
+    | 'LIFF_NOT_READY'
+    | 'ERROR'
+  contextType: string | null
+  shareTargetPickerAvailable: boolean
+  isInClient: boolean
+  isLoggedIn: boolean
+  durationMs: number
+  errorCode: string | null
+  errorMessage: string | null
+}
+
 const liffIdSuffix = (id: string) => (id.length > 12 ? id.slice(-12) : id)
+
+const safeIsApiAvailable = (apiName: 'getFriendship' | 'shareTargetPicker'): boolean => {
+  try {
+    return liff.isApiAvailable(apiName)
+  } catch {
+    return false
+  }
+}
 
 const formatError = (err: unknown): { name: string | null; code: string | null; message: string } => {
   if (err instanceof Error) {
@@ -255,20 +282,25 @@ export const collectPostInitSnapshot = async (): Promise<LiffPostInitSnapshot> =
     base.os = liff.getOS() ?? null
     base.language = liff.getLanguage() ?? null
     base.contextType = liff.getContext()?.type ?? null
-    base.apiGetFriendship = liff.isApiAvailable('getFriendship')
-    base.apiShareTargetPicker = liff.isApiAvailable('shareTargetPicker')
-    base.apiSendMessages = liff.isApiAvailable('sendMessages')
+    base.apiGetFriendship = safeIsApiAvailable('getFriendship')
+    base.apiShareTargetPicker = safeIsApiAvailable('shareTargetPicker')
+    base.apiSendMessages = false
 
     if (base.isLoggedIn) {
-      const idToken = liff.getIDToken()
-      base.idTokenPresent = Boolean(idToken)
-      base.idTokenPrefix = idToken ? `${idToken.slice(0, 12)}…` : null
+      try {
+        const idToken = liff.getIDToken()
+        base.idTokenPresent = Boolean(idToken)
+        base.idTokenPrefix = idToken ? `${idToken.slice(0, 12)}…` : null
+      } catch (err) {
+        base.profileError = `getIDToken: ${formatError(err).message}`
+      }
       try {
         const profile = await liff.getProfile()
         base.profileUserId = profile.userId
         base.profileDisplayName = profile.displayName
       } catch (err) {
-        base.profileError = formatError(err).message
+        const msg = formatError(err).message
+        base.profileError = base.profileError ? `${base.profileError}; getProfile: ${msg}` : `getProfile: ${msg}`
       }
     }
   } catch (err) {
@@ -281,6 +313,185 @@ export const collectPostInitSnapshot = async (): Promise<LiffPostInitSnapshot> =
 /** 從外部瀏覽器開啟；liff.state 僅帶 query（勿用 /?… 避免與 LINE 重複包裝） */
 export const buildLiffAdminDebugUrl = (liffId: string) =>
   `https://liff.line.me/${liffId.trim()}?liff.state=${encodeURIComponent('adminLiffDebug=1')}`
+
+export const buildAdminTestFlexMessage = (origin?: string) => {
+  const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
+  const heroUrl = `${siteOrigin}/logo.png`
+  const testedAt = new Date().toLocaleString('zh-TW', { hour12: false })
+
+  return {
+    type: 'flex' as const,
+    altText: '[TEST] NeighborGoods FLEX 分享測試',
+    contents: {
+      type: 'bubble' as const,
+      hero: {
+        type: 'image' as const,
+        url: heroUrl,
+        size: 'full' as const,
+        aspectRatio: '20:13' as const,
+        aspectMode: 'cover' as const,
+      },
+      body: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        spacing: 'md' as const,
+        contents: [
+          {
+            type: 'text' as const,
+            text: 'LIFF TEST FLEX',
+            weight: 'bold' as const,
+            size: 'lg' as const,
+            wrap: true,
+          },
+          {
+            type: 'text' as const,
+            text: `測試時間：${testedAt}`,
+            size: 'sm' as const,
+            color: '#666666',
+            wrap: true,
+          },
+          {
+            type: 'text' as const,
+            text: '此為 shareTargetPicker 測試訊息，請選擇要傳送的對象。',
+            size: 'sm' as const,
+            color: '#666666',
+            wrap: true,
+          },
+        ],
+      },
+      footer: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        spacing: 'sm' as const,
+        contents: [
+          {
+            type: 'button' as const,
+            style: 'primary' as const,
+            action: {
+              type: 'uri' as const,
+              label: '開啟 NeighborGoods',
+              uri: siteOrigin,
+            },
+          },
+        ],
+      },
+    },
+  }
+}
+
+/** 需先 liff.init()；會開啟 shareTargetPicker 讓使用者選擇傳送對象 */
+export const runShareTargetPickerTest = async (): Promise<ShareTargetPickerTestResult> => {
+  const started = performance.now()
+  const base = (): ShareTargetPickerTestResult => ({
+    ok: false,
+    reason: 'ERROR',
+    contextType: null,
+    shareTargetPickerAvailable: false,
+    isInClient: false,
+    isLoggedIn: false,
+    durationMs: Math.round(performance.now() - started),
+    errorCode: null,
+    errorMessage: null,
+  })
+
+  try {
+    let contextType: string | null = null
+    try {
+      contextType = liff.getContext()?.type ?? null
+    } catch {
+      return { ...base(), reason: 'LIFF_NOT_READY', errorMessage: '請先按 init 成功後再測分享' }
+    }
+
+    const isInClient = liff.isInClient()
+    const isLoggedIn = liff.isLoggedIn()
+    const shareTargetPickerAvailable = safeIsApiAvailable('shareTargetPicker')
+
+    if (!isLoggedIn) {
+      return {
+        ...base(),
+        reason: 'NOT_LOGGED_IN',
+        contextType,
+        isInClient,
+        isLoggedIn,
+        shareTargetPickerAvailable,
+        errorMessage: '尚未登入 LINE',
+      }
+    }
+    if (!isInClient) {
+      return {
+        ...base(),
+        reason: 'NOT_IN_CLIENT',
+        contextType,
+        isInClient,
+        isLoggedIn,
+        shareTargetPickerAvailable,
+        errorMessage: '請在 LINE App 內開啟此頁',
+      }
+    }
+    if (!shareTargetPickerAvailable) {
+      return {
+        ...base(),
+        reason: 'PICKER_UNAVAILABLE',
+        contextType,
+        isInClient,
+        isLoggedIn,
+        shareTargetPickerAvailable,
+        errorMessage: `此 LIFF 環境不支援 shareTargetPicker（context: ${contextType ?? '-'})`,
+      }
+    }
+
+    const flexMessage = buildAdminTestFlexMessage()
+    const pickerResult = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
+    if (pickerResult === null) {
+      return {
+        ok: false,
+        reason: 'CANCELLED',
+        contextType,
+        shareTargetPickerAvailable,
+        isInClient,
+        isLoggedIn,
+        durationMs: Math.round(performance.now() - started),
+        errorCode: null,
+        errorMessage: '已取消或未選擇對象',
+      }
+    }
+
+    return {
+      ok: true,
+      reason: 'SENT',
+      contextType,
+      shareTargetPickerAvailable,
+      isInClient,
+      isLoggedIn,
+      durationMs: Math.round(performance.now() - started),
+      errorCode: null,
+      errorMessage: null,
+    }
+  } catch (err) {
+    const { code, message } = formatError(err)
+    return {
+      ...base(),
+      errorCode: code,
+      errorMessage: message,
+    }
+  }
+}
+
+export const formatShareTargetPickerTest = (r: ShareTargetPickerTestResult): string =>
+  [
+    '[LIFF shareTargetPicker test]',
+    `ok: ${r.ok}`,
+    `reason: ${r.reason}`,
+    `contextType: ${r.contextType ?? '-'}`,
+    `isInClient: ${r.isInClient}`,
+    `isLoggedIn: ${r.isLoggedIn}`,
+    `shareTargetPickerAvailable: ${r.shareTargetPickerAvailable}`,
+    `durationMs: ${r.durationMs}`,
+    r.errorCode ? `errorCode: ${r.errorCode}` : null,
+    r.errorMessage ? `errorMessage: ${r.errorMessage}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
 
 export const openLiffForAdminDebug = (liffId: string) => {
   enableAdminLiffDebugSession()
