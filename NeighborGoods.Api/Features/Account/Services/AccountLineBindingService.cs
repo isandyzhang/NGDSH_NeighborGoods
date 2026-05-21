@@ -22,9 +22,7 @@ public sealed class AccountLineBindingService(
     private static string BuildLiffBindingUrl(string liffId, string bindToken, string botLink)
     {
         // liff.state carries path only; bindToken/botLink stay as outer query params (nested query in liff.state is dropped by LINE).
-        const string state = "/liff/line-notify";
-        return $"https://liff.line.me/{liffId.Trim()}" +
-               $"?liff.state={Uri.EscapeDataString(state)}" +
+        return LineLiffUrlBuilder.BuildDeepLink(liffId, "/liff/line-notify") +
                $"&bindToken={Uri.EscapeDataString(bindToken)}" +
                $"&botLink={Uri.EscapeDataString(botLink)}";
     }

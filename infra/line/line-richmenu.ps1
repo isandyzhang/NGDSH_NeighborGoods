@@ -89,12 +89,38 @@ function Invoke-LineImageUpload {
   }
 }
 
+function Build-LiffDeepLink {
+  param(
+    [string]$LiffUrl,
+    [string]$WebBaseUrl,
+    [string]$InternalPath
+  )
+
+  if (-not $InternalPath.StartsWith("/")) {
+    $InternalPath = "/$InternalPath"
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($LiffUrl)) {
+    $liffBase = $LiffUrl.Trim().TrimEnd("/")
+    $qIndex = $liffBase.IndexOf("?")
+    if ($qIndex -ge 0) {
+      $liffBase = $liffBase.Substring(0, $qIndex)
+    }
+    $encoded = [System.Uri]::EscapeDataString($InternalPath)
+    return "${liffBase}?liff.state=$encoded"
+  }
+
+  return "$WebBaseUrl$InternalPath"
+}
+
 function Build-RichMenuDefinition {
   param(
     [string]$Name,
     [string]$BarText,
-    [string]$BaseUrl,
-    [string]$OpenListingsUrl
+    [string]$ListingsUrl,
+    [string]$CreateListingUrl,
+    [string]$AccountUrl,
+    [string]$FavoritesUrl
   )
 
   return @{
@@ -111,7 +137,7 @@ function Build-RichMenuDefinition {
         bounds = @{ x = 0; y = 0; width = 833; height = 843 }
         action = @{
           type = "uri"
-          uri = $OpenListingsUrl
+          uri = $ListingsUrl
         }
       },
       @{
@@ -135,21 +161,21 @@ function Build-RichMenuDefinition {
         bounds = @{ x = 0; y = 843; width = 833; height = 843 }
         action = @{
           type = "uri"
-          uri = "$BaseUrl/listings/create"
+          uri = $CreateListingUrl
         }
       },
       @{
         bounds = @{ x = 833; y = 843; width = 834; height = 843 }
         action = @{
           type = "uri"
-          uri = "$BaseUrl/account"
+          uri = $AccountUrl
         }
       },
       @{
         bounds = @{ x = 1667; y = 843; width = 833; height = 843 }
         action = @{
           type = "uri"
-          uri = "$BaseUrl/favorites"
+          uri = $FavoritesUrl
         }
       }
     )
@@ -167,12 +193,25 @@ function Get-CurrentDefaultRichMenuId {
 }
 
 Write-Host "[1/4] Creating rich menu..."
-$listingsUrl = "https://www.neighborgoodstw.com/listings"
+$trimmedLiffUrl = $LiffUrl.Trim()
+$listingsUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings"
+$createListingUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings/create"
+$accountUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/account"
+$favoritesUrl = Build-LiffDeepLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/favorites"
+if ([string]::IsNullOrWhiteSpace($trimmedLiffUrl)) {
+  Write-Warning "LiffUrl not set; rich menu URI actions use WebBaseUrl only (LIFF init may fail in LINE in-app browser)."
+}
+else {
+  Write-Host "Using LIFF deep links (liff.state) for all URI menu areas."
+}
+Write-Host "  listings: $listingsUrl"
 $definition = Build-RichMenuDefinition `
   -Name $RichMenuName `
   -BarText $ChatBarText `
-  -BaseUrl $normalizedBaseUrl `
-  -OpenListingsUrl $listingsUrl
+  -ListingsUrl $listingsUrl `
+  -CreateListingUrl $createListingUrl `
+  -AccountUrl $accountUrl `
+  -FavoritesUrl $favoritesUrl
 $createResponse = Invoke-LineApiJson -Method "POST" -Uri "$apiBase/richmenu" -Body $definition
 $newRichMenuId = [string]$createResponse.richMenuId
 $newRichMenuId = $newRichMenuId.Trim()

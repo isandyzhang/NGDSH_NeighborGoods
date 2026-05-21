@@ -43,6 +43,14 @@ import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
 
 const PAGE_SIZE = 12
+const FILTER_SCROLL_NAV_OFFSET_PX = 104
+const FILTER_SCROLL_DURATION_MS = 700
+const FILTER_SCROLL_BROWSE_DURATION_MS = 1500
+
+const easeInOutCubic = (progress: number) =>
+  progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2
+
+const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches
 
 type ExpandableFilterKey = 'category' | 'condition' | 'residence'
 type QuickFilterKey = 'free' | 'charity' | 'tradeable'
@@ -135,7 +143,11 @@ export const ListingHomePage = () => {
   const [loadedItems, setLoadedItems] = useState<ListingItem[]>([])
   const [knownTotalPages, setKnownTotalPages] = useState(1)
   const listingSectionRef = useRef<HTMLElement | null>(null)
+  const filterSectionRef = useRef<HTMLElement | null>(null)
   const desktopFilterRowRef = useRef<HTMLDivElement | null>(null)
+  const mobileFilterSheetWasOpenRef = useRef(false)
+  const skipMobileFilterScrollRef = useRef(true)
+  const filterScrollFrameRef = useRef<number | null>(null)
   const desktopFilterAreaRef = useRef<HTMLDivElement | null>(null)
   const quickFilterHoverTimerRef = useRef<number | null>(null)
   const marqueeRef = useRef<HTMLElement | null>(null)
@@ -250,9 +262,86 @@ export const ListingHomePage = () => {
 
   useEffect(() => {
     setPage(1)
-    setLoadedItems([])
     setKnownTotalPages(1)
   }, [listingFilterSignature])
+
+  const scrollToFilterSection = useCallback((durationMs = FILTER_SCROLL_DURATION_MS) => {
+    const target = filterSectionRef.current ?? listingSectionRef.current
+    const targetTop = target?.getBoundingClientRect().top
+    if (targetTop == null) {
+      return
+    }
+
+    if (filterScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(filterScrollFrameRef.current)
+      filterScrollFrameRef.current = null
+    }
+
+    const startY = window.scrollY
+    const destinationY = Math.max(0, startY + targetTop - FILTER_SCROLL_NAV_OFFSET_PX)
+    const distance = destinationY - startY
+    if (Math.abs(distance) < 2) {
+      return
+    }
+
+    const startedAt = performance.now()
+
+    const animateScroll = (now: number) => {
+      const elapsed = now - startedAt
+      const progress = Math.min(elapsed / durationMs, 1)
+      const easedProgress = easeInOutCubic(progress)
+
+      window.scrollTo({
+        top: startY + distance * easedProgress,
+        behavior: 'auto',
+      })
+
+      if (progress < 1) {
+        filterScrollFrameRef.current = window.requestAnimationFrame(animateScroll)
+      } else {
+        filterScrollFrameRef.current = null
+      }
+    }
+
+    filterScrollFrameRef.current = window.requestAnimationFrame(animateScroll)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (filterScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(filterScrollFrameRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const sheetOpen = mobileSheetFilter !== null
+    const wasOpen = mobileFilterSheetWasOpenRef.current
+    mobileFilterSheetWasOpenRef.current = sheetOpen
+
+    if (!wasOpen || sheetOpen || !isMobileViewport()) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      scrollToFilterSection()
+    })
+  }, [mobileSheetFilter, scrollToFilterSection])
+
+  useEffect(() => {
+    if (skipMobileFilterScrollRef.current) {
+      skipMobileFilterScrollRef.current = false
+      return
+    }
+
+    if (mobileSheetFilter || !isMobileViewport()) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      scrollToFilterSection()
+    })
+  }, [listingFilterSignature, mobileSheetFilter, scrollToFilterSection])
 
   useEffect(() => {
     const response = listQuery.data
@@ -403,37 +492,11 @@ export const ListingHomePage = () => {
   }
 
   const handleBrowseListings = () => {
-    const targetTop = listingSectionRef.current?.getBoundingClientRect().top
-    if (targetTop == null) {
-      return
-    }
+    scrollToFilterSection(FILTER_SCROLL_BROWSE_DURATION_MS)
+  }
 
-    const startY = window.scrollY
-    const NAV_OFFSET_PX = 104
-    const destinationY = startY + targetTop - NAV_OFFSET_PX
-    const distance = destinationY - startY
-    const duration = 1500
-    const startedAt = performance.now()
-
-    const easeInOutCubic = (progress: number) =>
-      progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2
-
-    const animateScroll = (now: number) => {
-      const elapsed = now - startedAt
-      const progress = Math.min(elapsed / duration, 1)
-      const easedProgress = easeInOutCubic(progress)
-
-      window.scrollTo({
-        top: startY + distance * easedProgress,
-        behavior: 'auto',
-      })
-
-      if (progress < 1) {
-        window.requestAnimationFrame(animateScroll)
-      }
-    }
-
-    window.requestAnimationFrame(animateScroll)
+  const closeMobileFilterSheet = () => {
+    setMobileSheetFilter(null)
   }
 
   const triggerQuickFilterLottie = (key: QuickFilterKey) => {
@@ -898,7 +961,11 @@ export const ListingHomePage = () => {
 
       <div className="order-3 md:order-3">
       <section ref={listingSectionRef} aria-label="商品篩選起點" className="h-0 scroll-mt-28" />
-      <section className="animate-fade-rise mb-6 space-y-4" style={{ animationDelay: '360ms' }}>
+      <section
+        ref={filterSectionRef}
+        className="animate-fade-rise mb-6 scroll-mt-28 space-y-4"
+        style={{ animationDelay: '360ms' }}
+      >
         <div ref={desktopFilterAreaRef} className="hidden space-y-4 md:block">
           <div ref={desktopFilterRowRef} className="flex items-start justify-between gap-5 md:flex-nowrap">
             <div className="grid flex-1 grid-cols-3 items-start gap-5">
@@ -1206,7 +1273,7 @@ export const ListingHomePage = () => {
             type="button"
             className="absolute inset-0"
             aria-label="關閉條件選單"
-            onClick={() => setMobileSheetFilter(null)}
+            onClick={closeMobileFilterSheet}
           />
           <Card className="animate-sheet-up relative z-10 mx-auto flex h-[62vh] w-[calc(100%-1rem)] flex-col overflow-auto rounded-2xl p-0">
             <div className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded-t-2xl border-b border-border bg-[#F3E7D8] px-4 py-3">
@@ -1221,7 +1288,7 @@ export const ListingHomePage = () => {
                 type="button"
                 variant="secondary"
                 className="min-h-[3.3rem] px-5 text-xl font-semibold"
-                onClick={() => setMobileSheetFilter(null)}
+                onClick={closeMobileFilterSheet}
               >
                 完成
               </Button>

@@ -19,12 +19,12 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 ## Actions configured in this script
 
 - Row 1, Area 1: open listings entry (`uri`)
-  - If `LiffUrl` is provided, use LIFF URL (recommended for in-LINE experience)
-  - Otherwise fallback to `$WebBaseUrl/listings`
+  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all four URI areas use `?liff.state=/...` deep links
+  - Otherwise fallback to `$WebBaseUrl` + path
 - Row 1, Area 2: postback `action=myListings`
 - Row 1, Area 3: postback `action=myMessages`
 - Row 2, Area 1: open `$WebBaseUrl/listings/create` (`uri`)
-- Row 2, Area 2: open `$WebBaseUrl/profile` (`uri`)
+- Row 2, Area 2: open `$WebBaseUrl/account` (`uri`, or LIFF `liff.state=/account`)
 - Row 2, Area 3: open `$WebBaseUrl/favorites` (`uri`)
 
 Postback values are aligned with current backend webhook routing.
@@ -33,7 +33,7 @@ Current webhook reply behavior:
 
 - `action=myListings`
   - Reply a Flex carousel first (max 5 listing cards)
-  - Each card includes listing status, favorite count, and a deep link to `/listings/{id}`
+  - Each card includes listing status, favorite count, and a LIFF deep link to `/listings/{id}` when `LineMessagingApi:LiffId` is set
   - Ordering priority: has unread messages > recently changed status (proxied by latest update time) > latest updated/created
 - `action=myMessages`
   - Reply unread summary first
@@ -44,9 +44,10 @@ Current webhook reply behavior:
 
 ```powershell
 pwsh "./infra/line/line-richmenu.ps1" `
-  -ChannelAccessToken "Yza5/xt9annQc5UGZOX0phmWJLO3Ic4T+Ieho9BREqvUvzbAD48MZRjxHx/ED8rRRpe6IZHqcqqcJIIEqC9EHcHLP+sMKWY+K8l0fe9ukD8oiCkJYUCh6r1fmYcO9S7WiF+OCsskHElU95NKtHaGPAdB04t89/1O/w1cDnyilFU=" `
+  -ChannelAccessToken "..." `
   -RichMenuImagePath "C:\github\NGDSH_NeighborGoods\infra\line\linemenu.png" `
   -WebBaseUrl "https://www.neighborgoodstw.com/" `
+  -LiffUrl "https://liff.line.me/2008745853-Ui8PkOGi" `
   -ImageContentType "image/png"
 ```
 

@@ -76,7 +76,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
                                 {
                                     type = "uri",
                                     label = "前往刊登",
-                                    uri = BuildUrl("/create-listing")
+                                    uri = BuildUrl("/listings/create")
                                 }
                             },
                             new
@@ -524,7 +524,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             title: "尚未完成綁定",
             message: "請先到網站個人設定完成 LINE 通知綁定，才能查看個人摘要。",
             buttonLabel: "前往個人設定",
-            buttonUrl: BuildUrl("/profile"));
+            buttonUrl: BuildUrl("/account"));
     }
 
     private LineFlexMessage BuildCard(string title, string message, string? buttonLabel, string? buttonUrl)
@@ -702,16 +702,7 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         };
     }
 
-    private string BuildUrl(string path)
-    {
-        var baseUrl = string.IsNullOrWhiteSpace(_options.WebBaseUrl) ? "http://localhost:5173" : _options.WebBaseUrl.TrimEnd('/');
-        if (!path.StartsWith("/", StringComparison.Ordinal))
-        {
-            path = "/" + path;
-        }
-
-        return $"{baseUrl}{path}";
-    }
+    private string BuildUrl(string path) => LineLiffUrlBuilder.BuildLineOpenUrl(_options, path);
 }
 
 public sealed record LineFlexMessage(string AltText, object Contents);
