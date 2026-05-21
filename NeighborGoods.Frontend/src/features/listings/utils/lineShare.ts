@@ -385,6 +385,63 @@ const buildListingShareLoginRedirectUri = () => {
   return `${origin}/`
 }
 
+export type ListingPageLiffInitTestResult = {
+  ok: boolean
+  pathname: string
+  liffIdSuffix: string
+  isInClient: boolean
+  shareTargetPickerAvailable: boolean
+  isLoggedIn: boolean
+  version: string | null
+  errorMessage: string | null
+}
+
+/** 在「目前這個 pathname」強制嘗試 liff.init（除錯用；商品頁 /listings/:id 預期常失敗） */
+export const testLiffInitOnCurrentPage = async (): Promise<ListingPageLiffInitTestResult> => {
+  const liffId = getLineLiffId()
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+  const base: ListingPageLiffInitTestResult = {
+    ok: false,
+    pathname,
+    liffIdSuffix: liffId ? liffId.slice(-8) : '(none)',
+    isInClient: false,
+    shareTargetPickerAvailable: false,
+    isLoggedIn: false,
+    version: null,
+    errorMessage: null,
+  }
+
+  if (!liffId) {
+    return { ...base, errorMessage: 'VITE_LINE_LIFF_ID 未設定' }
+  }
+
+  resetLiffReadyCache()
+
+  try {
+    const liffMod = await import('@line/liff')
+    const liff = liffMod.default
+    await liff.init({ liffId })
+    liffReadyPromise = Promise.resolve(true)
+
+    return {
+      ok: true,
+      pathname,
+      liffIdSuffix: liffId.slice(-8),
+      isInClient: liff.isInClient(),
+      shareTargetPickerAvailable: safeSharePickerAvailable(liff),
+      isLoggedIn: liff.isLoggedIn(),
+      version: liff.getVersion(),
+      errorMessage: null,
+    }
+  } catch (err) {
+    liffReadyPromise = Promise.resolve(false)
+    return {
+      ...base,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
 /** 分享頁專用：一律明確 init（對齊 LiffDebugPage.runLiffInitAttempt / LineNotifyLiffPage） */
 export const initLiffForFlexShare = async () => {
   const liffId = getLineLiffId()

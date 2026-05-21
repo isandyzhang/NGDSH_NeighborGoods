@@ -21,7 +21,9 @@ import {
   getLiffShareDiagnostics,
   shareListingAsLineText,
   startListingFlexShare,
+  testLiffInitOnCurrentPage,
   type LiffShareDiagnostics,
+  type ListingPageLiffInitTestResult,
   type ShareListingResult,
 } from '@/features/listings/utils/lineShare'
 import { useAuth } from '@/features/auth/components/AuthProvider'
@@ -77,6 +79,8 @@ export const ListingDetailPage = () => {
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
   const [flexShareBusy, setFlexShareBusy] = useState(false)
+  const [liffInitTestBusy, setLiffInitTestBusy] = useState(false)
+  const [liffInitTestResult, setLiffInitTestResult] = useState<ListingPageLiffInitTestResult | null>(null)
   const [lineInApp, setLineInApp] = useState(false)
   const [lineActionMessage, setLineActionMessage] = useState<string | null>(null)
   const lineActionHandledRef = useRef(false)
@@ -364,6 +368,22 @@ export const ListingDetailPage = () => {
     }
   }
 
+  const handleLiffInitTestOnPage = async () => {
+    if (liffInitTestBusy) {
+      return
+    }
+
+    setLiffInitTestBusy(true)
+    setLiffInitTestResult(null)
+    try {
+      const result = await testLiffInitOnCurrentPage()
+      setLiffInitTestResult(result)
+      console.info('[LIFF init test — listing page]', result)
+    } finally {
+      setLiffInitTestBusy(false)
+    }
+  }
+
   const handleFlexShareToLine = async () => {
     if (!item || !canShare || flexShareBusy) {
       return
@@ -604,14 +624,38 @@ export const ListingDetailPage = () => {
                       {shareBusy ? '分享中…' : '分享到 LINE'}
                     </Button>
                     {lineInApp ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleFlexShareToLine()}
-                        disabled={!canShare || flexShareBusy}
-                        className="w-full text-center text-xs text-text-subtle underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
-                      >
-                        {flexShareBusy ? '準備 Flex 分享…' : '以 Flex 卡片分享（選人）'}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleFlexShareToLine()}
+                          disabled={!canShare || flexShareBusy}
+                          className="w-full text-center text-xs text-text-subtle underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
+                        >
+                          {flexShareBusy ? '準備 Flex 分享…' : '以 Flex 卡片分享（選人）'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleLiffInitTestOnPage()}
+                          disabled={liffInitTestBusy}
+                          className="w-full text-center text-[11px] text-text-subtle/80 underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
+                        >
+                          {liffInitTestBusy ? '本頁 init 測試中…' : '測試：在本商品頁 liff.init'}
+                        </button>
+                        {liffInitTestResult ? (
+                          <p
+                            className={`text-[11px] leading-relaxed ${liffInitTestResult.ok ? 'text-emerald-700' : 'text-danger'}`}
+                          >
+                            {liffInitTestResult.ok ? 'init 成功' : 'init 失敗'} · path=
+                            {liffInitTestResult.pathname} · picker=
+                            {String(liffInitTestResult.shareTargetPickerAvailable)} · login=
+                            {String(liffInitTestResult.isLoggedIn)}
+                            {liffInitTestResult.version ? ` · v${liffInitTestResult.version}` : ''}
+                            {liffInitTestResult.errorMessage
+                              ? ` · ${liffInitTestResult.errorMessage}`
+                              : ''}
+                          </p>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                 </div>
