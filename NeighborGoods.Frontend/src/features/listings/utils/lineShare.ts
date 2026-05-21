@@ -25,27 +25,30 @@ const MAX_META_LENGTH = 24
 const MAX_BADGE_LENGTH = 8
 const FLEX_OFFICIAL_FOOTER_TEXT = '還沒加官方帳號？馬上加入♪(๑ᵔ◡ᵔ๑)'
 
+/** 相對上一版 micro 版面整體放大约 40%（px／字級 ×1.4；寬度改 kilo） */
+const LISTING_FLEX_LAYOUT_SCALE = 1.4
+const listingFlexPx = (value: number) => `${Math.round(value * LISTING_FLEX_LAYOUT_SCALE)}px`
+
 /**
- * 商品分享 Flex 卡片版面常數（明確設計值，非縮放係數）。
- * 寬度由 LINE `bubble.size` 決定；高度主要由 hero 比例 + 內距 + 字級堆疊。
- * 在上一版 nano 基礎上整體放大约 25% → 改用 micro + 較大內距／字級。
+ * 商品分享 Flex 卡片版面常數。
+ * 寬度由 LINE `bubble.size` 決定；px 內距依 LISTING_FLEX_LAYOUT_SCALE 縮放。
  */
 const LISTING_FLEX_LAYOUT = {
-  bubbleSize: 'micro' as const,
+  bubbleSize: 'kilo' as const,
   heroAspectRatio: '5:3' as const,
-  bodyPadding: '10px',
-  footerPadding: '8px',
-  sectionSpacing: 'sm' as const,
-  buttonRowSpacing: 'sm' as const,
-  badgePadding: '3px',
-  badgePaddingX: '6px',
-  badgeOffset: '8px',
-  titleSize: 'lg' as const,
-  metaSize: 'sm' as const,
-  footerTextSize: 'xs' as const,
-  badgeTextSize: 'xs' as const,
-  buttonHeight: 'sm' as const,
-  footerTextMargin: 'sm' as const,
+  bodyPadding: listingFlexPx(10),
+  footerPadding: listingFlexPx(8),
+  sectionSpacing: 'md' as const,
+  buttonRowSpacing: 'md' as const,
+  badgePadding: listingFlexPx(3),
+  badgePaddingX: listingFlexPx(6),
+  badgeOffset: listingFlexPx(8),
+  titleSize: 'xl' as const,
+  metaSize: 'md' as const,
+  footerTextSize: 'sm' as const,
+  badgeTextSize: 'sm' as const,
+  buttonHeight: 'md' as const,
+  footerTextMargin: 'md' as const,
 } as const
 
 const resolveFlexHeroImage = (imageUrl: string | undefined, origin: string) => {
