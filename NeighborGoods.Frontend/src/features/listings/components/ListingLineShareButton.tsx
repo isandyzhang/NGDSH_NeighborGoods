@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   canOfferLineFlexShare,
+  LINE_FLEX_COMMUNITY_NOTICE,
   LINE_FLEX_SHARE_LABEL,
   LINE_TEXT_SHARE_LABEL,
   shareListingAsLineText,
@@ -32,7 +33,8 @@ export const ListingLineShareButton = ({
 }: ListingLineShareButtonProps) => {
   const [modeReady, setModeReady] = useState(false)
   const [flexMode, setFlexMode] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [flexBusy, setFlexBusy] = useState(false)
+  const [textBusy, setTextBusy] = useState(false)
   const [localNotice, setLocalNotice] = useState<string | null>(null)
 
   useEffect(() => {
@@ -57,57 +59,97 @@ export const ListingLineShareButton = ({
     onNotice?.(message)
   }
 
-  const handleClick = async () => {
-    if (!options || busy || disabled || !modeReady) {
+  const actionDisabled = disabled || !options || !modeReady
+
+  const handleFlexShare = async () => {
+    if (!options || flexBusy || textBusy || actionDisabled) {
       return
     }
 
-    setBusy(true)
+    setFlexBusy(true)
     setNotice(null)
     try {
-      if (flexMode) {
-        const result = await startListingFlexShare(options, returnTo)
-        if (result.started === false) {
-          setNotice(
-            result.reason === 'LIFF_ID_MISSING'
-              ? 'Flex 分享尚未設定（LIFF ID）。'
-              : 'Flex 卡片分享請在 LINE App 內使用。',
-          )
-        }
-        return
+      const result = await startListingFlexShare(options, returnTo)
+      if (result.started === false) {
+        setNotice(
+          result.reason === 'LIFF_ID_MISSING'
+            ? 'Flex 分享尚未設定（LIFF ID）。'
+            : 'Flex 卡片分享請在 LINE App 內使用。',
+        )
       }
-
-      shareListingAsLineText(options)
     } finally {
-      setBusy(false)
+      setFlexBusy(false)
     }
   }
 
-  const label = !modeReady
-    ? '載入分享選項…'
-    : flexMode
-      ? busy
-        ? '準備 Flex 分享…'
-        : LINE_FLEX_SHARE_LABEL
-      : busy
-        ? '分享中…'
-        : LINE_TEXT_SHARE_LABEL
+  const handleTextShare = () => {
+    if (!options || flexBusy || textBusy || actionDisabled) {
+      return
+    }
 
-  const notice = localNotice
+    setTextBusy(true)
+    setNotice(null)
+    try {
+      shareListingAsLineText(options)
+    } finally {
+      setTextBusy(false)
+    }
+  }
+
+  if (!modeReady) {
+    return (
+      <div className="space-y-2">
+        <Button type="button" fullWidth={fullWidth} variant={variant} className={className} disabled>
+          載入分享選項…
+        </Button>
+      </div>
+    )
+  }
+
+  if (flexMode) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="space-y-1">
+          <Button
+            type="button"
+            fullWidth={fullWidth}
+            variant="primary"
+            className={className}
+            disabled={actionDisabled || flexBusy || textBusy}
+            onClick={() => void handleFlexShare()}
+          >
+            {flexBusy ? '準備 Flex 分享…' : LINE_FLEX_SHARE_LABEL}
+          </Button>
+          <p className="text-center text-xs text-text-muted">{LINE_FLEX_COMMUNITY_NOTICE}</p>
+        </div>
+        <Button
+          type="button"
+          fullWidth={fullWidth}
+          variant={variant}
+          className={className}
+          disabled={actionDisabled || flexBusy || textBusy}
+          onClick={handleTextShare}
+        >
+          {textBusy ? '分享中…' : LINE_TEXT_SHARE_LABEL}
+        </Button>
+        {localNotice ? <p className={noticeClassName}>{localNotice}</p> : null}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-1">
       <Button
         type="button"
         fullWidth={fullWidth}
-        variant={flexMode && modeReady ? 'primary' : variant}
+        variant={variant}
         className={className}
-        disabled={disabled || !options || busy || !modeReady}
-        onClick={() => void handleClick()}
+        disabled={actionDisabled || textBusy}
+        onClick={handleTextShare}
       >
-        {label}
+        {textBusy ? '分享中…' : LINE_TEXT_SHARE_LABEL}
       </Button>
-      {notice ? <p className={noticeClassName}>{notice}</p> : null}
+      {localNotice ? <p className={noticeClassName}>{localNotice}</p> : null}
     </div>
   )
 }

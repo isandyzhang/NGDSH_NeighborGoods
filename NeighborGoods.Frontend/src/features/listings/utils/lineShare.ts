@@ -119,6 +119,7 @@ export type LiffShareRuntimeStatus = {
 
 export const LINE_FLEX_SHARE_LABEL = '分享商品卡片到 LINE'
 export const LINE_TEXT_SHARE_LABEL = '分享到 LINE'
+export const LINE_FLEX_COMMUNITY_NOTICE = '此卡片無法發送給社群'
 
 export const detectLiffInClient = async (): Promise<boolean | null> => {
   try {
