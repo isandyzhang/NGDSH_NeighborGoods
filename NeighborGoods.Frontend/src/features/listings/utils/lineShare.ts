@@ -93,6 +93,9 @@ export type LiffShareRuntimeStatus = {
   errorMessage: string | null
 }
 
+export const LINE_FLEX_SHARE_LABEL = '分享商品卡片到 LINE'
+export const LINE_TEXT_SHARE_LABEL = '分享到 LINE'
+
 export const detectLiffInClient = async (): Promise<boolean | null> => {
   try {
     const liffMod = await import('@line/liff')
@@ -100,6 +103,15 @@ export const detectLiffInClient = async (): Promise<boolean | null> => {
   } catch {
     return null
   }
+}
+
+/** 在 LINE App 內且已設定 LIFF ID 時，可改用 Flex shareTargetPicker */
+export const canOfferLineFlexShare = async (): Promise<boolean> => {
+  if (!getLineLiffId()) {
+    return false
+  }
+  const inClient = await detectLiffInClient()
+  return inClient === true
 }
 
 export const buildListingUrl = (listingId: string, origin: string = window.location.origin) =>

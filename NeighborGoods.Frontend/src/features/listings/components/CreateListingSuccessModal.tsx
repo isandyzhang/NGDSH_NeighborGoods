@@ -1,6 +1,7 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { detectLiffInClient, shareListingAsLineText, startListingFlexShare } from '@/features/listings/utils/lineShare'
+import { ListingLineShareButton } from '@/features/listings/components/ListingLineShareButton'
+import type { ShareListingOptions } from '@/features/listings/utils/lineShare'
 import { AppModal } from '@/shared/ui/modal/AppModal'
 import { Button } from '@/shared/ui/Button'
 
@@ -24,71 +25,28 @@ const formatSharePrice = (listing: CreatedListingSummary) =>
 
 export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateListingSuccessModalProps) => {
   const navigate = useNavigate()
-  const [shareBusy, setShareBusy] = useState(false)
-  const [flexShareBusy, setFlexShareBusy] = useState(false)
-  const [lineInApp, setLineInApp] = useState(false)
-  const [shareNotice, setShareNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    void detectLiffInClient().then((value) => setLineInApp(value === true))
-  }, [])
-
-  const shareOptions = () =>
-    listing
-      ? {
-          listingId: listing.id,
-          listingTitle: listing.title,
-          priceLabel: formatSharePrice(listing),
-          categoryName: listing.categoryName,
-          conditionName: listing.conditionName,
-        }
-      : null
-
-  const handleShareToLine = () => {
-    const options = shareOptions()
-    if (!options || shareBusy) {
-      return
+  const shareOptions = useMemo((): ShareListingOptions | null => {
+    if (!listing) {
+      return null
     }
-
-    setShareBusy(true)
-    setShareNotice(null)
-    try {
-      shareListingAsLineText(options)
-    } finally {
-      setShareBusy(false)
+    return {
+      listingId: listing.id,
+      listingTitle: listing.title,
+      priceLabel: formatSharePrice(listing),
+      categoryName: listing.categoryName,
+      conditionName: listing.conditionName,
     }
-  }
+  }, [listing])
 
-  const handleFlexShareToLine = async () => {
-    const options = shareOptions()
-    if (!options || flexShareBusy) {
-      return
-    }
-
-    setFlexShareBusy(true)
-    setShareNotice(null)
-    try {
-      const result = await startListingFlexShare(options, `/listings/${options.listingId}`)
-      if (result.started === false) {
-        setShareNotice(
-          result.reason === 'LIFF_ID_MISSING'
-            ? 'Flex 分享尚未設定（LIFF ID）。'
-            : 'Flex 卡片分享請在 LINE App 內使用。',
-        )
-      }
-    } finally {
-      setFlexShareBusy(false)
-    }
-  }
+  const returnTo = listing ? `/listings/${listing.id}` : '/listings'
 
   const handleNavigate = (path: string) => {
-    setShareNotice(null)
     onClose()
     navigate(path)
   }
 
   const handleClose = () => {
-    setShareNotice(null)
     onClose()
   }
 
@@ -110,27 +68,12 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="space-y-1">
-            <Button
-              type="button"
-              fullWidth
-              className="min-h-[3.2rem] text-lg font-semibold"
-              disabled={!listing || shareBusy}
-              onClick={handleShareToLine}
-            >
-              {shareBusy ? '分享中...' : '分享到 LINE'}
-            </Button>
-            {lineInApp ? (
-              <button
-                type="button"
-                disabled={!listing || flexShareBusy}
-                onClick={() => void handleFlexShareToLine()}
-                className="w-full text-xs text-text-subtle underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
-              >
-                {flexShareBusy ? '準備 Flex 分享…' : '以 Flex 卡片分享（選人）'}
-              </button>
-            ) : null}
-          </div>
+          <ListingLineShareButton
+            options={shareOptions}
+            returnTo={returnTo}
+            variant="primary"
+            className="min-h-[3.2rem] text-lg font-semibold"
+          />
           <Button
             type="button"
             variant="secondary"
@@ -150,8 +93,6 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
             商品列表
           </Button>
         </div>
-
-        {shareNotice ? <p className="text-base text-text-subtle">{shareNotice}</p> : null}
       </div>
     </AppModal>
   )

@@ -15,15 +15,12 @@ import {
   getUnavailableBannerMessage,
   shouldShowUnavailableBanner,
 } from '@/features/listings/constants/listingStatus'
+import { ListingLineShareButton } from '@/features/listings/components/ListingLineShareButton'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
-  detectLiffInClient,
   getLiffShareDiagnostics,
   shareListingAsLineText,
-  startListingFlexShare,
-  testLiffInitOnCurrentPage,
   type LiffShareDiagnostics,
-  type ListingPageLiffInitTestResult,
   type ShareListingResult,
 } from '@/features/listings/utils/lineShare'
 import { useAuth } from '@/features/auth/components/AuthProvider'
@@ -78,10 +75,6 @@ export const ListingDetailPage = () => {
   const [shareDebugInfo, setShareDebugInfo] = useState<LiffShareDiagnostics | null>(null)
   const [shareDebugResult, setShareDebugResult] = useState<ShareListingResult | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
-  const [flexShareBusy, setFlexShareBusy] = useState(false)
-  const [liffInitTestBusy, setLiffInitTestBusy] = useState(false)
-  const [liffInitTestResult, setLiffInitTestResult] = useState<ListingPageLiffInitTestResult | null>(null)
-  const [lineInApp, setLineInApp] = useState(false)
   const [lineActionMessage, setLineActionMessage] = useState<string | null>(null)
   const lineActionHandledRef = useRef(false)
 
@@ -307,10 +300,6 @@ export const ListingDetailPage = () => {
     }
   }
 
-  useEffect(() => {
-    void detectLiffInClient().then((value) => setLineInApp(value === true))
-  }, [])
-
   const executeTextShare = (targetItem: ListingDetail) => {
     const result = shareListingAsLineText(getShareOptions(targetItem))
     if (shareDebugEnabled) {
@@ -365,44 +354,6 @@ export const ListingDetailPage = () => {
       setShareDebugOpen(true)
     } finally {
       setShareBusy(false)
-    }
-  }
-
-  const handleLiffInitTestOnPage = async () => {
-    if (liffInitTestBusy) {
-      return
-    }
-
-    setLiffInitTestBusy(true)
-    setLiffInitTestResult(null)
-    try {
-      const result = await testLiffInitOnCurrentPage()
-      setLiffInitTestResult(result)
-      console.info('[LIFF init test — listing page]', result)
-    } finally {
-      setLiffInitTestBusy(false)
-    }
-  }
-
-  const handleFlexShareToLine = async () => {
-    if (!item || !canShare || flexShareBusy) {
-      return
-    }
-
-    setFlexShareBusy(true)
-    setError(null)
-    try {
-      const returnTo = `${location.pathname}${location.search}${location.hash}`
-      const result = await startListingFlexShare(getShareOptions(item), returnTo)
-      if (result.started === false) {
-        if (result.reason === 'LIFF_ID_MISSING') {
-          setError('Flex 分享尚未設定（LIFF ID）')
-        } else {
-          setError('Flex 卡片分享請在 LINE App 內使用')
-        }
-      }
-    } finally {
-      setFlexShareBusy(false)
     }
   }
 
@@ -613,7 +564,7 @@ export const ListingDetailPage = () => {
                     </>
                   )}
                   </div>
-                  <div className="space-y-1">
+                  {shareDebugEnabled ? (
                     <Button
                       type="button"
                       onClick={() => void handleShareToLine()}
@@ -621,43 +572,17 @@ export const ListingDetailPage = () => {
                       variant="secondary"
                       className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
                     >
-                      {shareBusy ? '分享中…' : '分享到 LINE'}
+                      {shareBusy ? '分享中…' : '分享到 LINE（除錯）'}
                     </Button>
-                    {lineInApp ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => void handleFlexShareToLine()}
-                          disabled={!canShare || flexShareBusy}
-                          className="w-full text-center text-xs text-text-subtle underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
-                        >
-                          {flexShareBusy ? '準備 Flex 分享…' : '以 Flex 卡片分享（選人）'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleLiffInitTestOnPage()}
-                          disabled={liffInitTestBusy}
-                          className="w-full text-center text-[11px] text-text-subtle/80 underline-offset-2 hover:text-text-main hover:underline disabled:opacity-50"
-                        >
-                          {liffInitTestBusy ? '本頁 init 測試中…' : '測試：在本商品頁 liff.init'}
-                        </button>
-                        {liffInitTestResult ? (
-                          <p
-                            className={`text-[11px] leading-relaxed ${liffInitTestResult.ok ? 'text-emerald-700' : 'text-danger'}`}
-                          >
-                            {liffInitTestResult.ok ? 'init 成功' : 'init 失敗'} · path=
-                            {liffInitTestResult.pathname} · picker=
-                            {String(liffInitTestResult.shareTargetPickerAvailable)} · login=
-                            {String(liffInitTestResult.isLoggedIn)}
-                            {liffInitTestResult.version ? ` · v${liffInitTestResult.version}` : ''}
-                            {liffInitTestResult.errorMessage
-                              ? ` · ${liffInitTestResult.errorMessage}`
-                              : ''}
-                          </p>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
+                  ) : (
+                    <ListingLineShareButton
+                      options={item ? getShareOptions(item) : null}
+                      returnTo={`${location.pathname}${location.search}${location.hash}`}
+                      disabled={!canShare}
+                      className="min-h-[3.2rem] w-full text-xl font-semibold md:text-2xl"
+                      onNotice={(message) => setError(message)}
+                    />
+                  )}
                 </div>
               </section>
             </Card>
