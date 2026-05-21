@@ -128,7 +128,7 @@ export const TopNav = () => {
                 type="button"
                 variant="secondary"
                 onClick={() => setMenuOpen((current) => !current)}
-                className="h-10 max-w-[8.5rem] px-2.5 !text-sm font-semibold sm:h-11 sm:max-w-[10.5rem] sm:px-3 sm:!text-base md:h-12 md:max-w-none md:min-w-[10.5rem] md:px-4 md:!text-[1.35rem]"
+                className="h-[2.875rem] max-w-[9.775rem] px-[0.72rem] !text-[1.00625rem] font-semibold sm:h-[3.1625rem] sm:max-w-[12.075rem] sm:px-[0.8625rem] sm:!text-[1.15rem] md:h-[3.45rem] md:max-w-none md:min-w-[12.075rem] md:px-[1.15rem] md:!text-[1.5525rem]"
                 aria-expanded={menuOpen}
                 aria-controls="topnav-user-menu"
               >
