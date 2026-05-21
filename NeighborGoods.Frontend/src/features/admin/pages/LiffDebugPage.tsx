@@ -12,6 +12,7 @@ import {
   formatPostInitSnapshot,
   formatPreInitSnapshot,
   HARDCODED_LIFF_ID,
+  hasNestedLiffState,
   isAdminLiffDebugSessionActive,
   openLiffForAdminDebug,
   runLiffInitAttempt,
@@ -206,9 +207,19 @@ export const LiffDebugPage = ({ mode }: LiffDebugPageProps) => {
         ) : (
           <p className="text-sm text-amber-900">
             你已在 LINE 內的除錯模式{isAdminLiffDebugSessionActive() ? '（session 已啟用）' : ''}。
-            請直接按下方 init 按鈕測試。
+            請直接按下方 init 按鈕測試。第二段診斷若出現 OAuth code，代表 LINE 登入回導完成，再按 init 即可。
           </p>
         )}
+        {mode === 'liffEntry' && hasNestedLiffState(location.search) ? (
+          <p className="mt-2 text-xs text-amber-800">
+            偵測到 liff.state 重複嵌套，系統會自動整理網址；若 init 仍失敗請重新整理後再試。
+          </p>
+        ) : null}
+        {mode === 'admin' ? (
+          <p className="mt-2 text-xs text-amber-800">
+            若你已在 LINE 內開啟此頁，請用上方按鈕（會直接導向根路徑，避免 liff.state 雙層嵌套）。
+          </p>
+        ) : null}
         {mode === 'admin' && !initPathOk ? (
           <p className="mt-2 text-xs text-amber-800">
             在電腦瀏覽器無法在此路徑執行 init；請用「在 LINE App 內開啟測試」。

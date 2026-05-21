@@ -25,20 +25,74 @@ export const isAdminLiffDebugSessionActive = (): boolean => {
   return sessionStorage.getItem(ADMIN_LIFF_DEBUG_SESSION_KEY) === '1'
 }
 
+const LIFF_OAUTH_PRESERVE_KEYS = ['code', 'state', 'liffClientId', 'liffRedirectUri', 'liff.hback'] as const
+
 const liffStateImpliesAdminDebug = (liffState: string): boolean => {
-  try {
-    const decoded = decodeURIComponent(liffState.trim())
-    if (!decoded) {
+  let current = liffState.trim()
+  for (let depth = 0; depth < 6; depth += 1) {
+    try {
+      if (current.includes('adminLiffDebug=1') || current.includes('adminLiffDebug%3D1')) {
+        return true
+      }
+      const decoded = decodeURIComponent(current)
+      if (decoded.includes('adminLiffDebug=1')) {
+        return true
+      }
+      const params = new URLSearchParams(decoded.startsWith('?') ? decoded.slice(1) : decoded)
+      if (params.get('adminLiffDebug') === '1') {
+        return true
+      }
+      const inner = params.get('liff.state')
+      if (!inner || inner === current) {
+        return false
+      }
+      current = inner
+    } catch {
       return false
     }
-    const query = decoded.includes('?') ? decoded.slice(decoded.indexOf('?')) : decoded.startsWith('?') ? decoded : ''
-    if (query) {
-      return new URLSearchParams(query.startsWith('?') ? query.slice(1) : query).get('adminLiffDebug') === '1'
-    }
-    return decoded.includes('adminLiffDebug=1')
-  } catch {
+  }
+  return false
+}
+
+/** liff.state 被 LINE 重複包裝（常見於已在 LINE 內再點 liff.line.me） */
+export const hasNestedLiffState = (search: string): boolean => {
+  const raw = search.startsWith('?') ? search.slice(1) : search
+  const liffState = new URLSearchParams(raw).get('liff.state') ?? ''
+  return liffState.includes('liff.state') || liffState.includes('%3Fliff.state') || liffState.includes('%253F')
+}
+
+export const adminLiffDebugUrlNeedsCleanup = (search: string): boolean => {
+  const raw = search.startsWith('?') ? search.slice(1) : search
+  const params = new URLSearchParams(raw)
+  if (!params.has('liff.state')) {
     return false
   }
+  if (hasNestedLiffState(search)) {
+    return true
+  }
+  return params.get('adminLiffDebug') !== '1' && Boolean(params.get('liff.state'))
+}
+
+/** 保留 OAuth 參數，移除巢狀 liff.state，改為乾淨的 adminLiffDebug=1 */
+export const buildCleanAdminLiffDebugSearch = (search: string): string => {
+  const raw = search.startsWith('?') ? search.slice(1) : search
+  const params = new URLSearchParams(raw)
+  const clean = new URLSearchParams()
+  clean.set('adminLiffDebug', '1')
+  for (const key of LIFF_OAUTH_PRESERVE_KEYS) {
+    const value = params.get(key)
+    if (value) {
+      clean.set(key, value)
+    }
+  }
+  return `?${clean.toString()}`
+}
+
+const isLineInAppBrowser = (): boolean => {
+  if (typeof navigator === 'undefined') {
+    return false
+  }
+  return /Line\//i.test(navigator.userAgent) || /\bLIFF\b/i.test(navigator.userAgent)
 }
 
 /** 根路徑是否應顯示 LIFF init 除錯頁（session、query、或 liff.state 皆可） */
@@ -64,6 +118,7 @@ export type LiffPreInitSnapshot = {
   pathname: string
   search: string
   hasLiffState: boolean
+  liffStateNested: boolean
   hasOAuthCode: boolean
   userAgent: string
   viteMode: string
@@ -132,6 +187,7 @@ export const collectPreInitSnapshot = (): LiffPreInitSnapshot => {
     pathname: typeof window !== 'undefined' ? window.location.pathname : '',
     search: typeof window !== 'undefined' ? window.location.search : '',
     hasLiffState: params.has('liff.state'),
+    liffStateNested: hasNestedLiffState(typeof window !== 'undefined' ? window.location.search : ''),
     hasOAuthCode: params.has('code'),
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
     viteMode: import.meta.env.MODE,
@@ -222,12 +278,16 @@ export const collectPostInitSnapshot = async (): Promise<LiffPostInitSnapshot> =
   return base
 }
 
-/** LIFF 入口；liff.state 由按鈕自動帶入，使用者無需手動改網址 */
+/** 從外部瀏覽器開啟；liff.state 僅帶 query（勿用 /?… 避免與 LINE 重複包裝） */
 export const buildLiffAdminDebugUrl = (liffId: string) =>
-  `https://liff.line.me/${liffId.trim()}?liff.state=${encodeURIComponent('/?adminLiffDebug=1')}`
+  `https://liff.line.me/${liffId.trim()}?liff.state=${encodeURIComponent('adminLiffDebug=1')}`
 
 export const openLiffForAdminDebug = (liffId: string) => {
   enableAdminLiffDebugSession()
+  if (typeof window !== 'undefined' && isLineInAppBrowser()) {
+    window.location.assign(`${window.location.origin}/?adminLiffDebug=1`)
+    return
+  }
   window.location.assign(buildLiffAdminDebugUrl(liffId))
 }
 
@@ -238,6 +298,7 @@ export const formatPreInitSnapshot = (s: LiffPreInitSnapshot): string =>
     `pathname: ${s.pathname} (initPathOk: ${s.initPathOk})`,
     `search: ${s.search || '(empty)'}`,
     `liff.state present: ${s.hasLiffState}`,
+    `liff.state nested: ${s.liffStateNested}`,
     `OAuth code present: ${s.hasOAuthCode}`,
     `viteMode: ${s.viteMode}`,
     `env liffId: ${s.envLiffIdConfigured ? `…${s.envLiffIdSuffix}` : 'MISSING'}`,
