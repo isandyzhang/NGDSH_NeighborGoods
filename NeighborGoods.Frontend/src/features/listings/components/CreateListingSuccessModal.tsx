@@ -42,8 +42,12 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
         categoryName: listing.categoryName,
         conditionName: listing.conditionName,
       })
-      if (result.usedFallbackUrlShare) {
-        setShareNotice('目前已改用一般 LINE 連結分享；若要分享 Flex 訊息，請在 LINE App 內開啟。')
+      if (result.shareMode === 'text') {
+        setShareNotice('已改以 LINE 文字訊息分享（非 LINE App 內時無法使用 Flex 選人）。')
+      } else if (result.shareMode === 'cancelled') {
+        setShareNotice(null)
+      } else {
+        setShareNotice(null)
       }
     } finally {
       setShareBusy(false)

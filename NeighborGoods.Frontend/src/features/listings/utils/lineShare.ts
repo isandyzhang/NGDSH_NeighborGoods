@@ -38,9 +38,12 @@ export type ShareListingOptions = ListingFlexPayload & {
   origin?: string
 }
 
+export type ShareListingShareMode = 'flex' | 'text' | 'cancelled'
+
 export type ShareListingResult = {
   usedLiffFlex: boolean
   usedFallbackUrlShare: boolean
+  shareMode: ShareListingShareMode
   fallbackUrl?: string
 }
 
@@ -353,63 +356,65 @@ const openLineUrlShareWindow = (shareUrl: string) => {
   window.open(shareUrl, '_blank', 'noopener,noreferrer')
 }
 
-export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> => {
+const openLineTextShare = (options: ShareListingOptions): ShareListingResult => {
   const fallbackUrl = buildLineTextShareUrl(options.listingId, options.listingTitle, options.origin)
+  openLineUrlShareWindow(fallbackUrl)
+  return {
+    usedLiffFlex: false,
+    usedFallbackUrlShare: true,
+    shareMode: 'text',
+    fallbackUrl,
+  }
+}
 
+/** 單一分享入口：LINE 內 → FLEX + 選人；否則 → 文字訊息分享 */
+export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> => {
   try {
-    const liff = await ensureLiffReady()
-    if (!liff || !liff.isInClient() || !safeSharePickerAvailable(liff)) {
-      openLineUrlShareWindow(fallbackUrl)
-      return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
+    const liffMod = await import('@line/liff')
+    const liff = liffMod.default
+
+    if (!liff.isInClient()) {
+      return openLineTextShare(options)
+    }
+
+    const ready = await ensureLiffReady()
+    if (!ready || !safeSharePickerAvailable(ready)) {
+      return openLineTextShare(options)
     }
 
     const flexMessage = buildListingFlexMessage(options)
-    const result = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
-    // LIFF may return null/undefined depending on version and user action.
-    // Treat an in-client call as handled and avoid forcing fallback text share.
-    if (result === null) {
-      return { usedLiffFlex: false, usedFallbackUrlShare: false }
+    const pickerResult = await ready.shareTargetPicker([flexMessage], { isMultiple: true })
+    if (pickerResult === null) {
+      return { usedLiffFlex: false, usedFallbackUrlShare: false, shareMode: 'cancelled' }
     }
 
-    return { usedLiffFlex: true, usedFallbackUrlShare: false }
+    return { usedLiffFlex: true, usedFallbackUrlShare: false, shareMode: 'flex' }
   } catch {
-    openLineUrlShareWindow(fallbackUrl)
-    return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
+    return openLineTextShare(options)
   }
 }
 
 export const shareListingToLineFlexOnly = async (
   options: ShareListingOptions
 ): Promise<ShareListingFlexOnlyResult> => {
-  try {
-    const liff = await ensureLiffReady()
-    if (!liff) {
-      return { sent: false, reason: 'LIFF_UNAVAILABLE' }
-    }
-    const contextType = liff.getContext()?.type ?? null
-    if (!liff.isLoggedIn()) {
-      return { sent: false, reason: 'NOT_LOGGED_IN', contextType }
-    }
-    if (!liff.isInClient()) {
-      return { sent: false, reason: 'NOT_IN_LINE_CLIENT', contextType }
-    }
-    if (!safeSharePickerAvailable(liff)) {
-      return { sent: false, reason: 'SHARE_TARGET_PICKER_UNAVAILABLE', contextType }
-    }
+  const result = await shareListingToLine(options)
 
-    const flexMessage = buildListingFlexMessage(options)
-    const result = await liff.shareTargetPicker([flexMessage], { isMultiple: true })
-    if (result === null) {
-      return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED', contextType }
-    }
-
-    return { sent: true, reason: 'SENT', contextType }
-  } catch (err) {
-    const errorCode = typeof err === 'object' && err && 'code' in err ? String((err as { code: unknown }).code) : undefined
-    const errorMessage =
-      typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message) : undefined
-    return { sent: false, reason: 'LIFF_ERROR', errorCode, errorMessage }
+  if (result.shareMode === 'flex') {
+    return { sent: true, reason: 'SENT', contextType: null }
   }
+  if (result.shareMode === 'cancelled') {
+    return { sent: false, reason: 'USER_CANCELLED_OR_CLOSED', contextType: null }
+  }
+  if (result.shareMode === 'text') {
+    return {
+      sent: false,
+      reason: 'NOT_IN_LINE_CLIENT',
+      contextType: null,
+      errorMessage: '非 LINE App 內開啟，已改用文字連結分享',
+    }
+  }
+
+  return { sent: false, reason: 'LIFF_ERROR', contextType: null }
 }
 
 export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> => {

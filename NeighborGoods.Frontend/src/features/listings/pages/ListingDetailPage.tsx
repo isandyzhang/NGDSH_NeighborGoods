@@ -305,8 +305,15 @@ export const ListingDetailPage = () => {
     if (shareDebugEnabled) {
       setShareDebugResult(result)
     }
-    if (result.usedFallbackUrlShare) {
-      setError('目前已改用一般 LINE 連結分享；若要分享 Flex 訊息，請在 LINE App 內開啟。')
+    if (result.shareMode === 'cancelled') {
+      return
+    }
+    if (result.shareMode === 'text') {
+      setError(null)
+      return
+    }
+    if (result.shareMode === 'flex') {
+      setError(null)
     }
   }
 
@@ -630,6 +637,7 @@ export const ListingDetailPage = () => {
           <p>shareTargetPickerAvailable: {String(shareDebugInfo?.shareTargetPickerAvailable ?? false)}</p>
           <p>errorCode: {shareDebugInfo?.errorCode ?? '-'}</p>
           <p>errorMessage: {shareDebugInfo?.errorMessage ?? '-'}</p>
+          <p>shareMode: {shareDebugResult?.shareMode ?? '-'}</p>
           <p>usedFallbackUrlShare: {shareDebugResult ? String(shareDebugResult.usedFallbackUrlShare) : '-'}</p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
