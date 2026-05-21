@@ -18,9 +18,14 @@ const FLEX_ALT_TEXT_PREFIX = '我在NeighborGoods-社宅二手交易平台看到
 const FLEX_TEXT_PRIMARY = '#333333'
 const FLEX_TEXT_SECONDARY = '#666666'
 const FLEX_BODY_BG = '#FFFFFF'
+/** NeighborGoods 官方帳號加好友（LINE Add friend） */
+const LINE_OFFICIAL_ADD_FRIEND_URL = 'https://lin.ee/6ZqrGei'
 const MAX_TITLE_LENGTH = 40
 const MAX_META_LENGTH = 24
 const MAX_BADGE_LENGTH = 8
+/** 視覺縮放約 75%（bubble size + 內距／字級） */
+const FLEX_CARD_SCALE = 0.75
+const flexPx = (value: number) => `${Math.round(value * FLEX_CARD_SCALE)}px`
 
 const resolveFlexHeroImage = (imageUrl: string | undefined, origin: string) => {
   const trimmed = imageUrl?.trim()
@@ -138,10 +143,8 @@ export const buildListingFlexMessage = ({
   origin,
 }: ListingFlexPayload & { origin?: string }): ListingLiffFlexMessage => {
   const siteOrigin = origin ?? (typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com')
-  const listingPath = `/listings/${listingId}`
+  const detailUrl = buildLiffDeepLink(`listingId=${listingId}`)
   const listingsUrl = buildLiffDeepLink('/listings')
-  const chatUrl = buildLiffDeepLink(`${listingPath}?lineAction=chat`)
-  const purchaseUrl = buildLiffDeepLink(`${listingPath}?lineAction=purchase`)
   const title = trimText(listingTitle, MAX_TITLE_LENGTH, '好物分享')
   const categoryBadge = trimText(categoryName, MAX_BADGE_LENGTH, '好物')
   const residence = trimText(residenceName, MAX_META_LENGTH, '社宅')
@@ -154,6 +157,7 @@ export const buildListingFlexMessage = ({
     altText: `${FLEX_ALT_TEXT_PREFIX}${title}`,
     contents: {
       type: 'bubble' as const,
+      size: 'kilo' as const,
       header: {
         type: 'box' as const,
         layout: 'vertical' as const,
@@ -168,7 +172,7 @@ export const buildListingFlexMessage = ({
                 url: heroImage,
                 size: 'full' as const,
                 aspectMode: 'cover' as const,
-                aspectRatio: '20:13' as const,
+                aspectRatio: '4:3' as const,
                 gravity: 'center' as const,
                 flex: 1,
               },
@@ -186,13 +190,13 @@ export const buildListingFlexMessage = ({
                   },
                 ],
                 backgroundColor: '#06C755',
-                paddingAll: '4px',
-                paddingStart: '8px',
-                paddingEnd: '8px',
+                paddingAll: flexPx(4),
+                paddingStart: flexPx(8),
+                paddingEnd: flexPx(8),
                 flex: 0,
                 position: 'absolute' as const,
-                offsetStart: '12px',
-                offsetTop: '12px',
+                offsetStart: flexPx(12),
+                offsetTop: flexPx(12),
                 cornerRadius: '100px',
               },
             ],
@@ -202,15 +206,15 @@ export const buildListingFlexMessage = ({
       body: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'md' as const,
-        paddingAll: '16px',
+        spacing: 'sm' as const,
+        paddingAll: flexPx(16),
         backgroundColor: FLEX_BODY_BG,
         contents: [
           {
             type: 'text' as const,
             text: title,
             weight: 'bold' as const,
-            size: 'xl' as const,
+            size: 'lg' as const,
             wrap: true,
             color: FLEX_TEXT_PRIMARY,
           },
@@ -224,7 +228,7 @@ export const buildListingFlexMessage = ({
           {
             type: 'text' as const,
             text: price,
-            size: 'md' as const,
+            size: 'sm' as const,
             color: FLEX_TEXT_PRIMARY,
             weight: 'bold' as const,
             wrap: true,
@@ -234,8 +238,8 @@ export const buildListingFlexMessage = ({
       footer: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'md' as const,
-        paddingAll: '12px',
+        spacing: 'sm' as const,
+        paddingAll: flexPx(12),
         paddingTop: '0px',
         backgroundColor: FLEX_BODY_BG,
         contents: [
@@ -251,8 +255,8 @@ export const buildListingFlexMessage = ({
                 flex: 1,
                 action: {
                   type: 'uri' as const,
-                  label: '我想聊聊',
-                  uri: chatUrl,
+                  label: '商品列表',
+                  uri: listingsUrl,
                 },
               },
               {
@@ -263,23 +267,24 @@ export const buildListingFlexMessage = ({
                 color: '#06C755',
                 action: {
                   type: 'uri' as const,
-                  label: '直接購買',
-                  uri: purchaseUrl,
+                  label: '查看商品詳情',
+                  uri: detailUrl,
                 },
               },
             ],
           },
           {
             type: 'text' as const,
-            text: '想逛逛商城嗎？點這邊前往商城尋寶 ✨',
+            text: '還沒有加官方帳號嗎？馬上加入！',
             size: 'xs' as const,
             color: FLEX_TEXT_SECONDARY,
             wrap: true,
             align: 'center' as const,
+            margin: 'md' as const,
             action: {
               type: 'uri' as const,
-              label: '前往商城',
-              uri: listingsUrl,
+              label: '加入官方帳號',
+              uri: LINE_OFFICIAL_ADD_FRIEND_URL,
             },
           },
         ],

@@ -19,19 +19,71 @@ export const buildLiffDeepLink = (internalTarget: string) => {
 const buildLineNotifyTarget = (bindToken: string, botLink: string) =>
   `/liff/line-notify?bindToken=${encodeURIComponent(bindToken)}&botLink=${encodeURIComponent(botLink)}`
 
+/** Flex 按鈕用：勿把 /listings/uuid?... 塞進 liff.state，LINE 易丟 query 導向首頁 */
+export const buildListingFlexLiffState = (listingId: string, lineAction: 'chat' | 'purchase') =>
+  `listingId=${listingId}&lineAction=${lineAction}`
+
+const buildListingTargetFromParams = (params: URLSearchParams): string | null => {
+  const listingId = params.get('listingId')?.trim()
+  if (!listingId) {
+    return null
+  }
+
+  const lineAction = params.get('lineAction')?.trim()
+  const search = lineAction ? `?lineAction=${lineAction}` : ''
+  return `/listings/${listingId}${search}`
+}
+
 const parseLiffStateTarget = (liffState: string): string | null => {
-  const decoded = decodeURIComponent(liffState.trim())
+  let decoded = liffState.trim()
+  for (let depth = 0; depth < 4; depth += 1) {
+    try {
+      const next = decodeURIComponent(decoded)
+      if (next === decoded) {
+        break
+      }
+      decoded = next
+    } catch {
+      break
+    }
+  }
+
   if (!decoded) {
     return null
   }
 
+  if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+    try {
+      const url = new URL(decoded)
+      const path = url.pathname
+      const search = url.search
+      if (isSafeInternalPath(path)) {
+        return `${path}${search}`
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const normalized = decoded.startsWith('?') ? decoded.slice(1) : decoded
+
+  const listingFromQuery = buildListingTargetFromParams(
+    new URLSearchParams(normalized.includes('?') && !normalized.startsWith('/') ? normalized.slice(normalized.indexOf('?') + 1) : normalized),
+  )
+  if (listingFromQuery) {
+    return listingFromQuery
+  }
+
   const qIndex = normalized.indexOf('?')
   const path = qIndex >= 0 ? normalized.slice(0, qIndex) : normalized
   const query = qIndex >= 0 ? normalized.slice(qIndex) : ''
 
-  if (isSafeInternalPath(path)) {
-    return `${path}${query}`
+  const pathOnly = path.startsWith('/') ? path : path.startsWith('listings') ? `/${path}` : path
+  if (isSafeInternalPath(pathOnly)) {
+    if (pathOnly === '/listings' || pathOnly.startsWith('/listings/')) {
+      return `${pathOnly}${query}`
+    }
+    return `${pathOnly}${query}`
   }
 
   // liff.state may carry query-only params (e.g. bindToken=...&botLink=...)
@@ -39,6 +91,11 @@ const parseLiffStateTarget = (liffState: string): string | null => {
   const bindToken = params.get('bindToken')
   if (bindToken) {
     return buildLineNotifyTarget(bindToken, params.get('botLink') ?? '')
+  }
+
+  const listingTarget = buildListingTargetFromParams(params)
+  if (listingTarget) {
+    return listingTarget
   }
 
   return null
@@ -62,13 +119,21 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
 
   const liffState = params.get('liff.state')
   if (liffState) {
+    const deepLinkTarget = parseLiffStateTarget(liffState)
+    if (deepLinkTarget?.includes('lineAction=')) {
+      return false
+    }
     const resolved = resolveListingShareParams(`?liff.state=${encodeURIComponent(liffState)}`)
     if (resolved) {
       return true
     }
   }
 
-  return hasListingSharePending()
+  if (shareFlag) {
+    return hasListingSharePending()
+  }
+
+  return false
 }
 
 /** LIFF Endpoint is site root; binding must run on `/` (not `/liff/line-notify`) for liff.init. */
@@ -104,7 +169,13 @@ export const resolveLiffEntryTarget = (pathname: string, search: string): string
     return null
   }
 
-  const params = new URLSearchParams(search)
+  const normalizedSearch = search.startsWith('?') ? search : search ? `?${search}` : ''
+
+  if (pathname.startsWith('/listings')) {
+    return `${pathname}${normalizedSearch}`
+  }
+
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const liffState = params.get('liff.state')
   if (liffState) {
     const target = parseLiffStateTarget(liffState)

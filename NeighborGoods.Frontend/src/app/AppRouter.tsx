@@ -108,7 +108,13 @@ const LiffDeepLinkNavigate = ({ to }: { to: string }) => {
     return <RouteFallback />
   }
 
-  return <Navigate to={to} replace />
+  const qIndex = to.indexOf('?')
+  const destination =
+    qIndex >= 0
+      ? { pathname: to.slice(0, qIndex), search: to.slice(qIndex) }
+      : { pathname: to }
+
+  return <Navigate to={destination} replace />
 }
 
 const RootEntry = () => {
