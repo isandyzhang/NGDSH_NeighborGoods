@@ -23,8 +23,9 @@ const LINE_OFFICIAL_ADD_FRIEND_URL = 'https://lin.ee/6ZqrGei'
 const MAX_TITLE_LENGTH = 40
 const MAX_META_LENGTH = 24
 const MAX_BADGE_LENGTH = 8
-/** 視覺縮放約 75%（bubble size + 內距／字級） */
-const FLEX_CARD_SCALE = 0.75
+/** 視覺縮放約 50%（bubble nano + 內距／字級） */
+const FLEX_CARD_SCALE = 0.5
+const FLEX_OFFICIAL_FOOTER_TEXT = '還沒加官方帳號？馬上加入♪(๑ᵔ◡ᵔ๑)'
 const flexPx = (value: number) => `${Math.round(value * FLEX_CARD_SCALE)}px`
 
 const resolveFlexHeroImage = (imageUrl: string | undefined, origin: string) => {
@@ -169,7 +170,7 @@ export const buildListingFlexMessage = ({
     altText: `${FLEX_ALT_TEXT_PREFIX}${title}`,
     contents: {
       type: 'bubble' as const,
-      size: 'kilo' as const,
+      size: 'nano' as const,
       header: {
         type: 'box' as const,
         layout: 'vertical' as const,
@@ -184,7 +185,7 @@ export const buildListingFlexMessage = ({
                 url: heroImage,
                 size: 'full' as const,
                 aspectMode: 'cover' as const,
-                aspectRatio: '4:3' as const,
+                aspectRatio: '2:1' as const,
                 gravity: 'center' as const,
                 flex: 1,
               },
@@ -218,47 +219,50 @@ export const buildListingFlexMessage = ({
       body: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'sm' as const,
-        paddingAll: flexPx(16),
+        spacing: 'xs' as const,
+        paddingAll: flexPx(12),
         backgroundColor: FLEX_BODY_BG,
         contents: [
           {
             type: 'text' as const,
             text: title,
             weight: 'bold' as const,
-            size: 'xl' as const,
+            size: 'md' as const,
             wrap: true,
+            maxLines: 2,
             color: FLEX_TEXT_PRIMARY,
           },
           {
             type: 'text' as const,
             text: `${residence} · ${condition}`,
-            size: 'sm' as const,
+            size: 'xs' as const,
             color: FLEX_TEXT_SECONDARY,
             wrap: true,
+            maxLines: 1,
           },
           {
             type: 'text' as const,
             text: price,
-            size: 'sm' as const,
+            size: 'xs' as const,
             color: FLEX_TEXT_PRIMARY,
             weight: 'bold' as const,
             wrap: true,
+            maxLines: 1,
           },
         ],
       },
       footer: {
         type: 'box' as const,
         layout: 'vertical' as const,
-        spacing: 'sm' as const,
-        paddingAll: flexPx(12),
+        spacing: 'xs' as const,
+        paddingAll: flexPx(8),
         paddingTop: '0px',
         backgroundColor: FLEX_BODY_BG,
         contents: [
           {
             type: 'box' as const,
             layout: 'horizontal' as const,
-            spacing: 'sm' as const,
+            spacing: 'xs' as const,
             contents: [
               {
                 type: 'button' as const,
@@ -287,12 +291,13 @@ export const buildListingFlexMessage = ({
           },
           {
             type: 'text' as const,
-            text: '還沒有加官方帳號嗎？馬上加入！(๑•̀ㅂ•́)و✧',
-            size: 'xs' as const,
+            text: FLEX_OFFICIAL_FOOTER_TEXT,
+            size: 'xxs' as const,
             color: FLEX_TEXT_SECONDARY,
-            wrap: true,
+            wrap: false,
+            maxLines: 1,
             align: 'center' as const,
-            margin: 'md' as const,
+            margin: 'sm' as const,
             action: {
               type: 'uri' as const,
               label: '加入官方帳號',
