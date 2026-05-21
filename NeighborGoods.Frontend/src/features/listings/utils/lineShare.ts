@@ -1,3 +1,8 @@
+import {
+  buildListingShareRootSearch,
+  saveListingSharePending,
+} from '@/features/listings/listingShareSession'
+
 const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
 const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
@@ -15,7 +20,7 @@ type ListingFlexPayload = {
   conditionName?: string
 }
 
-type ShareListingOptions = ListingFlexPayload & {
+export type ShareListingOptions = ListingFlexPayload & {
   origin?: string
 }
 
@@ -175,8 +180,28 @@ export const buildListingFlexMessage = ({
 
 let liffReadyPromise: Promise<boolean> | null = null
 
+/** LIFF Endpoint 為 `/`；在非根路徑 init 會失敗（除錯頁在 `/` 手動 init 才會成功）。 */
+export const isLiffEndpointPath = () =>
+  typeof window === 'undefined' || window.location.pathname === '/'
+
+export const resetLiffReadyCache = () => {
+  liffReadyPromise = null
+}
+
+const safeSharePickerAvailable = (liff: { isApiAvailable: (api: string) => boolean }) => {
+  try {
+    return liff.isApiAvailable('shareTargetPicker')
+  } catch {
+    return false
+  }
+}
+
 const ensureLiffReady = async () => {
   if (!LIFF_ID?.trim()) {
+    return null
+  }
+
+  if (!isLiffEndpointPath()) {
     return null
   }
 
@@ -190,9 +215,16 @@ const ensureLiffReady = async () => {
   }
   const ok = await liffReadyPromise
   if (!ok) {
+    resetLiffReadyCache()
     return null
   }
   return liff
+}
+
+/** 在 LINE 內從商品頁等非根路徑改走根路徑分享（與 LIFF Endpoint 一致） */
+export const redirectToRootListingShare = (options: ShareListingOptions, returnTo: string) => {
+  saveListingSharePending(options, returnTo)
+  window.location.assign(`${window.location.origin}${buildListingShareRootSearch(options, returnTo)}`)
 }
 
 const openLineUrlShareWindow = (shareUrl: string) => {
@@ -203,8 +235,20 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
   const fallbackUrl = buildLineTextShareUrl(options.listingId, options.listingTitle, options.origin)
 
   try {
+    const liffMod = await import('@line/liff')
+    const liffProbe = liffMod.default
+    const returnTo =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search}`
+        : `/listings/${options.listingId}`
+
+    if (liffProbe.isInClient() && !isLiffEndpointPath()) {
+      redirectToRootListingShare(options, returnTo)
+      return { usedLiffFlex: false, usedFallbackUrlShare: false }
+    }
+
     const liff = await ensureLiffReady()
-    if (!liff || !liff.isInClient() || !liff.isApiAvailable('shareTargetPicker')) {
+    if (!liff || !liff.isInClient() || !safeSharePickerAvailable(liff)) {
       openLineUrlShareWindow(fallbackUrl)
       return { usedLiffFlex: false, usedFallbackUrlShare: true, fallbackUrl }
     }
@@ -239,7 +283,7 @@ export const shareListingToLineFlexOnly = async (
     if (!liff.isInClient()) {
       return { sent: false, reason: 'NOT_IN_LINE_CLIENT', contextType }
     }
-    if (!liff.isApiAvailable('shareTargetPicker')) {
+    if (!safeSharePickerAvailable(liff)) {
       return { sent: false, reason: 'SHARE_TARGET_PICKER_UNAVAILABLE', contextType }
     }
 
@@ -284,7 +328,7 @@ export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> =
     }
 
     const isInClient = liff.isInClient()
-    const shareTargetPickerAvailable = liff.isApiAvailable('shareTargetPicker')
+    const shareTargetPickerAvailable = safeSharePickerAvailable(liff)
     return {
       liffIdConfigured: true,
       liffReady: true,
@@ -340,7 +384,7 @@ export const getLiffShareRuntimeStatus = async (): Promise<LiffShareRuntimeStatu
       liffReady: true,
       isLoggedIn: liff.isLoggedIn(),
       isInClient: liff.isInClient(),
-      shareTargetPickerAvailable: liff.isApiAvailable('shareTargetPicker'),
+      shareTargetPickerAvailable: safeSharePickerAvailable(liff),
       contextType: liff.getContext()?.type ?? null,
       errorCode: null,
       errorMessage: null,

@@ -10,7 +10,7 @@ import {
   buildCleanAdminLiffDebugSearch,
   isAdminLiffDebugEntry,
 } from '@/features/admin/liffInitDebug'
-import { isLineNotifyBindingEntry, resolveLiffEntryTarget } from '@/app/liffRoute'
+import { isLineNotifyBindingEntry, isListingShareEntry, resolveLiffEntryTarget } from '@/app/liffRoute'
 
 const LineLoginCallbackPage = lazy(() =>
   import('@/features/auth/pages/LineLoginCallbackPage').then((module) => ({ default: module.LineLoginCallbackPage })),
@@ -97,6 +97,10 @@ const RootEntry = () => {
     return <LineNotifyLiffPage />
   }
 
+  if (isListingShareEntry(location.pathname, location.search)) {
+    return <ListingShareLiffPage />
+  }
+
   const target = resolveLiffEntryTarget(location.pathname, location.search)
   if (target) {
     return <Navigate to={target} replace />
@@ -124,6 +128,13 @@ const LineNotifyLiffCanonicalRedirect = () => {
   return <Navigate to={{ pathname: '/', search }} replace />
 }
 
+const ListingShareLiffCanonicalRedirect = () => {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  params.set('listingShare', '1')
+  return <Navigate to={{ pathname: '/', search: `?${params.toString()}` }} replace />
+}
+
 export const AppRouter = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -135,7 +146,7 @@ export const AppRouter = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/line/callback" element={<LineLoginCallbackPage />} />
           <Route path="/liff/line-notify" element={<LineNotifyLiffCanonicalRedirect />} />
-          <Route path="/liff/share-listing" element={<ListingShareLiffPage />} />
+          <Route path="/liff/share-listing" element={<ListingShareLiffCanonicalRedirect />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/error" element={<ErrorPage />} />

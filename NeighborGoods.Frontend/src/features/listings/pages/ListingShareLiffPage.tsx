@@ -1,37 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  clearListingSharePending,
+  resolveListingShareParams,
+} from '@/features/listings/listingShareSession'
 import { shareListingToLineFlexOnly } from '@/features/listings/utils/lineShare'
 import { Button } from '@/shared/ui/Button'
 
 type SharePhase = 'loading' | 'done' | 'cancelled' | 'error'
 
-const safeReturnPath = (value: string | null, fallback: string) => {
-  if (!value) {
-    return fallback
-  }
-  return value.startsWith('/') ? value : fallback
-}
-
 export const ListingShareLiffPage = () => {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const location = useLocation()
   const [phase, setPhase] = useState<SharePhase>('loading')
-  const [message, setMessage] = useState('準備分享中...')
+  const [message, setMessage] = useState('準備分享中…')
 
-  const listingId = searchParams.get('listingId') ?? ''
-  const listingTitle = searchParams.get('title') ?? ''
-  const priceLabel = searchParams.get('price') ?? undefined
-  const categoryName = searchParams.get('category') ?? undefined
-  const conditionName = searchParams.get('condition') ?? undefined
-  const returnTo = useMemo(
-    () => safeReturnPath(searchParams.get('returnTo'), listingId ? `/listings/${listingId}` : '/listings'),
-    [listingId, searchParams]
+  const shareParams = useMemo(
+    () => resolveListingShareParams(location.search),
+    [location.search],
   )
+
+  const returnTo = shareParams?.returnTo ?? '/listings'
 
   useEffect(() => {
     let disposed = false
+
     void (async () => {
-      if (!listingId || !listingTitle.trim()) {
+      if (!shareParams) {
         if (!disposed) {
           setPhase('error')
           setMessage('缺少分享參數，請返回商品頁重試。')
@@ -40,17 +35,19 @@ export const ListingShareLiffPage = () => {
       }
 
       const result = await shareListingToLineFlexOnly({
-        listingId,
-        listingTitle,
-        priceLabel,
-        categoryName,
-        conditionName,
+        listingId: shareParams.listingId,
+        listingTitle: shareParams.listingTitle,
+        priceLabel: shareParams.priceLabel,
+        categoryName: shareParams.categoryName,
+        conditionName: shareParams.conditionName,
       })
+
       if (disposed) {
         return
       }
 
       if (result.reason === 'SENT') {
+        clearListingSharePending()
         setPhase('done')
         setMessage('已送出 Flex Message。')
         return
@@ -77,14 +74,14 @@ export const ListingShareLiffPage = () => {
       }
       setPhase('error')
       setMessage(
-        `分享失敗：${[result.errorCode, result.errorMessage, result.contextType].filter(Boolean).join(' | ') || '未知錯誤'}`
+        `分享失敗：${[result.errorCode, result.errorMessage, result.contextType].filter(Boolean).join(' | ') || '未知錯誤'}`,
       )
     })()
 
     return () => {
       disposed = true
     }
-  }, [categoryName, conditionName, listingId, listingTitle, priceLabel])
+  }, [shareParams])
 
   return (
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4 py-8">

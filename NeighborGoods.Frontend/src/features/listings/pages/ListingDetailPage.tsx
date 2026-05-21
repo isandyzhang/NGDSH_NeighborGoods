@@ -18,6 +18,7 @@ import {
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
   getLiffShareDiagnostics,
+  redirectToRootListingShare,
   shareListingToLine,
   type LiffShareDiagnostics,
   type ShareListingResult,
@@ -323,15 +324,9 @@ export const ListingDetailPage = () => {
     }
 
     setFlexShareBusy(true)
-    const params = new URLSearchParams({
-      listingId: item.id,
-      title: item.title,
-      price: formatPrice(item),
-      category: item.categoryName,
-      condition: item.conditionName,
-      returnTo: `${window.location.pathname}${window.location.search}`,
-    })
-    navigate(`/liff/share-listing?${params.toString()}`)
+    const options = getShareOptions(item)
+    const returnTo = `${window.location.pathname}${window.location.search}`
+    redirectToRootListingShare(options, returnTo)
   }
 
   const handleShareDebugConfirm = async () => {

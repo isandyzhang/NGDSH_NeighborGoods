@@ -1,4 +1,5 @@
 import { hasLineBindingPending } from '@/features/account/lineBindingSession'
+import { hasListingSharePending, resolveListingShareParams } from '@/features/listings/listingShareSession'
 
 const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
 
@@ -28,6 +29,28 @@ const parseLiffStateTarget = (liffState: string): string | null => {
   }
 
   return null
+}
+
+/** LIFF Endpoint is site root; listing FLEX share must run on `/` for liff.init. */
+export const isListingShareEntry = (pathname: string, search: string): boolean => {
+  if (pathname !== '/') {
+    return false
+  }
+
+  const params = new URLSearchParams(search)
+  if (params.get('listingShare') === '1' && params.get('listingId')?.trim()) {
+    return true
+  }
+
+  const liffState = params.get('liff.state')
+  if (liffState) {
+    const resolved = resolveListingShareParams(`?liff.state=${encodeURIComponent(liffState)}`)
+    if (resolved) {
+      return true
+    }
+  }
+
+  return hasListingSharePending()
 }
 
 /** LIFF Endpoint is site root; binding must run on `/` (not `/liff/line-notify`) for liff.init. */
