@@ -38,7 +38,7 @@ export type ShareListingOptions = ListingFlexPayload & {
   origin?: string
 }
 
-export type ShareListingShareMode = 'flex' | 'text' | 'cancelled'
+export type ShareListingShareMode = 'flex' | 'text' | 'cancelled' | 'redirect'
 
 export type ShareListingResult = {
   usedLiffFlex: boolean
@@ -329,7 +329,10 @@ export const ensureLiffReady = async () => {
     liff.getVersion()
     return liff
   } catch {
-    // not initialized yet
+    // not initialized yet — init only on LIFF Endpoint `/` (fails on /listings/:id)
+    if (!isLiffEndpointPath()) {
+      return null
+    }
   }
 
   if (!liffReadyPromise) {
@@ -377,7 +380,16 @@ export const shareListingToLine = async (options: ShareListingOptions): Promise<
       return openLineTextShare(options)
     }
 
-    const ready = await ensureLiffReady()
+    let ready = await ensureLiffReady()
+    if (!ready && !isLiffEndpointPath()) {
+      const returnTo =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+          : `/listings/${options.listingId}`
+      redirectToRootListingShare(options, returnTo)
+      return { usedLiffFlex: false, usedFallbackUrlShare: false, shareMode: 'redirect' }
+    }
+
     if (!ready || !safeSharePickerAvailable(ready)) {
       return openLineTextShare(options)
     }

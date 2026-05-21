@@ -1,5 +1,6 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { ensureLiffReady } from '@/features/listings/utils/lineShare'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
 import { RequireAdmin } from '@/features/admin/components/RequireAdmin'
 import { ListingHomePage } from '@/features/listings/pages/ListingHomePage'
@@ -72,6 +73,40 @@ const NotFoundPage = lazy(() =>
 
 const RouteFallback = () => <div className="px-4 py-8 text-sm text-text-subtle">頁面載入中...</div>
 
+/** 在 `/` 先完成 liff.init，再 SPA 導向深連結目標，避免商品頁無法 shareTargetPicker。 */
+const LiffDeepLinkNavigate = ({ to }: { to: string }) => {
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    let disposed = false
+
+    void (async () => {
+      try {
+        const liffMod = await import('@line/liff')
+        if (liffMod.default.isInClient()) {
+          await ensureLiffReady()
+        }
+      } catch {
+        // 仍導向目標頁；分享時會改走根路徑分享流程
+      } finally {
+        if (!disposed) {
+          setReady(true)
+        }
+      }
+    })()
+
+    return () => {
+      disposed = true
+    }
+  }, [to])
+
+  if (!ready) {
+    return <RouteFallback />
+  }
+
+  return <Navigate to={to} replace />
+}
+
 const RootEntry = () => {
   const location = useLocation()
   if (isAdminLiffDebugEntry(location.search)) {
@@ -103,7 +138,7 @@ const RootEntry = () => {
 
   const target = resolveLiffEntryTarget(location.pathname, location.search)
   if (target) {
-    return <Navigate to={target} replace />
+    return <LiffDeepLinkNavigate to={target} />
   }
 
   return <Navigate to="/listings" replace />
@@ -117,7 +152,7 @@ const LiffPathEntry = () => {
 
   const target = resolveLiffEntryTarget(location.pathname, location.search)
   if (target) {
-    return <Navigate to={target} replace />
+    return <LiffDeepLinkNavigate to={target} />
   }
 
   return <Navigate to="/listings" replace />

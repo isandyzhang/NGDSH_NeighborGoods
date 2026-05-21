@@ -17,7 +17,6 @@ import {
 } from '@/features/listings/constants/listingStatus'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import {
-  ensureLiffReady,
   getLiffShareDiagnostics,
   shareListingToLine,
   type LiffShareDiagnostics,
@@ -305,7 +304,7 @@ export const ListingDetailPage = () => {
     if (shareDebugEnabled) {
       setShareDebugResult(result)
     }
-    if (result.shareMode === 'cancelled') {
+    if (result.shareMode === 'cancelled' || result.shareMode === 'redirect') {
       return
     }
     if (result.shareMode === 'text') {
@@ -316,23 +315,6 @@ export const ListingDetailPage = () => {
       setError(null)
     }
   }
-
-  useEffect(() => {
-    if (!item) {
-      return
-    }
-
-    void (async () => {
-      try {
-        const liffMod = await import('@line/liff')
-        if (liffMod.default.isInClient()) {
-          await ensureLiffReady()
-        }
-      } catch {
-        // ignore
-      }
-    })()
-  }, [item?.id])
 
   useEffect(() => {
     lineActionHandledRef.current = false
