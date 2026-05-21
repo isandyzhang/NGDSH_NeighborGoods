@@ -357,16 +357,16 @@ export const ensureLiffReady = async () => {
 }
 
 /**
- * 與 admin LIFF 除錯頁相同：分享參數放在 liff.state（query-only），避免 LINE 重複包裝或丟失外層 query。
+ * 與 admin LIFF 除錯頁相同：liff.state 只帶旗標；完整參數已在 redirect 前寫入 sessionStorage。
+ * 勿把整串 listingId/title/... 塞進 liff.state，LINE 易改寫成 /listingShare=1&... path 而 404。
  * @see buildLiffAdminDebugUrl in liffInitDebug.ts
  */
-export const buildListingShareLiffEntryUrl = (options: ShareListingOptions, returnTo: string) => {
+export const buildListingShareLiffEntryUrl = (_options: ShareListingOptions, _returnTo: string) => {
   const liffId = getLineLiffId()
   if (!liffId) {
     return null
   }
-  const query = buildListingShareRootSearch(options, returnTo).slice(1)
-  return `https://liff.line.me/${liffId}?liff.state=${encodeURIComponent(query)}`
+  return `https://liff.line.me/${liffId}?liff.state=${encodeURIComponent('listingShare=1')}`
 }
 
 /** 在 LINE 內改走 liff.line.me 根路徑分享（保留 LIFF context） */

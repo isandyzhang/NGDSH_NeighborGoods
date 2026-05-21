@@ -46,11 +46,11 @@ const parseLiffStateTarget = (liffState: string): string | null => {
 
 /** LIFF Endpoint is site root; listing FLEX share must run on `/` for liff.init. */
 export const isListingShareEntry = (pathname: string, search: string): boolean => {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+
   if (pathname !== '/') {
     return false
   }
-
-  const params = new URLSearchParams(search)
   if (params.get('listingShare') === '1' && params.get('listingId')?.trim()) {
     return true
   }

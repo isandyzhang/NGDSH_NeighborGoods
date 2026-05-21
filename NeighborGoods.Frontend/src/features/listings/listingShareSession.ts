@@ -111,6 +111,43 @@ export const resolveListingShareParams = (
   return options
 }
 
+/**
+ * LINE 有時把 liff.line.me 的 query 變成站內 path，例如
+ * /listingShare=1&listingId=... → 應修正為 /?listingShare=1&listingId=...
+ */
+export const getListingShareRedirectFromBrokenPath = (
+  pathname: string,
+  search: string,
+): { pathname: string; search: string } | null => {
+  if (pathname === '/') {
+    return null
+  }
+
+  const pathBody = pathname.startsWith('/') ? pathname.slice(1) : pathname
+  const searchBody = search.startsWith('?') ? search.slice(1) : search
+  const looksLikeSharePath =
+    pathBody.startsWith('listingShare=') ||
+    pathBody.includes('&listingId=') ||
+    pathBody.includes('listingId=')
+  const looksLikeShareSearch = searchBody.includes('listingShare=') || searchBody.includes('listingId=')
+
+  if (!looksLikeSharePath && !looksLikeShareSearch) {
+    return null
+  }
+
+  const combined = [pathBody, searchBody].filter(Boolean).join('&')
+  const params = new URLSearchParams(combined)
+  if (!params.get('listingShare')) {
+    params.set('listingShare', '1')
+  }
+
+  if (!params.get('listingId')?.trim() && !hasListingSharePending()) {
+    return null
+  }
+
+  return { pathname: '/', search: `?${params.toString()}` }
+}
+
 export const buildListingShareRootSearch = (options: ShareListingOptions, returnTo: string): string => {
   const params = new URLSearchParams({
     listingShare: '1',
