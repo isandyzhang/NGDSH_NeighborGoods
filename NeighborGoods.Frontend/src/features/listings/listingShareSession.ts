@@ -1,6 +1,35 @@
+import { hasNestedLiffState } from '@/features/admin/liffInitDebug'
 import type { ShareListingOptions } from '@/features/listings/utils/lineShare'
 
 const STORAGE_KEY = 'neighborGoods.listingSharePending'
+const LIFF_OAUTH_PRESERVE_KEYS = ['code', 'state', 'liffClientId', 'liffRedirectUri', 'liff.hback'] as const
+
+const isListingShareFlag = (params: URLSearchParams) =>
+  params.get('listingShare') === '1' || params.get('listingsShare') === '1'
+
+const liffStateImpliesListingShare = (liffStateRaw: string): boolean => {
+  let current = liffStateRaw.trim()
+  for (let depth = 0; depth < 6; depth += 1) {
+    try {
+      const decoded = decodeURIComponent(current)
+      const params = new URLSearchParams(decoded.startsWith('?') ? decoded.slice(1) : decoded)
+      if (isListingShareFlag(params)) {
+        return true
+      }
+      if (/listingShare(=|%3D)1|listingsShare(=|%3D)1/i.test(decoded)) {
+        return true
+      }
+      const inner = params.get('liff.state')
+      if (!inner || inner === current) {
+        return false
+      }
+      current = inner
+    } catch {
+      return false
+    }
+  }
+  return false
+}
 const PENDING_TTL_MS = 15 * 60 * 1000
 
 export type ListingSharePendingSession = ShareListingOptions & {
@@ -79,11 +108,58 @@ const liffStateQueryParams = (liffStateRaw: string): URLSearchParams | null => {
   return null
 }
 
+/** 已在 LINE WebView 且 URL 被重複包裝 liff.state 時，改為乾淨的 /?listingShare=1 */
+export const listingShareEntryNeedsCleanup = (pathname: string, search: string): boolean => {
+  if (pathname !== '/') {
+    return false
+  }
+
+  const normalized = search.startsWith('?') ? search : search ? `?${search}` : ''
+  if (!normalized) {
+    return false
+  }
+
+  if (hasNestedLiffState(normalized)) {
+    return hasListingSharePending() || liffStateImpliesListingShare(new URLSearchParams(normalized.slice(1)).get('liff.state') ?? '')
+  }
+
+  const params = new URLSearchParams(normalized.slice(1))
+  const liffState = params.get('liff.state') ?? ''
+  if (liffState && liffStateImpliesListingShare(liffState) && !isListingShareFlag(params)) {
+    return hasListingSharePending()
+  }
+
+  return false
+}
+
+export const buildCleanListingShareEntrySearch = (search: string): string => {
+  const raw = search.startsWith('?') ? search.slice(1) : search
+  const params = new URLSearchParams(raw)
+  const clean = new URLSearchParams()
+  clean.set('listingShare', '1')
+
+  for (const key of LIFF_OAUTH_PRESERVE_KEYS) {
+    const value = params.get(key)
+    if (value) {
+      clean.set(key, value)
+    }
+  }
+
+  return `?${clean.toString()}`
+}
+
 export const resolveListingShareParams = (
   search: string,
 ): (ShareListingOptions & { returnTo: string }) | null => {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const liffStateParams = params.get('liff.state') ? liffStateQueryParams(params.get('liff.state') ?? '') : null
+
+  if (isListingShareFlag(params) && !params.get('listingId')?.trim() && !liffStateParams?.get('listingId')?.trim()) {
+    const pending = readListingSharePending()
+    if (pending) {
+      return pending
+    }
+  }
 
   const listingId = params.get('listingId') ?? liffStateParams?.get('listingId') ?? ''
   const listingTitle = params.get('title') ?? liffStateParams?.get('title') ?? ''

@@ -51,7 +51,12 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
   if (pathname !== '/') {
     return false
   }
-  if (params.get('listingShare') === '1' && params.get('listingId')?.trim()) {
+  const shareFlag =
+    params.get('listingShare') === '1' || params.get('listingsShare') === '1'
+  if (shareFlag && params.get('listingId')?.trim()) {
+    return true
+  }
+  if (shareFlag && hasListingSharePending()) {
     return true
   }
 

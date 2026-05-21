@@ -369,14 +369,27 @@ export const buildListingShareLiffEntryUrl = (_options: ShareListingOptions, _re
   return `https://liff.line.me/${liffId}?liff.state=${encodeURIComponent('listingShare=1')}`
 }
 
-/** 在 LINE 內改走 liff.line.me 根路徑分享（保留 LIFF context） */
-export const redirectToRootListingShare = (options: ShareListingOptions, returnTo: string) => {
+/**
+ * 在 LINE 內改走根路徑分享。
+ * 已在 LINE WebView 時用同源 /?listingShare=1，避免再開 liff.line.me 造成 liff.state 雙層嵌套。
+ */
+export const redirectToRootListingShare = (
+  options: ShareListingOptions,
+  returnTo: string,
+  opts?: { alreadyInLineClient?: boolean },
+) => {
   saveListingSharePending(options, returnTo)
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'
+
+  if (opts?.alreadyInLineClient) {
+    window.location.assign(`${origin}/?listingShare=1`)
+    return
+  }
+
   const search = buildListingShareRootSearch(options, returnTo)
   const liffEntry = buildListingShareLiffEntryUrl(options, returnTo)
-  const target =
-    liffEntry ??
-    `${typeof window !== 'undefined' ? window.location.origin : 'https://www.neighborgoodstw.com'}${search}`
+  const target = liffEntry ?? `${origin}${search}`
   window.location.assign(target)
 }
 
@@ -508,7 +521,7 @@ export const startListingFlexShare = async (
     return { started: false, reason: 'NOT_IN_LINE_CLIENT' }
   }
 
-  redirectToRootListingShare(options, returnTo)
+  redirectToRootListingShare(options, returnTo, { alreadyInLineClient: true })
   return { started: true }
 }
 

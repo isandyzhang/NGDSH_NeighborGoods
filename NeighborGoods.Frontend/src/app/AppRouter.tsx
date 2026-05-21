@@ -12,6 +12,10 @@ import {
   isAdminLiffDebugEntry,
 } from '@/features/admin/liffInitDebug'
 import { isLineNotifyBindingEntry, isListingShareEntry, resolveLiffEntryTarget } from '@/app/liffRoute'
+import {
+  buildCleanListingShareEntrySearch,
+  listingShareEntryNeedsCleanup,
+} from '@/features/listings/listingShareSession'
 
 const LineLoginCallbackPage = lazy(() =>
   import('@/features/auth/pages/LineLoginCallbackPage').then((module) => ({ default: module.LineLoginCallbackPage })),
@@ -133,6 +137,18 @@ const RootEntry = () => {
   }
 
   if (isListingShareEntry(location.pathname, location.search)) {
+    if (listingShareEntryNeedsCleanup(location.pathname, location.search)) {
+      return (
+        <Navigate
+          to={{
+            pathname: '/',
+            search: buildCleanListingShareEntrySearch(location.search),
+            hash: location.hash,
+          }}
+          replace
+        />
+      )
+    }
     return <ListingShareLiffPage />
   }
 
