@@ -1,11 +1,11 @@
-import { hasLineBindingPending } from '@/features/account/lineBindingSession'
+import { hasLineBindingPending, readLineBindingPending } from '@/features/account/lineBindingSession'
 import {
   hasListingSharePending,
+  isSafeInternalPath,
   liffStateImpliesListingShare,
+  readListingSharePending,
   resolveListingShareParams,
 } from '@/features/listings/listingShareSession'
-
-const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
 
 import { resolveLineLiffId } from '@/app/lineLiffId'
 
@@ -83,6 +83,22 @@ const buildListingTargetFromParams = (params: URLSearchParams): string | null =>
   const lineAction = params.get('lineAction')?.trim()
   const search = lineAction ? `?lineAction=${lineAction}` : ''
   return `/listings/${listingId}${search}`
+}
+
+const isListingShareFlag = (params: URLSearchParams) =>
+  params.get('listingShare') === '1' || params.get('listingsShare') === '1'
+
+const searchImpliesListingShare = (params: URLSearchParams) =>
+  isListingShareFlag(params) || liffStateImpliesListingShare(params.get('liff.state') ?? '')
+
+const listingSharePendingIsNewest = () => {
+  const listingShare = readListingSharePending()
+  if (!listingShare) {
+    return false
+  }
+
+  const lineBinding = readLineBindingPending()
+  return !lineBinding || listingShare.savedAt >= lineBinding.savedAt
 }
 
 const parseLiffStateTarget = (liffState: string): string | null => {
@@ -167,8 +183,7 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
   if (pathname !== '/') {
     return false
   }
-  const shareFlag =
-    params.get('listingShare') === '1' || params.get('listingsShare') === '1'
+  const shareFlag = isListingShareFlag(params)
   if (shareFlag && params.get('listingId')?.trim()) {
     return true
   }
@@ -199,7 +214,7 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
     return hasListingSharePending()
   }
 
-  return false
+  return listingSharePendingIsNewest()
 }
 
 /** LIFF Endpoint is site root; binding must run on `/` (not `/liff/line-notify`) for liff.init. */
@@ -221,7 +236,8 @@ export const isLineNotifyBindingEntry = (pathname: string, search: string): bool
   }
 
   // OAuth return (?code=...) drops bindToken from URL; session keeps binding on `/`.
-  return pathname === '/' && hasLineBindingPending()
+  // If a newer listing-share session exists, the same root return belongs to that flow.
+  return pathname === '/' && hasLineBindingPending() && !searchImpliesListingShare(params) && !listingSharePendingIsNewest()
 }
 
 /** Redirect URI for liff.login — root only; bindToken lives in sessionStorage across OAuth. */

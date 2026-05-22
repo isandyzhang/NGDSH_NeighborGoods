@@ -3,6 +3,7 @@ import { resolveLineLiffId } from '@/app/lineLiffId'
 import { buildLiffPathUrl, buildListingDetailLiffUrl } from '@/app/liffRoute'
 import {
   buildListingShareRootSearch,
+  isSafeInternalPath,
   saveListingSharePending,
 } from '@/features/listings/listingShareSession'
 
@@ -622,7 +623,7 @@ export const shareListingToLineFlexOnly = async (
 
     if (!liff.isLoggedIn()) {
       const back =
-        returnTo?.startsWith('/') ? returnTo : `/listings/${options.listingId}`
+        isSafeInternalPath(returnTo) ? returnTo.trim() : `/listings/${options.listingId}`
       saveListingSharePending(options, back)
       liff.login({ redirectUri: buildListingShareLoginRedirectUri() })
       return {

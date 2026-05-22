@@ -7,6 +7,16 @@ const LIFF_OAUTH_PRESERVE_KEYS = ['code', 'state', 'liffClientId', 'liffRedirect
 const isListingShareFlag = (params: URLSearchParams) =>
   params.get('listingShare') === '1' || params.get('listingsShare') === '1'
 
+export const isSafeInternalPath = (path: string | null | undefined): path is string => {
+  const trimmed = path?.trim() ?? ''
+  return trimmed.startsWith('/') && !trimmed.startsWith('//')
+}
+
+const safeInternalPathOr = (path: string | null | undefined, fallback: string) => {
+  const trimmed = path?.trim() ?? ''
+  return isSafeInternalPath(trimmed) ? trimmed : fallback
+}
+
 export const liffStateImpliesListingShare = (liffStateRaw: string): boolean => {
   let current = liffStateRaw.trim()
   for (let depth = 0; depth < 6; depth += 1) {
@@ -73,7 +83,7 @@ export const saveListingSharePending = (options: ShareListingOptions, returnTo: 
 
   const payload: ListingSharePendingSession = {
     ...options,
-    returnTo: returnTo.startsWith('/') ? returnTo : '/listings',
+    returnTo: safeInternalPathOr(returnTo, '/listings'),
     savedAt: Date.now(),
   }
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
@@ -170,6 +180,11 @@ export const resolveListingShareParams = (
   const listingId = params.get('listingId') ?? liffStateParams?.get('listingId') ?? ''
   const listingTitle = params.get('title') ?? liffStateParams?.get('title') ?? ''
   if (!listingId.trim() || !listingTitle.trim()) {
+    const pending = readListingSharePending()
+    if (pending) {
+      return pending
+    }
+
     const liffStateRaw = params.get('liff.state') ?? ''
     const isShareFlow =
       isListingShareFlag(params) ||
@@ -178,8 +193,14 @@ export const resolveListingShareParams = (
     if (!isShareFlow) {
       return null
     }
-    return readListingSharePending()
+    return null
   }
+
+  const fallbackReturnTo = `/listings/${listingId.trim()}`
+  const returnTo = safeInternalPathOr(
+    params.get('returnTo') ?? liffStateParams?.get('returnTo'),
+    fallbackReturnTo,
+  )
 
   const options: ShareListingOptions & { returnTo: string } = {
     listingId: listingId.trim(),
@@ -189,11 +210,7 @@ export const resolveListingShareParams = (
     imageUrl: params.get('imageUrl') ?? liffStateParams?.get('imageUrl') ?? undefined,
     categoryName: params.get('category') ?? liffStateParams?.get('category') ?? undefined,
     conditionName: params.get('condition') ?? liffStateParams?.get('condition') ?? undefined,
-    returnTo: params.get('returnTo')?.startsWith('/')
-      ? (params.get('returnTo') as string)
-      : liffStateParams?.get('returnTo')?.startsWith('/')
-        ? (liffStateParams.get('returnTo') as string)
-        : `/listings/${listingId.trim()}`,
+    returnTo,
   }
 
   saveListingSharePending(options, options.returnTo)
@@ -242,7 +259,7 @@ export const buildListingShareRootSearch = (options: ShareListingOptions, return
     listingShare: '1',
     listingId: options.listingId,
     title: options.listingTitle,
-    returnTo: returnTo.startsWith('/') ? returnTo : '/listings',
+    returnTo: safeInternalPathOr(returnTo, '/listings'),
   })
   if (options.priceLabel) {
     params.set('price', options.priceLabel)
