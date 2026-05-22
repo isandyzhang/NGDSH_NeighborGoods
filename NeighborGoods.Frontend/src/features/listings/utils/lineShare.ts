@@ -408,7 +408,7 @@ export const ensureLiffReady = async () => {
  * 勿把整串 listingId/title/... 塞進 liff.state，LINE 易改寫成 /listingShare=1&... path 而 404。
  * @see buildLiffAdminDebugUrl in liffInitDebug.ts
  */
-export const buildListingShareLiffEntryUrl = (_options: ShareListingOptions, _returnTo: string) => {
+export const buildListingShareLiffEntryUrl = () => {
   const liffId = getLineLiffId()
   if (!liffId) {
     return null
@@ -435,7 +435,7 @@ export const redirectToRootListingShare = (
   }
 
   const search = buildListingShareRootSearch(options, returnTo)
-  const liffEntry = buildListingShareLiffEntryUrl(options, returnTo)
+  const liffEntry = buildListingShareLiffEntryUrl()
   const target = liffEntry ?? `${origin}${search}`
   window.location.assign(target)
 }
