@@ -199,7 +199,14 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
     return hasListingSharePending()
   }
 
-  return false
+  // OAuth return (?code=...) drops listingShare from the URL; session keeps share state on `/`.
+  const hasOAuthReturn =
+    params.has('code') ||
+    params.has('state') ||
+    params.has('liffClientId') ||
+    params.has('liffRedirectUri') ||
+    params.has('liff.hback')
+  return hasOAuthReturn && hasListingSharePending()
 }
 
 /** LIFF Endpoint is site root; binding must run on `/` (not `/liff/line-notify`) for liff.init. */
