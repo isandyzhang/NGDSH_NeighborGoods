@@ -135,13 +135,6 @@ const RootEntry = () => {
     return <LiffDebugPage mode="liffEntry" />
   }
 
-  if (isLineNotifyBindingEntry(location.pathname, location.search)) {
-    if (location.pathname !== '/') {
-      return <Navigate to={{ pathname: '/', search: location.search }} replace />
-    }
-    return <LineNotifyLiffPage />
-  }
-
   if (isListingShareEntry(location.pathname, location.search)) {
     if (listingShareEntryNeedsCleanup(location.pathname, location.search)) {
       return (
@@ -156,6 +149,13 @@ const RootEntry = () => {
       )
     }
     return <ListingShareLiffPage />
+  }
+
+  if (isLineNotifyBindingEntry(location.pathname, location.search)) {
+    if (location.pathname !== '/') {
+      return <Navigate to={{ pathname: '/', search: location.search }} replace />
+    }
+    return <LineNotifyLiffPage />
   }
 
   const target = resolveLiffEntryTarget(location.pathname, location.search)
