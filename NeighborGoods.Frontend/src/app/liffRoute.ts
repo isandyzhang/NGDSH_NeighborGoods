@@ -1,6 +1,7 @@
 import { hasLineBindingPending } from '@/features/account/lineBindingSession'
 import {
   hasListingSharePending,
+  isListingSharePendingResume,
   liffStateImpliesListingShare,
   resolveListingShareParams,
 } from '@/features/listings/listingShareSession'
@@ -166,6 +167,9 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
 
   if (pathname !== '/') {
     return false
+  }
+  if (isListingSharePendingResume(search)) {
+    return true
   }
   const shareFlag =
     params.get('listingShare') === '1' || params.get('listingsShare') === '1'
