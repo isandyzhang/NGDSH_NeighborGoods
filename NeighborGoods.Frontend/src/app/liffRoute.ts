@@ -1,16 +1,46 @@
-import { hasLineBindingPending } from '@/features/account/lineBindingSession'
+import { hasLineBindingPending, readLineBindingPending } from '@/features/account/lineBindingSession'
 import {
   hasListingSharePending,
   liffStateImpliesListingShare,
+  readListingSharePending,
   resolveListingShareParams,
 } from '@/features/listings/listingShareSession'
 
 const isSafeInternalPath = (path: string) => path.startsWith('/') && !path.startsWith('//')
+const LIFF_OAUTH_RETURN_KEYS = ['code', 'state', 'liffClientId', 'liffRedirectUri', 'liff.hback'] as const
 
 import { resolveLineLiffId } from '@/app/lineLiffId'
 
 const normalizeLiffQuery = (search: string) =>
   !search || search === '?' ? '' : search.startsWith('?') ? search : `?${search}`
+
+const isListingShareFlag = (params: URLSearchParams) =>
+  params.get('listingShare') === '1' || params.get('listingsShare') === '1'
+
+const hasExplicitListingShareIntent = (params: URLSearchParams) => {
+  if (isListingShareFlag(params)) {
+    return true
+  }
+
+  const liffState = params.get('liff.state')
+  return liffState ? liffStateImpliesListingShare(liffState) : false
+}
+
+const isLiffOAuthReturn = (params: URLSearchParams) =>
+  LIFF_OAUTH_RETURN_KEYS.some((key) => params.has(key))
+
+const resolveNewestPendingRootFlow = (): 'listingShare' | 'lineBinding' | null => {
+  const listingShare = readListingSharePending()
+  const lineBinding = readLineBindingPending()
+
+  if (listingShare && (!lineBinding || listingShare.savedAt >= lineBinding.savedAt)) {
+    return 'listingShare'
+  }
+  if (lineBinding) {
+    return 'lineBinding'
+  }
+  return null
+}
 
 /**
  * path 格式：liff.line.me/{liffId}/listings（圖文選單、Flex 按鈕；手機實測較穩）。
@@ -167,12 +197,14 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
   if (pathname !== '/') {
     return false
   }
-  const shareFlag =
-    params.get('listingShare') === '1' || params.get('listingsShare') === '1'
+  const shareFlag = isListingShareFlag(params)
   if (shareFlag && params.get('listingId')?.trim()) {
     return true
   }
   if (shareFlag && hasListingSharePending()) {
+    return true
+  }
+  if (!shareFlag && isLiffOAuthReturn(params) && resolveNewestPendingRootFlow() === 'listingShare') {
     return true
   }
 
@@ -205,6 +237,10 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
 /** LIFF Endpoint is site root; binding must run on `/` (not `/liff/line-notify`) for liff.init. */
 export const isLineNotifyBindingEntry = (pathname: string, search: string): boolean => {
   const params = new URLSearchParams(search)
+  if (pathname === '/' && hasExplicitListingShareIntent(params)) {
+    return false
+  }
+
   if (
     params.get('bindToken') &&
     (pathname === '/' || pathname === '/liff' || pathname === '/liff/line-notify')
@@ -221,7 +257,7 @@ export const isLineNotifyBindingEntry = (pathname: string, search: string): bool
   }
 
   // OAuth return (?code=...) drops bindToken from URL; session keeps binding on `/`.
-  return pathname === '/' && hasLineBindingPending()
+  return pathname === '/' && hasLineBindingPending() && resolveNewestPendingRootFlow() === 'lineBinding'
 }
 
 /** Redirect URI for liff.login — root only; bindToken lives in sessionStorage across OAuth. */

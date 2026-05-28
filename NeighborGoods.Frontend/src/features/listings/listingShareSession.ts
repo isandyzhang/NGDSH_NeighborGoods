@@ -7,6 +7,9 @@ const LIFF_OAUTH_PRESERVE_KEYS = ['code', 'state', 'liffClientId', 'liffRedirect
 const isListingShareFlag = (params: URLSearchParams) =>
   params.get('listingShare') === '1' || params.get('listingsShare') === '1'
 
+const isLiffOAuthReturn = (params: URLSearchParams) =>
+  LIFF_OAUTH_PRESERVE_KEYS.some((key) => params.has(key))
+
 export const liffStateImpliesListingShare = (liffStateRaw: string): boolean => {
   let current = liffStateRaw.trim()
   for (let depth = 0; depth < 6; depth += 1) {
@@ -174,7 +177,8 @@ export const resolveListingShareParams = (
     const isShareFlow =
       isListingShareFlag(params) ||
       liffStateImpliesListingShare(liffStateRaw) ||
-      listingShareFlag === '1'
+      listingShareFlag === '1' ||
+      isLiffOAuthReturn(params)
     if (!isShareFlow) {
       return null
     }
