@@ -1,7 +1,12 @@
 import { AppRouter } from '@/app/AppRouter'
+import { ApiWarmupGate } from '@/features/system/components/ApiWarmupGate'
 
 function App() {
-  return <AppRouter />
+  return (
+    <ApiWarmupGate>
+      <AppRouter />
+    </ApiWarmupGate>
+  )
 }
 
 export default App
