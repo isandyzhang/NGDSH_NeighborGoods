@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   adminApi,
@@ -39,6 +39,7 @@ export const AdminConversationsPage = () => {
   const [messagesError, setMessagesError] = useState<string | null>(null)
   const [messagePage, setMessagePage] = useState(1)
   const [messageTotalPages, setMessageTotalPages] = useState(1)
+  const messagesPanelRef = useRef<HTMLDivElement>(null)
 
   const loadConversations = useCallback(async (targetPage: number) => {
     setLoading(true)
@@ -75,10 +76,13 @@ export const AdminConversationsPage = () => {
     void loadConversations(page)
   }, [loadConversations, page])
 
-  const handleView = (conversation: AdminConversationListItem) => {
+  const handleView = async (conversation: AdminConversationListItem) => {
     setSelectedId(conversation.conversationId)
     setMessagePage(1)
-    void loadMessages(conversation.conversationId, 1)
+    await loadMessages(conversation.conversationId, 1)
+    requestAnimationFrame(() => {
+      messagesPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   if (loading && items.length === 0) {
@@ -135,9 +139,9 @@ export const AdminConversationsPage = () => {
                     <button
                       type="button"
                       className="underline"
-                      onClick={() => handleView(item)}
+                      onClick={() => void handleView(item)}
                     >
-                      查看
+                      {selectedId === item.conversationId ? '查看中' : '查看'}
                     </button>
                   </td>
                 </tr>
@@ -167,7 +171,7 @@ export const AdminConversationsPage = () => {
       ) : null}
 
       {selectedId ? (
-        <div className="border border-border p-3">
+        <div ref={messagesPanelRef} className="scroll-mt-4 border border-border bg-surface p-3">
           <p className="mb-2 font-semibold">
             對話紀錄
             {selectedConversation
