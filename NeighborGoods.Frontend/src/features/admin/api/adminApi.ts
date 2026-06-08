@@ -65,6 +65,45 @@ export type UpsertAdminAnnouncementPayload = {
   linkLabel: string | null
 }
 
+export type AdminConversationListItem = {
+  conversationId: string
+  listingId: string
+  listingTitle: string
+  participant1Id: string
+  participant1DisplayName: string
+  participant2Id: string
+  participant2DisplayName: string
+  lastMessagePreview: string | null
+  lastMessageAt: string | null
+  updatedAt: string
+  messageCount: number
+}
+
+export type AdminConversationList = {
+  items: AdminConversationListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export type AdminConversationMessage = {
+  id: string
+  conversationId: string
+  senderId: string
+  senderDisplayName: string
+  content: string
+  createdAt: string
+}
+
+export type AdminConversationMessages = {
+  items: AdminConversationMessage[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
 export type AdminListingManagement = {
   items: Array<{
     id: string
@@ -141,5 +180,21 @@ export const adminApi = {
   async deleteAnnouncement(id: string): Promise<void> {
     const response = await http.delete<ApiResponse<{ id: string; deleted: boolean }>>(`/api/v1/admin/announcements/${id}`)
     unwrapApiResponse(response.data)
+  },
+
+  async listConversations(params?: { page?: number; pageSize?: number }): Promise<AdminConversationList> {
+    const response = await http.get<ApiResponse<AdminConversationList>>('/api/v1/admin/conversations', { params })
+    return unwrapApiResponse(response.data)
+  },
+
+  async getConversationMessages(
+    conversationId: string,
+    params?: { page?: number; pageSize?: number },
+  ): Promise<AdminConversationMessages> {
+    const response = await http.get<ApiResponse<AdminConversationMessages>>(
+      `/api/v1/admin/conversations/${conversationId}/messages`,
+      { params },
+    )
+    return unwrapApiResponse(response.data)
   },
 }

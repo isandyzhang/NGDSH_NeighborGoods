@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Admin.Contracts.Requests;
 using NeighborGoods.Api.Features.Admin.Contracts.Responses;
+using NeighborGoods.Api.Features.Admin.Services;
 using NeighborGoods.Api.Features.Announcements.Contracts;
 using NeighborGoods.Api.Features.Announcements.Services;
 using NeighborGoods.Api.Features.Listing;
@@ -57,6 +58,14 @@ public static class AdminEndpoints
 
         app.MapDelete("/api/v1/admin/announcements/{id:guid}", DeleteAdminAnnouncementAsync)
         .WithName("AdminDeleteAnnouncementV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/conversations", GetAdminConversationsAsync)
+        .WithName("AdminGetConversationsV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/conversations/{conversationId:guid}/messages", GetAdminConversationMessagesAsync)
+        .WithName("AdminGetConversationMessagesV1")
         .RequireAuthorization();
 
         return app;
@@ -479,6 +488,61 @@ public static class AdminEndpoints
         await dbContext.SaveChangesAsync(ct);
 
         return Results.Ok(ApiResponseFactory.Success(new { id, deleted = true }, httpContext));
+    }
+
+    private static async Task<IResult> GetAdminConversationsAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        AdminConversationQueryService conversationQueryService,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
+        if (!isAdmin)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var result = await conversationQueryService.ListConversationsAsync(page, pageSize, ct);
+        return Results.Ok(ApiResponseFactory.Success(result, httpContext));
+    }
+
+    private static async Task<IResult> GetAdminConversationMessagesAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        AdminConversationQueryService conversationQueryService,
+        Guid conversationId,
+        int page = 1,
+        int pageSize = 100,
+        CancellationToken ct = default)
+    {
+        var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
+        if (!isAdmin)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var (data, conversationExists) = await conversationQueryService.GetMessagesAsync(
+            conversationId,
+            page,
+            pageSize,
+            ct);
+
+        if (!conversationExists)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("CONVERSATION_NOT_FOUND", "找不到對話", httpContext),
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return Results.Ok(ApiResponseFactory.Success(data, httpContext));
     }
 
     private static AdminAnnouncementResponse ToAdminResponse(SiteAnnouncement entity) =>

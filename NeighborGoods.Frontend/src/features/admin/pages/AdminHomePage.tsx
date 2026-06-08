@@ -144,6 +144,12 @@ export const AdminHomePage = () => {
 
   return (
     <div className="space-y-6">
+      <p>
+        <Link to="/admin/conversations" className="text-sm text-text-subtle underline">
+          查看聊天室列表 →
+        </Link>
+      </p>
+
       <AdminAnnouncementsCard />
 
       <Card className="border-[#f2d59a] bg-[#fff7e0]">

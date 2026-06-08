@@ -64,6 +64,9 @@ const NotificationCenterPage = lazy(() =>
 const AdminHomePage = lazy(() =>
   import('@/features/admin/pages/AdminHomePage').then((module) => ({ default: module.AdminHomePage })),
 )
+const AdminConversationsPage = lazy(() =>
+  import('@/features/admin/pages/AdminConversationsPage').then((module) => ({ default: module.AdminConversationsPage })),
+)
 const LiffDebugPage = lazy(() =>
   import('@/features/admin/pages/LiffDebugPage').then((module) => ({ default: module.LiffDebugPage })),
 )
@@ -215,6 +218,7 @@ export const AppRouter = () => {
           <Route element={<RequireAuth />}>
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminHomePage />} />
+              <Route path="/admin/conversations" element={<AdminConversationsPage />} />
               <Route path="/admin/liff-debug" element={<LiffDebugPage mode="admin" />} />
             </Route>
             <Route path="/account" element={<AccountPage />} />
