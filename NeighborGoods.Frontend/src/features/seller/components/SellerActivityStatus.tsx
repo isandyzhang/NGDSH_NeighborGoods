@@ -40,20 +40,17 @@ export const SellerActivityStatus = ({
       : null
 
   return (
-    <div className={`space-y-1 ${className}`.trim()}>
-      <p className="flex items-center justify-center gap-2 text-sm font-medium text-text-main md:justify-start md:text-base">
-        <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
-        <span>{loginActivityLabel}</span>
-        {replyHint ? (
-          <>
-            <span className="text-text-muted" aria-hidden="true">
-              ·
-            </span>
-            <span className="text-text-subtle">{replyHint}</span>
-          </>
-        ) : null}
-      </p>
-      <p className="text-xs text-text-muted md:text-sm">登入狀態僅供參考，不保證即時回覆。</p>
-    </div>
+    <p className={`flex items-center justify-center gap-2 text-sm font-medium text-text-main md:justify-start md:text-base ${className}`.trim()}>
+      <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
+      <span>{loginActivityLabel}</span>
+      {replyHint ? (
+        <>
+          <span className="text-text-muted" aria-hidden="true">
+            ·
+          </span>
+          <span className="text-text-subtle">{replyHint}</span>
+        </>
+      ) : null}
+    </p>
   )
 }
