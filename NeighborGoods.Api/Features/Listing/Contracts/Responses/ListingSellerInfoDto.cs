@@ -7,5 +7,8 @@ public sealed record ListingSellerInfoDto(
     int MemberDays,
     bool EmailVerified,
     bool QuickResponder,
-    bool LineBound
+    bool LineBound,
+    string LoginActivityLabel,
+    string LoginActivityLevel,
+    int? TypicalReplyMinutes
 );

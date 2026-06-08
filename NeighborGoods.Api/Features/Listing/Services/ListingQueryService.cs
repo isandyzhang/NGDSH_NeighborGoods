@@ -46,6 +46,8 @@ public sealed class ListingQueryService(
                 x.CreatedAt,
                 x.EmailConfirmed,
                 x.IsQuickResponder,
+                x.QuickResponderP75Minutes,
+                x.LastLoginAt,
                 x.LineUserId,
                 x.LineMessagingApiUserId
             })
@@ -68,6 +70,8 @@ public sealed class ListingQueryService(
         var mainImageUrl = resolvedImageUrls.FirstOrDefault();
         var pendingSummary = await GetPendingPurchaseRequestSummaryAsync(id, now, cancellationToken);
 
+        var loginActivity = SellerLoginActivityResolver.Resolve(seller.LastLoginAt, now);
+
         return new ListingDetailDto(
             listing.Id,
             new ListingSellerInfoDto(
@@ -77,7 +81,10 @@ public sealed class ListingQueryService(
                 Math.Max(1, (int)Math.Floor((now - seller.CreatedAt).TotalDays)),
                 seller.EmailConfirmed,
                 seller.IsQuickResponder,
-                !string.IsNullOrWhiteSpace(seller.LineUserId) || !string.IsNullOrWhiteSpace(seller.LineMessagingApiUserId)),
+                !string.IsNullOrWhiteSpace(seller.LineUserId) || !string.IsNullOrWhiteSpace(seller.LineMessagingApiUserId),
+                loginActivity.Label,
+                loginActivity.Level,
+                seller.QuickResponderP75Minutes),
             listing.Title,
             listing.Description,
             listing.Category,
@@ -433,10 +440,18 @@ public sealed class ListingQueryService(
             return null;
         }
 
+        var now = DateTime.UtcNow;
         var seller = await dbContext.AspNetUsers
             .AsNoTracking()
             .Where(x => x.Id == sellerId)
-            .Select(x => new { x.Id, x.DisplayName })
+            .Select(x => new
+            {
+                x.Id,
+                x.DisplayName,
+                x.LastLoginAt,
+                x.IsQuickResponder,
+                x.QuickResponderP75Minutes
+            })
             .FirstOrDefaultAsync(cancellationToken);
         if (seller is null)
         {
@@ -503,12 +518,17 @@ public sealed class ListingQueryService(
                      (x.Status == sold || x.Status == donated || x.Status == givenOrTraded),
                 cancellationToken);
 
+        var loginActivity = SellerLoginActivityResolver.Resolve(seller.LastLoginAt, now);
         var sellerSummary = new SellerSummaryDto(
             seller.Id,
             string.IsNullOrWhiteSpace(seller.DisplayName) ? "賣家" : seller.DisplayName,
             totalListings,
             activeListings,
-            completedListings);
+            completedListings,
+            loginActivity.Label,
+            loginActivity.Level,
+            seller.QuickResponderP75Minutes,
+            seller.IsQuickResponder);
 
         return new SellerListingsQueryResultDto(
             sellerSummary,

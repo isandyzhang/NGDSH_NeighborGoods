@@ -65,6 +65,8 @@ public partial class AspNetUser
 
     public int? QuickResponderP75Minutes { get; set; }
 
+    public DateTime? LastLoginAt { get; set; }
+
     public virtual ICollection<AdminMessage> AdminMessages { get; set; } = new List<AdminMessage>();
 
     public virtual ICollection<AspNetUserClaim> AspNetUserClaims { get; set; } = new List<AspNetUserClaim>();

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NeighborGoods.Data;
 
@@ -11,9 +12,11 @@ using NeighborGoods.Data;
 namespace NeighborGoods.Data.Migrations
 {
     [DbContext(typeof(NeighborGoodsDbContext))]
-    partial class NeighborGoodsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260608014132_AddUserLastLoginAt")]
+    partial class AddUserLastLoginAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { accountApi } from '@/features/account/api/accountApi'
 import { saveLineBindingPending } from '@/features/account/lineBindingSession'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
+import { SellerActivityStatus } from '@/features/seller/components/SellerActivityStatus'
 import { ListingImageCarousel } from '@/features/listings/components/ListingImageCarousel'
 import {
   canEditListing,
@@ -442,6 +443,12 @@ export const ListingDetailPage = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
                     <p className="text-3xl font-bold text-text-main md:text-4xl">{item.seller.displayName || '未提供'}</p>
+                    <SellerActivityStatus
+                      loginActivityLabel={item.seller.loginActivityLabel}
+                      loginActivityLevel={item.seller.loginActivityLevel}
+                      typicalReplyMinutes={item.seller.typicalReplyMinutes}
+                      quickResponder={item.seller.quickResponder}
+                    />
                     <p className="text-base text-text-subtle md:text-lg">加入時間：{item.seller.memberDays} 天</p>
                   </div>
                   <Link

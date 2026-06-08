@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { listingApi, type SellerListingItem, type SellerSummary } from '@/features/listings/api/listingApi'
+import { SellerActivityStatus } from '@/features/seller/components/SellerActivityStatus'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -74,6 +75,16 @@ export const SellerPage = () => {
           賣家<span className="marker-wipe">頁面</span>
         </h1>
         <p className="text-lg text-text-subtle">{titleText}</p>
+        {seller ? (
+          <div className="mx-auto max-w-xl">
+            <SellerActivityStatus
+              loginActivityLabel={seller.loginActivityLabel}
+              loginActivityLevel={seller.loginActivityLevel}
+              typicalReplyMinutes={seller.typicalReplyMinutes}
+              quickResponder={seller.quickResponder}
+            />
+          </div>
+        ) : null}
       </section>
 
       {loading ? <PageSkeleton className="h-64" /> : null}

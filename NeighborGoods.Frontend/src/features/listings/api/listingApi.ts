@@ -105,6 +105,10 @@ export type SellerSummary = {
   totalListings: number
   activeListings: number
   completedListings: number
+  loginActivityLabel: string
+  loginActivityLevel: string
+  typicalReplyMinutes: number | null
+  quickResponder: boolean
 }
 
 export type SellerListingItem = {
@@ -167,6 +171,9 @@ export type ListingDetail = {
     emailVerified: boolean
     quickResponder: boolean
     lineBound: boolean
+    loginActivityLabel: string
+    loginActivityLevel: string
+    typicalReplyMinutes: number | null
   }
   title: string
   description: string | null

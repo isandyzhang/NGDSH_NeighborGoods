@@ -5,7 +5,11 @@ public sealed record SellerSummaryDto(
     string SellerDisplayName,
     int TotalListings,
     int ActiveListings,
-    int CompletedListings
+    int CompletedListings,
+    string LoginActivityLabel,
+    string LoginActivityLevel,
+    int? TypicalReplyMinutes,
+    bool QuickResponder
 );
 
 public sealed record SellerListingListItemDto(

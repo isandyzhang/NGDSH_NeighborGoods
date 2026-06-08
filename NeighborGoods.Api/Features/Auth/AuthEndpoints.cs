@@ -16,6 +16,7 @@ public static class AuthEndpoints
             HttpContext httpContext,
             LoginRequest request,
             PasswordAuthService passwordAuthService,
+            NeighborGoodsDbContext dbContext,
             ITokenService tokenService,
             CancellationToken ct = default) =>
         {
@@ -26,6 +27,9 @@ public static class AuthEndpoints
                     ApiResponseFactory.Error("UNAUTHORIZED", "帳號或密碼錯誤", httpContext),
                     statusCode: StatusCodes.Status401Unauthorized);
             }
+
+            user.LastLoginAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(ct);
 
             var tokens = await tokenService.IssueAsync(user, ct);
             var response = ToTokenResponse(tokens);
@@ -108,8 +112,10 @@ public static class AuthEndpoints
             {
                 user = CreateLineUser(profile);
                 dbContext.AspNetUsers.Add(user);
-                await dbContext.SaveChangesAsync(ct);
             }
+
+            user.LastLoginAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(ct);
 
             var tokens = await tokenService.IssueAsync(user, ct);
             var response = ToTokenResponse(tokens);
