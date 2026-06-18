@@ -29,6 +29,14 @@ public sealed record LineMyListingCardItem(
     DateTime UpdatedAt,
     DateTime CreatedAt);
 
+public sealed record LineListingExpiryItem(
+    Guid ListingId,
+    string Title,
+    string? ImageUrl,
+    decimal Price,
+    bool IsFree,
+    string CategoryName);
+
 public sealed record LineRecentConversationItem(
     Guid ConversationId,
     string OtherDisplayName,

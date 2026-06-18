@@ -430,6 +430,163 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
         return BuildCard(title, message, buttonLabel, buttonUrl);
     }
 
+    public LineFlexMessage BuildListingExpiryNotice(IReadOnlyList<LineListingExpiryItem> items)
+    {
+        if (items.Count == 0)
+        {
+            throw new ArgumentException("At least one listing is required.", nameof(items));
+        }
+
+        if (items.Count == 1)
+        {
+            return BuildListingExpiryBubble(items[0]);
+        }
+
+        var bubbles = items.Take(10).Select(BuildListingExpiryBubble).Cast<object>().ToList();
+        return new LineFlexMessage(
+            AltText: $"刊登到期通知｜{items.Count} 件商品",
+            Contents: new
+            {
+                type = "carousel",
+                contents = bubbles
+            });
+    }
+
+    private LineFlexMessage BuildListingExpiryBubble(LineListingExpiryItem item)
+    {
+        var safeTitle = string.IsNullOrWhiteSpace(item.Title) ? "未命名商品" : item.Title.Trim();
+        var priceText = item.IsFree ? "免費" : $"NT$ {item.Price:0}";
+        var detailUrl = BuildUrl($"/listings/{item.ListingId}");
+        var imageUrl = string.IsNullOrWhiteSpace(item.ImageUrl)
+            ? "https://developers-resource.landpress.line.me/fx/img/01_1_cafe.png"
+            : item.ImageUrl;
+
+        return new LineFlexMessage(
+            AltText: $"刊登到期｜{safeTitle}",
+            Contents: new
+            {
+                type = "bubble",
+                hero = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "image",
+                            url = imageUrl,
+                            size = "full",
+                            aspectRatio = "20:13",
+                            aspectMode = "cover",
+                            action = new { type = "uri", uri = detailUrl }
+                        },
+                        new
+                        {
+                            type = "box",
+                            layout = "vertical",
+                            position = "absolute",
+                            cornerRadius = "16px",
+                            offsetTop = "12px",
+                            offsetStart = "12px",
+                            height = "32px",
+                            paddingStart = "10px",
+                            paddingEnd = "10px",
+                            backgroundColor = "#9CA3AF",
+                            justifyContent = "center",
+                            contents = new object[]
+                            {
+                                new
+                                {
+                                    type = "text",
+                                    text = "刊登已到期",
+                                    color = "#ffffff",
+                                    align = "center",
+                                    size = "sm",
+                                    weight = "bold"
+                                }
+                            }
+                        }
+                    }
+                },
+                body = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "sm",
+                    paddingAll = "16px",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = safeTitle,
+                            weight = "bold",
+                            size = "lg",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = "此商品已刊登滿 14 天，目前為非活躍狀態。",
+                            size = "sm",
+                            color = "#666666",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = $"{priceText}｜{item.CategoryName}",
+                            size = "sm",
+                            color = "#111111",
+                            wrap = true
+                        }
+                    }
+                },
+                footer = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "sm",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "button",
+                            style = "primary",
+                            color = "#1DB446",
+                            action = new
+                            {
+                                type = "uri",
+                                label = "延續刊登商品",
+                                uri = detailUrl
+                            }
+                        },
+                        new
+                        {
+                            type = "button",
+                            style = "link",
+                            action = new
+                            {
+                                type = "uri",
+                                label = "已經成交了！恭喜",
+                                uri = detailUrl
+                            }
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = "請更新商品狀態，避免買家撲空",
+                            size = "xs",
+                            color = "#888888",
+                            wrap = true,
+                            align = "center"
+                        }
+                    }
+                }
+            });
+    }
+
     public LineFlexMessage BuildPurchaseRequestReminderCard(string listingTitle, Guid conversationId)
     {
         var safeListingTitle = string.IsNullOrWhiteSpace(listingTitle) ? "未命名商品" : listingTitle.Trim();

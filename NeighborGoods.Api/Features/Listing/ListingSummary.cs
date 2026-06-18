@@ -20,6 +20,7 @@ public sealed record ListingSummary(
     bool IsTradeable,
     bool IsPinned,
     DateTime? PinnedEndDate,
+    DateTime? AutoExpiredAt,
     DateTime? PendingPurchaseRequestExpireAt,
     int? PendingPurchaseRequestRemainingSeconds,
     int InterestCount

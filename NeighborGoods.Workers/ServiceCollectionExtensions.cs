@@ -5,6 +5,7 @@ using NeighborGoods.Data;
 using NeighborGoods.Messaging;
 using NeighborGoods.Notifications;
 using NeighborGoods.Workers.Line;
+using NeighborGoods.Workers.Listings;
 using NeighborGoods.Workers.Messaging;
 using NeighborGoods.Workers.PurchaseRequests;
 
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<QuickResponderEvaluationService>();
         services.AddScoped<UnreadMessageEmailNotificationJob>();
         services.AddScoped<LinePreferencePushJob>();
+        services.AddScoped<ListingExpiryJob>();
         return services;
     }
 

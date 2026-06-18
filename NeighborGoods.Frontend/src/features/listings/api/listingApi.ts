@@ -27,6 +27,7 @@ export type ListingItem = {
   isTradeable: boolean
   isPinned: boolean
   pinnedEndDate: string | null
+  autoExpiredAt: string | null
   pendingPurchaseRequestExpireAt: string | null
   pendingPurchaseRequestRemainingSeconds: number | null
   inProgress: boolean
@@ -58,6 +59,8 @@ export type MyListingItem = {
   isTradeable: boolean
   statusCode: number
   mainImageUrl: string | null
+  listedAt: string
+  autoExpiredAt: string | null
   createdAt: string
   updatedAt: string
   /** 已接受購買請求 Id（完成態且可對應時才有） */
@@ -197,6 +200,8 @@ export type ListingDetail = {
   pinnedEndDate: string | null
   pendingPurchaseRequestExpireAt: string | null
   pendingPurchaseRequestRemainingSeconds: number | null
+  listedAt: string
+  autoExpiredAt: string | null
   createdAt: string
   updatedAt: string | null
 }
@@ -373,6 +378,20 @@ export const listingApi = {
   async changeStatus(id: string, action: ListingStatusAction): Promise<{ id: string; warning?: string | null }> {
     const response = await http.patch<ApiResponse<{ id: string; warning?: string | null }>>(
       `/api/v1/listings/${id}/${action}`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async renew(id: string): Promise<{ id: string; warning?: string | null }> {
+    const response = await http.patch<ApiResponse<{ id: string; warning?: string | null }>>(
+      `/api/v1/listings/${id}/renew`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async markSoldFromExpiry(id: string): Promise<{ id: string; warning?: string | null }> {
+    const response = await http.patch<ApiResponse<{ id: string; warning?: string | null }>>(
+      `/api/v1/listings/${id}/mark-sold-from-expiry`,
     )
     return unwrapApiResponse(response.data)
   },

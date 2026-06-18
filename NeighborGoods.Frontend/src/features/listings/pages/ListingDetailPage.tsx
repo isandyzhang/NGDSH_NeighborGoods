@@ -7,6 +7,7 @@ import { saveLineBindingPending } from '@/features/account/lineBindingSession'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
 import { SellerActivityStatus } from '@/features/seller/components/SellerActivityStatus'
 import { ListingImageCarousel } from '@/features/listings/components/ListingImageCarousel'
+import { ListingExpiredActionPanel } from '@/features/listings/components/ListingExpiredActionPanel'
 import {
   canEditListing,
   canPurchaseListing,
@@ -14,6 +15,7 @@ import {
   getListingDetailOverlay,
   getListingStatusLabel,
   getUnavailableBannerMessage,
+  isAutoExpiredListing,
   shouldShowUnavailableBanner,
 } from '@/features/listings/constants/listingStatus'
 import { ListingLineShareButton } from '@/features/listings/components/ListingLineShareButton'
@@ -150,7 +152,9 @@ export const ListingDetailPage = () => {
   const canEdit = item ? isOwnListing && canEditListing(item.statusCode) : false
   const canShare = item ? canShareListing(item.statusCode) : false
   const detailOverlay = item ? getListingDetailOverlay(item.statusCode, hasPendingPurchaseRequest) : null
-  const showUnavailableBanner = item ? shouldShowUnavailableBanner(item.statusCode) : false
+  const showExpiredPanel = !!item && isOwnListing && isAutoExpiredListing(item.statusCode, item.autoExpiredAt)
+  const showUnavailableBanner =
+    !!item && shouldShowUnavailableBanner(item.statusCode) && !showExpiredPanel
   const source = searchParams.get('from')
   const sourceConversationId = searchParams.get('conversationId')
   const shareDebugEnabled = searchParams.get('liffDebug') === '1'
@@ -428,8 +432,17 @@ export const ListingDetailPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22 }}
             >
-              <p className="text-lg font-semibold md:text-xl">{getUnavailableBannerMessage(item.statusCode)}</p>
+              <p className="text-lg font-semibold md:text-xl">
+                {getUnavailableBannerMessage(item.statusCode, item.autoExpiredAt)}
+              </p>
             </motion.div>
+          ) : null}
+          {showExpiredPanel ? (
+            <ListingExpiredActionPanel
+              className="mb-4"
+              listingId={item.id}
+              onCompleted={() => void detailQuery.refetch()}
+            />
           ) : null}
           <motion.div className="grid gap-4 lg:grid-cols-[minmax(0,0.76fr)_minmax(0,1.24fr)] lg:items-start">
             <motion.div
@@ -522,7 +535,18 @@ export const ListingDetailPage = () => {
                 <div className="space-y-3 pt-2">
                   <div className={`grid gap-3 ${isOwnListing || !canPurchase ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   {isOwnListing ? (
-                    canEdit ? (
+                    showExpiredPanel ? (
+                      <Link
+                        to={`/listings/${item.id}/edit`}
+                        className={getButtonClassName({
+                          className:
+                            'inline-flex min-h-[3.2rem] w-full items-center justify-center text-xl font-semibold md:text-2xl',
+                          variant: 'secondary',
+                        })}
+                      >
+                        修改商品
+                      </Link>
+                    ) : canEdit ? (
                     <Link
                       to={`/listings/${item.id}/edit`}
                       className={getButtonClassName({

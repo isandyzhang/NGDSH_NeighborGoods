@@ -93,7 +93,7 @@ public sealed class AccountEmailVerificationService(
                 email.Trim(),
                 "NeighborGoods 刊登前 Email 驗證碼",
                 $"您的 Email 驗證碼為：{code}（{AccountConstants.VerificationCodeExpiresInMinutes} 分鐘內有效）",
-                cancellationToken);
+                cancellationToken: cancellationToken);
         }
         catch (InvalidOperationException ex) when (ex.Message == "EMAIL_NOT_CONFIGURED")
         {

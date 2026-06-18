@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listingApi, type MyListingItem } from '@/features/listings/api/listingApi'
+import { ListingExpiredActionPanel } from '@/features/listings/components/ListingExpiredActionPanel'
 import {
   canEditListing,
+  isAutoExpiredListing,
   isTerminalListingStatus,
   LISTING_STATUS_LABEL,
 } from '@/features/listings/constants/listingStatus'
@@ -16,7 +18,7 @@ const SKELETON_CARD_COUNT = 6
 type StatusActionKey = 'inactive' | 'sold' | 'activate' | 'reactivate' | 'donated' | 'given-or-traded'
 
 const getSecondaryActions = (item: MyListingItem): { key: StatusActionKey; label: string }[] => {
-  const { statusCode, isFree, isCharity, isTradeable } = item
+  const { statusCode, isFree, isCharity, isTradeable, autoExpiredAt } = item
   const donationEligible = isFree || isCharity
   const extras: { key: StatusActionKey; label: string }[] = []
   if (donationEligible) {
@@ -32,6 +34,9 @@ const getSecondaryActions = (item: MyListingItem): { key: StatusActionKey; label
     case 1:
       return [{ key: 'activate', label: '恢復上架' }, { key: 'inactive', label: '下架' }, { key: 'sold', label: '標記已售出' }, ...extras]
     case 4:
+      if (isAutoExpiredListing(statusCode, autoExpiredAt)) {
+        return []
+      }
       return [{ key: 'reactivate', label: '重新上架' }]
     default:
       return []
@@ -105,6 +110,11 @@ export const MyListingsPage = () => {
     }
   }, [])
 
+  const refreshList = async () => {
+    const refreshed = await listingApi.listMine(1, 50)
+    setItems(refreshed.items)
+  }
+
   const handleStatusAction = async (listingId: string, action: StatusActionKey) => {
     setBusyItemId(listingId)
     setError(null)
@@ -113,8 +123,7 @@ export const MyListingsPage = () => {
       if (result.warning) {
         setError(result.warning)
       }
-      const refreshed = await listingApi.listMine(1, 50)
-      setItems(refreshed.items)
+      await refreshList()
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '更新商品狀態失敗')
     } finally {
@@ -187,6 +196,10 @@ export const MyListingsPage = () => {
           <section className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
             {items.map((item, index) => {
               const actions = getSecondaryActions(item)
+              const showExpiredPanel = isAutoExpiredListing(item.statusCode, item.autoExpiredAt)
+              const statusLabel = showExpiredPanel
+                ? '非活躍'
+                : (LISTING_STATUS_LABEL[item.statusCode] ?? `狀態 ${item.statusCode}`)
               const editButtonClass =
                 'inline-flex min-h-[3.2rem] w-full items-center justify-center rounded-xl border-[#D8C0A3] bg-[#F3E7D8] px-1 py-1 text-xl font-semibold leading-tight hover:bg-[#EBD9C3]'
 
@@ -209,7 +222,7 @@ export const MyListingsPage = () => {
                     </span>
                   </div>
                   <p className="text-lg text-text-subtle">
-                    狀態：{LISTING_STATUS_LABEL[item.statusCode] ?? `狀態 ${item.statusCode}`}
+                    狀態：{statusLabel}
                   </p>
 
                   {isTerminalListingStatus(item.statusCode) ? (
@@ -247,6 +260,14 @@ export const MyListingsPage = () => {
                   ) : null}
 
                   <div className="grid grid-cols-1 gap-2 pt-1">
+                    {showExpiredPanel ? (
+                      <ListingExpiredActionPanel
+                        listingId={item.id}
+                        disabled={busyItemId === item.id}
+                        onCompleted={() => void refreshList()}
+                        className="text-left"
+                      />
+                    ) : null}
                     {canEditListing(item.statusCode) ? (
                       <Link
                         to={`/listings/${item.id}/edit`}

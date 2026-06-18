@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Rocket } from 'lucide-react'
 import { type ListingItem } from '@/features/listings/api/listingApi'
-import { canPurchaseListing, LISTING_STATUS } from '@/features/listings/constants/listingStatus'
+import { canPurchaseListing, LISTING_STATUS, isAutoExpiredListing, isEffectivelyPinned } from '@/features/listings/constants/listingStatus'
 import { Button } from '@/shared/ui/Button'
 
 const formatPrice = (item: ListingItem) => {
@@ -81,6 +81,8 @@ export const ListingGridCard = memo(({
       hasPendingPurchaseRequest,
       hasInProgressTrade,
     })
+  const showPinnedBadge = isEffectivelyPinned(item.isPinned, item.pinnedEndDate, countdownNowMs)
+  const showInactiveBadge = isAutoExpiredListing(item.statusCode, item.autoExpiredAt)
 
   return (
     <motion.div
@@ -99,11 +101,15 @@ export const ListingGridCard = memo(({
       }}
     >
       <div className="flex h-full flex-col gap-2">
-        <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+        <div className={`flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-soft${showInactiveBadge ? ' opacity-75' : ''}`}>
           <div className="relative aspect-square overflow-hidden">
-            {item.isPinned ? (
+            {showPinnedBadge ? (
               <div className="absolute left-2 top-2 z-10">
                 <span className="rounded-full bg-[#D64545] px-2.5 py-1 text-xs font-semibold text-white">置頂中</span>
+              </div>
+            ) : showInactiveBadge ? (
+              <div className="absolute left-2 top-2 z-10">
+                <span className="rounded-full bg-gray-400/80 px-2.5 py-1 text-xs font-semibold text-white">非活躍</span>
               </div>
             ) : null}
             <div className="absolute right-2 top-2 z-10">

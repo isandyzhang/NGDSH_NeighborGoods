@@ -25,6 +25,9 @@ public sealed class Listing
     public DateTime? PinnedEndDate { get; set; }
     public DateTime? PinnedStartDate { get; set; }
     public int Status { get; set; }
+    public DateTime ListedAt { get; set; }
+    public DateTime? AutoExpiredAt { get; set; }
+    public DateTime? ExpiryNoticeSentAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

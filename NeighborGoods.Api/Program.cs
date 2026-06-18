@@ -47,6 +47,7 @@ builder.Services.AddScoped<ListingCommandService>();
 builder.Services.AddScoped<ListingConversationNotifyService>();
 builder.Services.AddScoped<ListingTopPinService>();
 builder.Services.AddScoped<ListingStatusService>();
+builder.Services.AddScoped<ListingRenewalService>();
 builder.Services.AddScoped<ListingFavoriteService>();
 builder.Services.AddScoped<MessagingQueryService>();
 builder.Services.AddScoped<AdminConversationQueryService>();

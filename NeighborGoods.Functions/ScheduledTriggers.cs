@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NeighborGoods.Workers.Line;
+using NeighborGoods.Workers.Listings;
 using NeighborGoods.Workers.Messaging;
 using NeighborGoods.Workers.PurchaseRequests;
 
@@ -67,6 +68,27 @@ public sealed class ScheduledTriggers(
         catch (Exception ex)
         {
             logger.LogError(ex, "{Function} failed.", nameof(PurchaseRequestExpirationTimer));
+        }
+    }
+
+    [Function(nameof(ListingExpiryTimer))]
+    public async Task ListingExpiryTimer(
+        [TimerTrigger("0 0 */1 * * *")] TimerInfo timerInfo,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var processed = await scope.ServiceProvider.GetRequiredService<ListingExpiryJob>()
+                .RunOnceAsync(cancellationToken);
+            if (processed > 0)
+            {
+                logger.LogInformation("ListingExpiry timer: processed={Processed}", processed);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "{Function} failed.", nameof(ListingExpiryTimer));
         }
     }
 

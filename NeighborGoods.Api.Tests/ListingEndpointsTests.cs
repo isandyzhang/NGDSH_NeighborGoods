@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NeighborGoods.Api.Features.Listing.Services;
 using NeighborGoods.Data;
 using NeighborGoods.Data.LegacyEntities;
+using NeighborGoods.Data.Listings;
 
 namespace NeighborGoods.Api.Tests;
 
@@ -1205,6 +1206,110 @@ public sealed class ListingEndpointsTests
     }
 
     [Fact]
+    public async Task PatchRenew_FromInactive_ReturnsOkAndClearsAutoExpiredAt()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(client, "延續刊登測試");
+        await SetListingAutoExpiredAsync(factory, id);
+
+        var response = await client.PatchAsync($"/api/v1/listings/{id}/renew", content: null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var get = await client.GetAsync($"/api/v1/listings/{id}");
+        var data = (await get.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.Equal(0, data.GetProperty("statusCode").GetInt32());
+        Assert.True(data.TryGetProperty("autoExpiredAt", out var autoExpired) && autoExpired.ValueKind == JsonValueKind.Null);
+        Assert.True(data.TryGetProperty("listedAt", out var listedAt) && listedAt.ValueKind != JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task PatchRenew_FromActive_ReturnsBadRequest()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(client, "延續刊登擋錯");
+
+        var response = await client.PatchAsync($"/api/v1/listings/{id}/renew", content: null);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("LISTING_RENEW_NOT_ALLOWED", body.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task PatchRenew_AsNonOwner_ReturnsForbidden()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var ownerClient = factory.CreateClient();
+        using var otherClient = factory.CreateClient();
+        await AuthenticateAsAsync(ownerClient, ConfirmedUserName, UserPassword);
+        await AuthenticateAsAsync(otherClient, ListingApiFactory.OtherConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(ownerClient, "延續刊登權限");
+        await SetListingAutoExpiredAsync(factory, id);
+
+        var response = await otherClient.PatchAsync($"/api/v1/listings/{id}/renew", content: null);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchMarkSoldFromExpiry_WhenAutoExpired_ReturnsOkAndSold()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(client, "到期標成交測試");
+        await SetListingAutoExpiredAsync(factory, id);
+
+        var response = await client.PatchAsync($"/api/v1/listings/{id}/mark-sold-from-expiry", content: null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var get = await client.GetAsync($"/api/v1/listings/{id}");
+        var data = (await get.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.Equal(2, data.GetProperty("statusCode").GetInt32());
+        Assert.True(data.TryGetProperty("autoExpiredAt", out var autoExpired) && autoExpired.ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task PatchMarkSoldFromExpiry_WhenManualInactive_ReturnsBadRequest()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(client, "手動下架不可標成交");
+        await client.PatchAsync($"/api/v1/listings/{id}/inactive", content: null);
+
+        var response = await client.PatchAsync($"/api/v1/listings/{id}/mark-sold-from-expiry", content: null);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            "LISTING_MARK_SOLD_FROM_EXPIRY_NOT_ALLOWED",
+            body.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GetListingById_WhenTopPinExpired_ReturnsIsPinnedFalse()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
+
+        var id = await CreateListingAsync(client, "置頂到期回傳測試");
+        await SetListingExpiredTopPinAsync(factory, id);
+
+        var response = await client.GetAsync($"/api/v1/listings/{id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var data = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.False(data.GetProperty("isPinned").GetBoolean());
+    }
+
+    [Fact]
     public async Task PostTopPin_SetsPinnedAndDecrementsCredits()
     {
         using var factory = new ListingApiFactory(_fixture.ConnectionString);
@@ -1302,6 +1407,29 @@ public sealed class ListingEndpointsTests
         var detail = await client.GetAsync($"/api/v1/listings/{id}");
         var detailBody = await detail.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(1, detailBody.GetProperty("data").GetProperty("imageUrls").GetArrayLength());
+    }
+
+    private static async Task SetListingAutoExpiredAsync(ListingApiFactory factory, Guid id)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var entity = await db.Listings.FirstAsync(x => x.Id == id);
+        var now = DateTime.UtcNow;
+        entity.Status = (int)ListingStatus.Inactive;
+        entity.AutoExpiredAt = now;
+        entity.ListedAt = now.AddDays(-15);
+        entity.UpdatedAt = now;
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SetListingExpiredTopPinAsync(ListingApiFactory factory, Guid id)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var entity = await db.Listings.FirstAsync(x => x.Id == id);
+        entity.IsPinned = true;
+        entity.PinnedEndDate = DateTime.UtcNow.AddDays(-1);
+        await db.SaveChangesAsync();
     }
 
     private static async Task<int> GetTopPinCreditsAsync(ListingApiFactory factory, string userId)

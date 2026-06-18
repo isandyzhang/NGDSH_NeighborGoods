@@ -18,6 +18,7 @@ public sealed record ListingListItemDto(
     bool IsTradeable,
     bool IsPinned,
     DateTime? PinnedEndDate,
+    DateTime? AutoExpiredAt,
     DateTime? PendingPurchaseRequestExpireAt,
     int? PendingPurchaseRequestRemainingSeconds,
     bool InProgress,

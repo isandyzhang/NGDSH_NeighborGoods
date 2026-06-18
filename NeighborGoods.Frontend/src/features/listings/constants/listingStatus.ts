@@ -67,7 +67,41 @@ export const getListingDetailOverlay = (
 export const shouldShowUnavailableBanner = (statusCode: number) =>
   statusCode !== LISTING_STATUS.Active
 
-export const getUnavailableBannerMessage = (statusCode: number): string => {
+export const canShareListing = (statusCode: number) => statusCode === LISTING_STATUS.Active
+
+const parseApiDateToMs = (value: string | null | undefined) => {
+  if (!value) {
+    return null
+  }
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  const normalized = hasTimezone ? value : `${value}Z`
+  const parsed = Date.parse(normalized)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+export const isEffectivelyPinned = (
+  isPinned: boolean,
+  pinnedEndDate: string | null | undefined,
+  nowMs = Date.now(),
+) => {
+  if (!isPinned) {
+    return false
+  }
+  const endMs = parseApiDateToMs(pinnedEndDate ?? null)
+  return endMs != null && endMs >= nowMs
+}
+
+export const isAutoExpiredListing = (statusCode: number, autoExpiredAt: string | null | undefined) =>
+  statusCode === LISTING_STATUS.Inactive && autoExpiredAt != null && autoExpiredAt !== ''
+
+export const getUnavailableBannerMessage = (
+  statusCode: number,
+  autoExpiredAt?: string | null,
+): string => {
+  if (isAutoExpiredListing(statusCode, autoExpiredAt)) {
+    return '此商品目前非活躍，暫停交易中。'
+  }
+
   switch (statusCode) {
     case LISTING_STATUS.Reserved:
       return '此商品目前保留中，暫時無法購買。'
@@ -83,5 +117,3 @@ export const getUnavailableBannerMessage = (statusCode: number): string => {
       return '此商品目前無法購買。'
   }
 }
-
-export const canShareListing = (statusCode: number) => statusCode === LISTING_STATUS.Active

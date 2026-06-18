@@ -86,7 +86,7 @@ public sealed class AccountRegistrationService(
                 email.Trim(),
                 "NeighborGoods 註冊驗證碼",
                 $"您的註冊驗證碼為：{code}（{AccountConstants.VerificationCodeExpiresInMinutes} 分鐘內有效）",
-                cancellationToken);
+                cancellationToken: cancellationToken);
         }
         catch (InvalidOperationException ex) when (ex.Message == "EMAIL_NOT_CONFIGURED")
         {

@@ -575,6 +575,46 @@ public static class ListingEndpoints
         .WithSummary("重新上架（僅已下架）")
         .RequireAuthorization();
 
+        app.MapPatch("/api/v1/listings/{id:guid}/renew", async (
+            HttpContext httpContext,
+            ListingRenewalService service,
+            Guid id,
+            CancellationToken ct = default) =>
+        {
+            try
+            {
+                var outcome = await service.RenewAsync(id, ct);
+                return ToStatusActionResult(outcome, id, httpContext);
+            }
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
+        })
+        .WithName("RenewListingV1")
+        .WithSummary("延續刊登（14 天到期非活躍商品）")
+        .RequireAuthorization();
+
+        app.MapPatch("/api/v1/listings/{id:guid}/mark-sold-from-expiry", async (
+            HttpContext httpContext,
+            ListingRenewalService service,
+            Guid id,
+            CancellationToken ct = default) =>
+        {
+            try
+            {
+                var outcome = await service.MarkSoldFromAutoExpiredAsync(id, ct);
+                return ToStatusActionResult(outcome, id, httpContext);
+            }
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
+        })
+        .WithName("MarkSoldFromExpiryListingV1")
+        .WithSummary("標記已成交（僅系統到期非活躍商品）")
+        .RequireAuthorization();
+
         app.MapPost("/api/v1/listings/{id:guid}/top-pin", async (
             HttpContext httpContext,
             ListingTopPinService service,
@@ -733,6 +773,16 @@ public static class ListingEndpoints
                 Results.BadRequest(ApiResponseFactory.Error(
                     "LISTING_MAX_ACTIVE_REACHED",
                     $"您目前已有 {ListingConstants.MaxActiveListingsPerUser} 個刊登中的商品，請先下架或售出部分商品後再重新上架",
+                    httpContext)),
+            ListingStatusChangeResult.RenewInvalidState =>
+                Results.BadRequest(ApiResponseFactory.Error(
+                    "LISTING_RENEW_NOT_ALLOWED",
+                    "只有已下架的商品才能延續刊登",
+                    httpContext)),
+            ListingStatusChangeResult.MarkSoldFromExpiryInvalidState =>
+                Results.BadRequest(ApiResponseFactory.Error(
+                    "LISTING_MARK_SOLD_FROM_EXPIRY_NOT_ALLOWED",
+                    "只有因刊登到期而下架的商品才能使用此操作",
                     httpContext)),
             _ =>
                 Results.BadRequest(ApiResponseFactory.Error("VALIDATION_ERROR", "狀態操作失敗", httpContext))

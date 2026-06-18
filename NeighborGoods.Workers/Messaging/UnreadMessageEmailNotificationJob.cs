@@ -142,7 +142,7 @@ public sealed class UnreadMessageEmailNotificationJob(
                     userEmail,
                     "你有未讀訊息",
                     $"你有尚未讀取的新訊息。\n\n請點擊此連結查看：{chatUrl}",
-                    cancellationToken);
+                    cancellationToken: cancellationToken);
 
                 var user = await dbContext.AspNetUsers.FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
                 if (user != null)

@@ -6,6 +6,7 @@ using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Contracts;
 using NeighborGoods.Data;
 using NeighborGoods.Api.Shared.Security;
+using NeighborGoods.Data.Listings;
 
 namespace NeighborGoods.Api.Features.Listing.Services;
 
@@ -102,11 +103,13 @@ public sealed class ListingQueryService(
             listing.IsFree,
             listing.IsCharity,
             listing.IsTradeable,
-            listing.IsPinned,
+            ListingTopPinRules.IsEffectivelyPinned(listing.IsPinned, listing.PinnedEndDate, now),
             listing.PinnedStartDate,
             listing.PinnedEndDate,
             pendingSummary?.ExpireAt,
             pendingSummary?.RemainingSeconds,
+            listing.ListedAt,
+            listing.AutoExpiredAt,
             listing.CreatedAt,
             listing.UpdatedAt);
     }
@@ -127,9 +130,12 @@ public sealed class ListingQueryService(
 
         var active = (int)ListingStatus.Active;
         var reserved = (int)ListingStatus.Reserved;
+        var inactive = (int)ListingStatus.Inactive;
 
         var queryable = dbContext.Listings
-            .Where(x => x.Status == active || x.Status == reserved);
+            .Where(x => x.Status == active
+                || x.Status == reserved
+                || (x.Status == inactive && x.AutoExpiredAt != null));
 
         if (!string.IsNullOrWhiteSpace(request.ExcludeUserId))
         {
@@ -204,8 +210,13 @@ public sealed class ListingQueryService(
 
         var todayUtc = DateTime.UtcNow.Date;
         queryable = queryable
-            .OrderByDescending(x => x.IsPinned && x.PinnedEndDate.HasValue && x.PinnedEndDate.Value.Date >= todayUtc)
-            .ThenByDescending(x => x.CreatedAt);
+            .OrderByDescending(x => x.Status == active || x.Status == reserved)
+            .ThenByDescending(x =>
+                (x.Status == active || x.Status == reserved)
+                && x.IsPinned
+                && x.PinnedEndDate.HasValue
+                && x.PinnedEndDate.Value.Date >= todayUtc)
+            .ThenByDescending(x => x.ListedAt);
 
         var total = await queryable.CountAsync(cancellationToken);
         var listings = await queryable
@@ -231,6 +242,7 @@ public sealed class ListingQueryService(
                 x.IsTradeable,
                 x.IsPinned,
                 x.PinnedEndDate,
+                x.AutoExpiredAt,
                 null,
                 null,
                 dbContext.Conversations.Count(c => c.ListingId == x.Id)))
@@ -261,6 +273,10 @@ public sealed class ListingQueryService(
                 var hasInProgressStage = inProgressStageMap.TryGetValue(x.Id, out var inProgressStage);
                 int? inProgressStageValue = hasInProgressStage ? inProgressStage : null;
                 favoriteCountMap.TryGetValue(x.Id, out var favoriteCount);
+                var effectivePinned = ListingTopPinRules.IsEffectivelyPinned(
+                    x.IsPinned,
+                    x.PinnedEndDate,
+                    now);
                 return new ListingListItemDto(
                     x.Id,
                     new ListingListSellerInfoDto(
@@ -284,8 +300,9 @@ public sealed class ListingQueryService(
                     x.IsFree,
                     x.IsCharity,
                     x.IsTradeable,
-                    x.IsPinned,
+                    effectivePinned,
                     x.PinnedEndDate,
+                    x.AutoExpiredAt,
                     pendingSummary?.ExpireAt,
                     pendingSummary?.RemainingSeconds,
                     hasInProgressStage,
@@ -310,7 +327,7 @@ public sealed class ListingQueryService(
 
         var queryable = dbContext.Listings
             .Where(x => x.SellerId == sellerId)
-            .OrderByDescending(x => x.CreatedAt);
+            .OrderByDescending(x => x.ListedAt);
 
         var total = await queryable.CountAsync(cancellationToken);
         var rows = await queryable
@@ -326,6 +343,8 @@ public sealed class ListingQueryService(
                 x.IsCharity,
                 x.IsTradeable,
                 x.Status,
+                x.ListedAt,
+                x.AutoExpiredAt,
                 x.CreatedAt,
                 x.UpdatedAt
             })
@@ -417,6 +436,8 @@ public sealed class ListingQueryService(
                     x.IsTradeable,
                     x.Status,
                     coverImageMap.GetValueOrDefault(x.Id),
+                    x.ListedAt,
+                    x.AutoExpiredAt,
                     x.CreatedAt,
                     x.UpdatedAt,
                     extra?.PurchaseRequestId,
@@ -471,7 +492,7 @@ public sealed class ListingQueryService(
         var queryable = dbContext.Listings
             .AsNoTracking()
             .Where(x => x.SellerId == sellerId && visibleStatuses.Contains(x.Status))
-            .OrderByDescending(x => x.CreatedAt);
+            .OrderByDescending(x => x.ListedAt);
 
         var total = await queryable.CountAsync(cancellationToken);
         var rows = await queryable

@@ -9,5 +9,7 @@ public enum ListingStatusChangeResult
     InvalidDonatedListingType = 4,
     InvalidTradeListingType = 5,
     ReactivateInvalidState = 6,
-    MaxActiveListingsReached = 7
+    MaxActiveListingsReached = 7,
+    RenewInvalidState = 8,
+    MarkSoldFromExpiryInvalidState = 9
 }

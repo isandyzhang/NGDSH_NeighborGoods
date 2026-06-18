@@ -13,6 +13,7 @@ internal sealed class FakeEmailSender : IEmailSender
         string toEmail,
         string subject,
         string plainTextContent,
+        string? htmlContent = null,
         CancellationToken cancellationToken = default)
     {
         var code = ExtractCode(plainTextContent);

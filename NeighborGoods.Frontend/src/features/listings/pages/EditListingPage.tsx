@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
 import { listingApi, type ListingMutationPayload } from '@/features/listings/api/listingApi'
+import { ListingExpiredActionPanel } from '@/features/listings/components/ListingExpiredActionPanel'
+import { isAutoExpiredListing, isEffectivelyPinned } from '@/features/listings/constants/listingStatus'
 import { TOP_PIN_FOCUS_QUERY } from '@/features/listings/constants/topPin'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { ApiClientError } from '@/shared/types/api'
@@ -27,6 +29,8 @@ export const EditListingPage = () => {
   const [topPinCredits, setTopPinCredits] = useState<number>(0)
   const [isPinned, setIsPinned] = useState(false)
   const [pinnedEndDate, setPinnedEndDate] = useState<string | null>(null)
+  const [statusCode, setStatusCode] = useState<number | null>(null)
+  const [autoExpiredAt, setAutoExpiredAt] = useState<string | null>(null)
   const [topPinBusy, setTopPinBusy] = useState(false)
   const [topPinHighlighted, setTopPinHighlighted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +100,8 @@ export const EditListingPage = () => {
         setTopPinCredits(me.statistics.topPinCredits)
         setIsPinned(detail.isPinned)
         setPinnedEndDate(detail.pinnedEndDate)
+        setStatusCode(detail.statusCode)
+        setAutoExpiredAt(detail.autoExpiredAt ?? null)
       })
       .catch((err: unknown) => {
         if (!disposed) {
@@ -201,6 +207,21 @@ export const EditListingPage = () => {
     )
   }
 
+  const effectivePinned = isEffectivelyPinned(isPinned, pinnedEndDate)
+  const showExpiredPanel =
+    statusCode != null && isAutoExpiredListing(statusCode, autoExpiredAt)
+
+  const reloadDetail = async () => {
+    if (!id) {
+      return
+    }
+    const detail = await listingApi.getById(id)
+    setStatusCode(detail.statusCode)
+    setAutoExpiredAt(detail.autoExpiredAt ?? null)
+    setIsPinned(detail.isPinned)
+    setPinnedEndDate(detail.pinnedEndDate)
+  }
+
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 md:py-8">
       <div className="mb-4">
@@ -218,6 +239,9 @@ export const EditListingPage = () => {
       <Card>
         {form ? (
           <form className="space-y-5" onSubmit={handleSubmit}>
+            {showExpiredPanel ? (
+              <ListingExpiredActionPanel listingId={id} onCompleted={() => void reloadDetail()} />
+            ) : null}
             <Input
               label="標題"
               value={form.title}
@@ -373,7 +397,7 @@ export const EditListingPage = () => {
                 <h2 className="text-[1.45rem] font-bold leading-tight text-text-main">新增置頂功能區</h2>
                 <p className="text-base text-text-subtle">每次使用 1 次置頂，商品可置頂 7 天，讓曝光更穩定。</p>
                 <p className="text-sm text-text-muted">可用置頂次數：{topPinCredits}</p>
-                {isPinned ? (
+                {effectivePinned ? (
                   <p className="text-sm font-semibold text-[#8A6B45]">
                     目前狀態：置頂中{pinnedEndDate ? `（到期：${new Date(pinnedEndDate).toLocaleString()}）` : ''}
                   </p>
@@ -384,10 +408,10 @@ export const EditListingPage = () => {
               <Button
                 type="button"
                 onClick={() => void handleUseTopPin()}
-                disabled={topPinBusy || isPinned}
+                disabled={topPinBusy || effectivePinned}
                 className="min-h-[3rem] px-5 font-semibold"
               >
-                {isPinned ? '目前已置頂' : topPinBusy ? '處理中...' : '使用 1 次置頂（7 天）'}
+                {effectivePinned ? '目前已置頂' : topPinBusy ? '處理中...' : '使用 1 次置頂（7 天）'}
               </Button>
             </section>
 

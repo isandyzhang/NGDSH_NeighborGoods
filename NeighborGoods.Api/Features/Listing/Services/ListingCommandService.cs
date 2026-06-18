@@ -347,6 +347,7 @@ public sealed class ListingCommandService(
             IsTradeable = request.IsTradeable,
             IsPinned = false,
             Status = active,
+            ListedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         };

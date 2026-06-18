@@ -25,6 +25,8 @@ public sealed record ListingDetailDto(
     DateTime? PinnedEndDate,
     DateTime? PendingPurchaseRequestExpireAt,
     int? PendingPurchaseRequestRemainingSeconds,
+    DateTime ListedAt,
+    DateTime? AutoExpiredAt,
     DateTime CreatedAt,
     DateTime? UpdatedAt
 );

@@ -14,6 +14,7 @@ public sealed class AcsEmailSender(
         string toEmail,
         string subject,
         string plainTextContent,
+        string? htmlContent = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_options.ConnectionString) ||
@@ -29,6 +30,10 @@ public sealed class AcsEmailSender(
             {
                 PlainText = plainTextContent
             };
+            if (!string.IsNullOrWhiteSpace(htmlContent))
+            {
+                emailContent.Html = htmlContent;
+            }
             var recipients = new EmailRecipients([new EmailAddress(toEmail)]);
             var message = new EmailMessage(_options.FromEmailAddress, recipients, emailContent);
             await emailClient.SendAsync(WaitUntil.Started, message, cancellationToken);
