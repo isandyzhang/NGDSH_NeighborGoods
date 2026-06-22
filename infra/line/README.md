@@ -19,12 +19,12 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 ## Actions configured in this script
 
 - Row 1, Area 1: open listings entry (`uri`)
-  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all four URI areas use path links `liff.line.me/{LiffId}/listings` etc.
+  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), URI areas for listings/create/favorites use path links `liff.line.me/{LiffId}/listings` etc.
   - Otherwise fallback to `$WebBaseUrl` + path
 - Row 1, Area 2: postback `action=myListings`
 - Row 1, Area 3: postback `action=myMessages`
 - Row 2, Area 1: open `$WebBaseUrl/listings/create` (`uri`)
-- Row 2, Area 2: open `$WebBaseUrl/account` (`uri`, or LIFF path `/account`)
+- Row 2, Area 2: open LINE group invite (`uri`) — `https://line.me/ti/g/gZrLPpCtDH`
 - Row 2, Area 3: open `$WebBaseUrl/favorites` (`uri`)
 
 Postback values are aligned with current backend webhook routing.
@@ -101,8 +101,8 @@ How to run:
    - Environment: `production`
    - Assign to all users: `true`
    - Delete old default rich menu: `true`
-   - Image path: `infra/line/menu.jpg`
-   - Image content type: `image/jpeg`
+   - Image path: `infra/line/menu.png`
+   - Image content type: `image/png`
 
 Required GitHub Actions secrets (set in `production` Environment):
 

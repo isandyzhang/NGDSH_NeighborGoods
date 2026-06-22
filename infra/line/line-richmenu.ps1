@@ -118,7 +118,7 @@ function Build-RichMenuDefinition {
     [string]$BarText,
     [string]$ListingsUrl,
     [string]$CreateListingUrl,
-    [string]$AccountUrl,
+    [string]$GroupInviteUrl,
     [string]$FavoritesUrl
   )
 
@@ -167,7 +167,7 @@ function Build-RichMenuDefinition {
         bounds = @{ x = 833; y = 843; width = 834; height = 843 }
         action = @{
           type = "uri"
-          uri = $AccountUrl
+          uri = $GroupInviteUrl
         }
       },
       @{
@@ -195,7 +195,7 @@ Write-Host "[1/4] Creating rich menu..."
 $trimmedLiffUrl = $LiffUrl.Trim()
 $listingsUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings"
 $createListingUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings/create"
-$accountUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/account"
+$groupInviteUrl = "https://line.me/ti/g/gZrLPpCtDH"
 $favoritesUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/favorites"
 if ([string]::IsNullOrWhiteSpace($trimmedLiffUrl)) {
   Write-Warning "LiffUrl not set; rich menu URI actions use WebBaseUrl only (LIFF init may fail in LINE in-app browser)."
@@ -209,7 +209,7 @@ $definition = Build-RichMenuDefinition `
   -BarText $ChatBarText `
   -ListingsUrl $listingsUrl `
   -CreateListingUrl $createListingUrl `
-  -AccountUrl $accountUrl `
+  -GroupInviteUrl $groupInviteUrl `
   -FavoritesUrl $favoritesUrl
 $createResponse = Invoke-LineApiJson -Method "POST" -Uri "$apiBase/richmenu" -Body $definition
 $newRichMenuId = [string]$createResponse.richMenuId
