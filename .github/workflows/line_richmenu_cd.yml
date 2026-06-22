@@ -17,7 +17,12 @@ jobs:
       - name: Validate rich menu image exists
         shell: bash
         run: |
-          test -f "infra/line/menu.png"
+          test -f "infra/line/menu.jpg"
+          size=$(stat -c%s "infra/line/menu.jpg")
+          if [ "$size" -gt 1048576 ]; then
+            echo "menu.jpg is ${size} bytes; LINE Messaging API max is 1 MB (1048576 bytes)."
+            exit 1
+          fi
 
       - name: Run LINE rich menu deployment script
         shell: pwsh
@@ -33,10 +38,10 @@ jobs:
 
           pwsh "./infra/line/line-richmenu.ps1" `
             -ChannelAccessToken "$env:LINE_CHANNEL_ACCESS_TOKEN" `
-            -RichMenuImagePath "./infra/line/menu.png" `
+            -RichMenuImagePath "./infra/line/menu.jpg" `
             -WebBaseUrl "$env:LINE_WEB_BASE_URL" `
             -LiffUrl "$env:LINE_LIFF_URL" `
-            -ImageContentType "image/png" `
+            -ImageContentType "image/jpeg" `
             -RichMenuName "$richMenuName" `
             -ChatBarText "$chatBarText" `
             -AssignToAllUsers:$true `

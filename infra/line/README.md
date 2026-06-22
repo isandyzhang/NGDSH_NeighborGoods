@@ -10,8 +10,9 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 
 - A valid LINE Messaging API channel access token
 - PowerShell 7+ (recommended)
-- A rich menu image in supported size/format
+  - Rich menu image in supported size/format
   - Script uses full-size 6-area layout: `2500x1686` (2 rows x 3 columns)
+  - Messaging API max file size: **1 MB** (management console allows larger files)
   - Content type must match file:
     - PNG: `image/png`
     - JPG/JPEG: `image/jpeg`
@@ -101,8 +102,8 @@ How to run:
    - Environment: `production`
    - Assign to all users: `true`
    - Delete old default rich menu: `true`
-   - Image path: `infra/line/menu.png`
-   - Image content type: `image/png`
+   - Image path: `infra/line/menu.jpg`
+   - Image content type: `image/jpeg`
 
 Required GitHub Actions secrets (set in `production` Environment):
 
