@@ -41,6 +41,16 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
         var createdAt = data.GetProperty("createdAt").GetDateTime();
         var diff = expireAt - createdAt;
         Assert.True(diff.TotalHours is > 11.9 and < 12.1);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var conversationId = data.GetProperty("conversationId").GetGuid();
+        var systemMessage = await db.Messages
+            .Where(x => x.ConversationId == conversationId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => x.Content)
+            .FirstAsync();
+        Assert.Equal("[系統發送]買家已送出購買請求，請於 12 小時內回覆。", systemMessage);
     }
 
     [Fact]
@@ -57,7 +67,9 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         var body = await second.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("PURCHASE_REQUEST_ALREADY_PENDING", body.GetProperty("error").GetProperty("code").GetString());
+        var error = body.GetProperty("error");
+        Assert.Equal("PURCHASE_REQUEST_ALREADY_PENDING", error.GetProperty("code").GetString());
+        Assert.Equal("此商品已有待回覆的交易請求", error.GetProperty("message").GetString());
     }
 
     [Fact]
