@@ -369,8 +369,37 @@ const safeSharePickerAvailable = (liff: { isApiAvailable: (api: string) => boole
   }
 }
 
+type LiffClient = import('@line/liff').Liff
+
+/** 單例 liff.init；一律傳入 liffId，已初始化時視為成功（對齊 LineNotifyLiffPage） */
+const runLiffInitOnce = async (liff: LiffClient, liffId: string): Promise<boolean> => {
+  const trimmed = liffId.trim()
+  if (!trimmed) {
+    return false
+  }
+
+  if (!liffReadyPromise) {
+    liffReadyPromise = (async () => {
+      try {
+        await liff.init({ liffId: trimmed })
+        return true
+      } catch (err) {
+        try {
+          liff.getVersion()
+          return true
+        } catch {
+          console.warn('[liff] init failed', err)
+          return false
+        }
+      }
+    })()
+  }
+
+  return liffReadyPromise
+}
+
 export const ensureLiffReady = async () => {
-  const liffId = getLineLiffId()
+  const liffId = getLineLiffId()?.trim()
   if (!liffId) {
     return null
   }
@@ -388,13 +417,7 @@ export const ensureLiffReady = async () => {
     }
   }
 
-  if (!liffReadyPromise) {
-    liffReadyPromise = liff
-      .init({ liffId })
-      .then(() => true)
-      .catch(() => false)
-  }
-  const ok = await liffReadyPromise
+  const ok = await runLiffInitOnce(liff, liffId)
   if (!ok) {
     resetLiffReadyCache()
     return null
@@ -501,8 +524,22 @@ export const testLiffInitOnCurrentPage = async (): Promise<ListingPageLiffInitTe
   }
 }
 
-/** 分享頁專用：共用 ensureLiffReady 單例 init，避免與 LiffShareBootstrap 重複 liff.init() 失敗 */
-export const initLiffForFlexShare = () => ensureLiffReady()
+/** 分享頁：一律走 runLiffInitOnce 傳入 liffId（不僅靠 getVersion 提早返回） */
+export const initLiffForFlexShare = async () => {
+  const liffId = getLineLiffId()?.trim()
+  if (!liffId || !isLiffEndpointPath()) {
+    return null
+  }
+
+  const liffMod = await import('@line/liff')
+  const liff = liffMod.default
+  const ok = await runLiffInitOnce(liff, liffId)
+  if (!ok) {
+    resetLiffReadyCache()
+    return null
+  }
+  return liff
+}
 
 const openLineUrlShareWindow = (shareUrl: string) => {
   window.open(shareUrl, '_blank', 'noopener,noreferrer')
