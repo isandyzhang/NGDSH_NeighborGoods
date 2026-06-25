@@ -18,11 +18,6 @@ jobs:
         shell: bash
         run: |
           test -f "infra/line/menu.jpg"
-          size=$(stat -c%s "infra/line/menu.jpg")
-          if [ "$size" -gt 1048576 ]; then
-            echo "menu.jpg is ${size} bytes; LINE Messaging API max is 1 MB (1048576 bytes)."
-            exit 1
-          fi
 
       - name: Run LINE rich menu deployment script
         shell: pwsh

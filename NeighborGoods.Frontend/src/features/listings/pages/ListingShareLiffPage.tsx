@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   clearListingSharePending,
-  isListingShareUrlReady,
   resolveListingShareParams,
 } from '@/features/listings/listingShareSession'
 import { shareListingToLineFlexOnly } from '@/features/listings/utils/lineShare'
@@ -16,25 +15,14 @@ export const ListingShareLiffPage = () => {
   const [phase, setPhase] = useState<SharePhase>('loading')
   const [message, setMessage] = useState('準備分享中…')
 
-  const shareUrlReady = useMemo(
-    () => isListingShareUrlReady(location.pathname, location.search),
-    [location.pathname, location.search],
-  )
-
   const shareParams = useMemo(
-    () => (shareUrlReady ? resolveListingShareParams(location.search) : null),
-    [location.search, shareUrlReady],
+    () => resolveListingShareParams(location.search),
+    [location.search],
   )
 
   const returnTo = shareParams?.returnTo ?? '/listings'
 
   useEffect(() => {
-    if (!shareUrlReady) {
-      setPhase('loading')
-      setMessage('準備分享中…')
-      return
-    }
-
     let disposed = false
 
     void (async () => {
@@ -99,7 +87,7 @@ export const ListingShareLiffPage = () => {
     return () => {
       disposed = true
     }
-  }, [shareParams, shareUrlReady])
+  }, [shareParams])
 
   return (
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 px-4 py-8">

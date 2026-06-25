@@ -10,9 +10,8 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 
 - A valid LINE Messaging API channel access token
 - PowerShell 7+ (recommended)
-  - Rich menu image in supported size/format
+- A rich menu image in supported size/format
   - Script uses full-size 6-area layout: `2500x1686` (2 rows x 3 columns)
-  - Messaging API max file size: **1 MB** (management console allows larger files)
   - Content type must match file:
     - PNG: `image/png`
     - JPG/JPEG: `image/jpeg`
@@ -20,12 +19,12 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 ## Actions configured in this script
 
 - Row 1, Area 1: open listings entry (`uri`)
-  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), URI areas for listings/create/favorites use path links `liff.line.me/{LiffId}/listings` etc.
+  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all four URI areas use path links `liff.line.me/{LiffId}/listings` etc.
   - Otherwise fallback to `$WebBaseUrl` + path
 - Row 1, Area 2: postback `action=myListings`
 - Row 1, Area 3: postback `action=myMessages`
 - Row 2, Area 1: open `$WebBaseUrl/listings/create` (`uri`)
-- Row 2, Area 2: open LINE group invite (`uri`) — `https://line.me/ti/g/gZrLPpCtDH`
+- Row 2, Area 2: open `$WebBaseUrl/account` (`uri`, or LIFF path `/account`)
 - Row 2, Area 3: open `$WebBaseUrl/favorites` (`uri`)
 
 Postback values are aligned with current backend webhook routing.

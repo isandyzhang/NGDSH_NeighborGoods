@@ -369,37 +369,8 @@ const safeSharePickerAvailable = (liff: { isApiAvailable: (api: string) => boole
   }
 }
 
-type LiffClient = import('@line/liff').Liff
-
-/** 單例 liff.init；一律傳入 liffId，已初始化時視為成功（對齊 LineNotifyLiffPage） */
-const runLiffInitOnce = async (liff: LiffClient, liffId: string): Promise<boolean> => {
-  const trimmed = liffId.trim()
-  if (!trimmed) {
-    return false
-  }
-
-  if (!liffReadyPromise) {
-    liffReadyPromise = (async () => {
-      try {
-        await liff.init({ liffId: trimmed })
-        return true
-      } catch (err) {
-        try {
-          liff.getVersion()
-          return true
-        } catch {
-          console.warn('[liff] init failed', err)
-          return false
-        }
-      }
-    })()
-  }
-
-  return liffReadyPromise
-}
-
 export const ensureLiffReady = async () => {
-  const liffId = getLineLiffId()?.trim()
+  const liffId = getLineLiffId()
   if (!liffId) {
     return null
   }
@@ -417,7 +388,13 @@ export const ensureLiffReady = async () => {
     }
   }
 
-  const ok = await runLiffInitOnce(liff, liffId)
+  if (!liffReadyPromise) {
+    liffReadyPromise = liff
+      .init({ liffId })
+      .then(() => true)
+      .catch(() => false)
+  }
+  const ok = await liffReadyPromise
   if (!ok) {
     resetLiffReadyCache()
     return null
@@ -524,21 +501,25 @@ export const testLiffInitOnCurrentPage = async (): Promise<ListingPageLiffInitTe
   }
 }
 
-/** 分享頁：一律走 runLiffInitOnce 傳入 liffId（不僅靠 getVersion 提早返回） */
+/** 分享頁專用：一律明確 init（對齊 LiffDebugPage.runLiffInitAttempt / LineNotifyLiffPage） */
 export const initLiffForFlexShare = async () => {
-  const liffId = getLineLiffId()?.trim()
+  const liffId = getLineLiffId()
   if (!liffId || !isLiffEndpointPath()) {
     return null
   }
 
+  resetLiffReadyCache()
   const liffMod = await import('@line/liff')
   const liff = liffMod.default
-  const ok = await runLiffInitOnce(liff, liffId)
-  if (!ok) {
-    resetLiffReadyCache()
+  try {
+    await liff.init({ liffId })
+    liffReadyPromise = Promise.resolve(true)
+    return liff
+  } catch (err) {
+    liffReadyPromise = Promise.resolve(false)
+    console.warn('[listing flex share] liff.init failed', err)
     return null
   }
-  return liff
 }
 
 const openLineUrlShareWindow = (shareUrl: string) => {
