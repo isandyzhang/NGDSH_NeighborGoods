@@ -5,7 +5,27 @@ export type AdminDashboard = {
   kpi: {
     totalListings: number
     activeListings: number
-    completedListings: number
+    soldListings: number
+    donatedListings: number
+    givenOrTradedListings: number
+    activeListingsLast7Days: number
+    soldListingsLast7Days: number
+    donatedListingsLast7Days: number
+    givenOrTradedListingsLast7Days: number
+    totalMembers: number
+    passwordLoginMembers: number
+    lineLoginMembers: number
+    emailBoundMembers: number
+    lineOfficialBoundMembers: number
+    activeMembers24h: number
+    activeMembers7d: number
+    activeMembers30d: number
+    emailedMembers24h: number
+    emailedMembers7d: number
+    emailedMembers30d: number
+    lineNotifiedMembers24h: number
+    lineNotifiedMembers7d: number
+    lineNotifiedMembers30d: number
     pendingTopSubmissions: number
     unreadAdminMessages: number
   }
@@ -104,6 +124,30 @@ export type AdminConversationMessages = {
   totalPages: number
 }
 
+export type AdminConversationByListing = {
+  items: Array<{
+    listingId: string
+    listingTitle: string
+    sellerDisplayName: string
+    listingImageUrl: string | null
+    conversationCount: number
+    lastUpdatedAt: string
+    conversations: Array<{
+      conversationId: string
+      participant1Id: string
+      participant1DisplayName: string
+      participant2Id: string
+      participant2DisplayName: string
+      messageCount: number
+      lastMessageAt: string | null
+    }>
+  }>
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
 export type AdminListingManagement = {
   items: Array<{
     id: string
@@ -121,6 +165,54 @@ export type AdminListingManagement = {
     totalCount: number
     totalPages: number
   }
+}
+
+export type AdminListingDetail = {
+  id: string
+  title: string
+  description: string
+  categoryCode: number
+  conditionCode: number
+  price: number
+  residenceCode: number
+  pickupLocationCode: number
+  isFree: boolean
+  isCharity: boolean
+  isTradeable: boolean
+  status: number
+  sellerId: string
+  sellerDisplayName: string
+  images: Array<{
+    id: string
+    imageUrl: string
+    sortOrder: number
+  }>
+}
+
+export type AdminMemberList = {
+  items: Array<{
+    id: string
+    displayName: string
+    userName: string | null
+    email: string | null
+    emailConfirmed: boolean
+    lineUserId: string | null
+    lineContactId: string | null
+    role: number
+    createdAt: string
+    lastLoginAt: string | null
+    lineMessagingApiAuthorizedAt: string | null
+    lineNotificationPreference: number
+    topPinCredits: number
+    isQuickResponder: boolean
+    phoneNumber: string | null
+    lockoutEnabled: boolean
+    hasPassword: boolean
+  }>
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
 }
 
 export const adminApi = {
@@ -146,6 +238,36 @@ export const adminApi = {
 
   async listListings(params: { q?: string; status?: number; page?: number; pageSize?: number }): Promise<AdminListingManagement> {
     const response = await http.get<ApiResponse<AdminListingManagement>>('/api/v1/admin/listings', { params })
+    return unwrapApiResponse(response.data)
+  },
+
+  async getListingDetail(id: string): Promise<AdminListingDetail> {
+    const response = await http.get<ApiResponse<AdminListingDetail>>(`/api/v1/admin/listings/${id}`)
+    return unwrapApiResponse(response.data)
+  },
+
+  async updateListing(
+    id: string,
+    payload: {
+      title: string
+      description?: string | null
+      categoryCode: number
+      conditionCode: number
+      price: number
+      residenceCode: number
+      pickupLocationCode: number
+      isFree: boolean
+      isCharity: boolean
+      isTradeable: boolean
+      status: number
+      imageUrlsToDelete?: string[] | null
+      imageUrlsInOrder?: string[] | null
+    },
+  ): Promise<{ id: string; updated: boolean; status: number }> {
+    const response = await http.patch<ApiResponse<{ id: string; updated: boolean; status: number }>>(
+      `/api/v1/admin/listings/${id}`,
+      payload,
+    )
     return unwrapApiResponse(response.data)
   },
 
@@ -187,14 +309,32 @@ export const adminApi = {
     return unwrapApiResponse(response.data)
   },
 
+  async listConversationsByListing(params?: { page?: number; pageSize?: number }): Promise<AdminConversationByListing> {
+    const response = await http.get<ApiResponse<AdminConversationByListing>>('/api/v1/admin/conversations/by-listing', { params })
+    return unwrapApiResponse(response.data)
+  },
+
   async getConversationMessages(
     conversationId: string,
-    params?: { page?: number; pageSize?: number },
+    params?: { page?: number; pageSize?: number; q?: string },
   ): Promise<AdminConversationMessages> {
     const response = await http.get<ApiResponse<AdminConversationMessages>>(
       `/api/v1/admin/conversations/${conversationId}/messages`,
       { params },
     )
+    return unwrapApiResponse(response.data)
+  },
+
+  async postConversationMessage(conversationId: string, content: string): Promise<AdminConversationMessage> {
+    const response = await http.post<ApiResponse<AdminConversationMessage>>(
+      `/api/v1/admin/conversations/${conversationId}/messages`,
+      { content },
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async listMembers(params?: { q?: string; page?: number; pageSize?: number }): Promise<AdminMemberList> {
+    const response = await http.get<ApiResponse<AdminMemberList>>('/api/v1/admin/members', { params })
     return unwrapApiResponse(response.data)
   },
 }

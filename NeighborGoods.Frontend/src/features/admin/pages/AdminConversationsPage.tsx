@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  adminApi,
-  type AdminConversationListItem,
-  type AdminConversationMessage,
-} from '@/features/admin/api/adminApi'
+import { useCallback, useEffect, useState } from 'react'
+import { adminApi, type AdminConversationByListing, type AdminConversationMessage } from '@/features/admin/api/adminApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
+import { AppModal } from '@/shared/ui/modal/AppModal'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
@@ -19,15 +15,8 @@ const formatDateTime = (value: string) =>
     minute: '2-digit',
   })
 
-const truncate = (value: string | null, max = 40) => {
-  if (!value) {
-    return '-'
-  }
-  return value.length > max ? `${value.slice(0, max)}…` : value
-}
-
 export const AdminConversationsPage = () => {
-  const [items, setItems] = useState<AdminConversationListItem[]>([])
+  const [data, setData] = useState<AdminConversationByListing | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -35,18 +24,18 @@ export const AdminConversationsPage = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<AdminConversationMessage[]>([])
+  const [keyword, setKeyword] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
+  const [sending, setSending] = useState(false)
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesError, setMessagesError] = useState<string | null>(null)
-  const [messagePage, setMessagePage] = useState(1)
-  const [messageTotalPages, setMessageTotalPages] = useState(1)
-  const messagesPanelRef = useRef<HTMLDivElement>(null)
 
   const loadConversations = useCallback(async (targetPage: number) => {
     setLoading(true)
     setError(null)
     try {
-      const result = await adminApi.listConversations({ page: targetPage, pageSize: 50 })
-      setItems(result.items)
+      const result = await adminApi.listConversationsByListing({ page: targetPage, pageSize: 10 })
+      setData(result)
       setPage(result.page)
       setTotalPages(Math.max(result.totalPages, 1))
     } catch (err) {
@@ -56,14 +45,12 @@ export const AdminConversationsPage = () => {
     }
   }, [])
 
-  const loadMessages = useCallback(async (conversationId: string, targetPage: number) => {
+  const loadMessages = useCallback(async (conversationId: string, q?: string) => {
     setMessagesLoading(true)
     setMessagesError(null)
     try {
-      const result = await adminApi.getConversationMessages(conversationId, { page: targetPage, pageSize: 100 })
+      const result = await adminApi.getConversationMessages(conversationId, { page: 1, pageSize: 200, q: q?.trim() || undefined })
       setMessages(result.items)
-      setMessagePage(result.page)
-      setMessageTotalPages(Math.max(result.totalPages, 1))
     } catch (err) {
       setMessagesError(err instanceof ApiClientError ? err.message : '讀取對話紀錄失敗')
       setMessages([])
@@ -76,79 +63,86 @@ export const AdminConversationsPage = () => {
     void loadConversations(page)
   }, [loadConversations, page])
 
-  const handleView = async (conversation: AdminConversationListItem) => {
-    setSelectedId(conversation.conversationId)
-    setMessagePage(1)
-    await loadMessages(conversation.conversationId, 1)
-    requestAnimationFrame(() => {
-      messagesPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
+  const handleView = async (conversationId: string) => {
+    setSelectedId(conversationId)
+    setDraftMessage('')
+    await loadMessages(conversationId)
   }
 
-  if (loading && items.length === 0) {
+  const handleSendMessage = async () => {
+    if (!selectedId || sending) {
+      return
+    }
+
+    const trimmed = draftMessage.trim()
+    if (!trimmed) {
+      return
+    }
+
+    setSending(true)
+    setMessagesError(null)
+    try {
+      const sent = await adminApi.postConversationMessage(selectedId, trimmed)
+      setMessages((current) => [...current, sent])
+      setDraftMessage('')
+    } catch (err) {
+      setMessagesError(err instanceof ApiClientError ? err.message : '送出訊息失敗')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const selectedConversation = data?.items.flatMap((g) => g.conversations).find((item) => item.conversationId === selectedId) ?? null
+  const selectedListing = data?.items.find((group) => group.conversations.some((conversation) => conversation.conversationId === selectedId)) ?? null
+
+  if (loading && !data) {
     return <PageSkeleton className="h-96" />
   }
 
-  if (error && items.length === 0) {
+  if (error && !data) {
     return <ErrorState description={error} onRetry={() => void loadConversations(page)} />
   }
 
-  const selectedConversation = items.find((item) => item.conversationId === selectedId) ?? null
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-text-main">聊天室列表</h1>
-        <Link to="/admin" className="text-sm text-text-subtle underline">
-          返回後台首頁
-        </Link>
-      </div>
+      <h1 className="text-2xl font-semibold text-text-main">聊天室檢查</h1>
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
-      <div className="overflow-x-auto border border-border">
-        <table className="min-w-full border-collapse text-left text-sm">
-          <thead className="bg-surface-2">
-            <tr>
-              <th className="border border-border px-2 py-2">更新時間</th>
-              <th className="border border-border px-2 py-2">商品</th>
-              <th className="border border-border px-2 py-2">參與者 A</th>
-              <th className="border border-border px-2 py-2">參與者 B</th>
-              <th className="border border-border px-2 py-2">訊息數</th>
-              <th className="border border-border px-2 py-2">最後訊息</th>
-              <th className="border border-border px-2 py-2">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 ? (
-              <tr>
-                <td className="border border-border px-2 py-4 text-text-muted" colSpan={7}>
-                  目前沒有聊天室
-                </td>
-              </tr>
-            ) : (
-              items.map((item) => (
-                <tr key={item.conversationId} className={selectedId === item.conversationId ? 'bg-surface-2' : ''}>
-                  <td className="border border-border px-2 py-2 whitespace-nowrap">{formatDateTime(item.updatedAt)}</td>
-                  <td className="border border-border px-2 py-2">{item.listingTitle}</td>
-                  <td className="border border-border px-2 py-2">{item.participant1DisplayName}</td>
-                  <td className="border border-border px-2 py-2">{item.participant2DisplayName}</td>
-                  <td className="border border-border px-2 py-2">{item.messageCount}</td>
-                  <td className="border border-border px-2 py-2">{truncate(item.lastMessagePreview)}</td>
-                  <td className="border border-border px-2 py-2">
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => void handleView(item)}
-                    >
-                      {selectedId === item.conversationId ? '查看中' : '查看'}
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {data?.items.length ? data.items.map((group) => (
+          <div key={group.listingId} className="rounded-xl border border-border bg-surface p-3">
+            <div className="mb-2 flex gap-3">
+              {group.listingImageUrl ? (
+                <img src={group.listingImageUrl} alt={group.listingTitle} className="h-16 w-16 rounded object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded bg-surface-2 text-xs text-text-muted">無圖</div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-text-main">
+                  {group.listingTitle}（賣家：{group.sellerDisplayName}）
+                </p>
+                <p className="text-sm text-text-subtle">
+                  {group.conversationCount} 個對話・最後更新 {formatDateTime(group.lastUpdatedAt)}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {group.conversations.map((item) => (
+                <div key={item.conversationId} className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm">
+                  <p>
+                    {item.participant1DisplayName} ↔ {item.participant2DisplayName}（{item.messageCount} 則）
+                  </p>
+                  <button type="button" className="underline" onClick={() => void handleView(item.conversationId)}>
+                    查看
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )) : (
+          <p className="text-sm text-text-muted">目前沒有聊天室</p>
+        )}
       </div>
 
       {totalPages > 1 ? (
@@ -170,23 +164,32 @@ export const AdminConversationsPage = () => {
         </div>
       ) : null}
 
-      {selectedId ? (
-        <div ref={messagesPanelRef} className="scroll-mt-4 border border-border bg-surface p-3">
-          <p className="mb-2 font-semibold">
+      <AppModal open={Boolean(selectedId)} onClose={() => setSelectedId(null)} maxWidthClassName="max-w-3xl">
+        <div className="space-y-3">
+          <p className="font-semibold">
             對話紀錄
-            {selectedConversation
-              ? `：${selectedConversation.participant1DisplayName} ↔ ${selectedConversation.participant2DisplayName}（${selectedConversation.listingTitle}）`
+            {selectedConversation && selectedListing
+              ? `：${selectedConversation.participant1DisplayName} ↔ ${selectedConversation.participant2DisplayName}（${selectedListing.listingTitle}）`
               : ''}
           </p>
-
+          <div className="flex gap-2">
+            <input
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main outline-none transition placeholder:text-text-muted focus:border-brand"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜尋關鍵字"
+            />
+            <Button type="button" variant="secondary" onClick={() => selectedId && void loadMessages(selectedId, keyword)}>
+              查詢
+            </Button>
+          </div>
           {messagesLoading ? <p className="text-sm text-text-subtle">載入中...</p> : null}
           {messagesError ? <p className="text-sm text-rose-600">{messagesError}</p> : null}
-
           {!messagesLoading && !messagesError ? (
             messages.length === 0 ? (
-              <p className="text-sm text-text-muted">此對話尚無訊息</p>
+              <p className="text-sm text-text-muted">查無訊息</p>
             ) : (
-              <div className="space-y-1 font-mono text-sm">
+              <div className="max-h-[60vh] space-y-1 overflow-y-auto font-mono text-sm">
                 {messages.map((message) => (
                   <div key={message.id}>
                     [{formatDateTime(message.createdAt)}] {message.senderDisplayName}：{message.content}
@@ -196,39 +199,26 @@ export const AdminConversationsPage = () => {
             )
           ) : null}
 
-          {messageTotalPages > 1 ? (
-            <div className="mt-3 flex items-center gap-3">
+          <div className="border-t border-border pt-3">
+            <p className="mb-2 text-sm text-text-subtle">以管理員身分回覆</p>
+            <div className="flex gap-2">
+              <input
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-text-main outline-none transition placeholder:text-text-muted focus:border-brand"
+                value={draftMessage}
+                onChange={(e) => setDraftMessage(e.target.value)}
+                placeholder="輸入要回覆的內容"
+              />
               <Button
                 type="button"
-                variant="secondary"
-                disabled={messagePage <= 1 || messagesLoading}
-                onClick={() => {
-                  const nextPage = messagePage - 1
-                  setMessagePage(nextPage)
-                  void loadMessages(selectedId, nextPage)
-                }}
+                onClick={() => void handleSendMessage()}
+                disabled={sending || !selectedId || draftMessage.trim().length === 0}
               >
-                較舊訊息
-              </Button>
-              <span className="text-sm text-text-subtle">
-                第 {messagePage} / {messageTotalPages} 頁
-              </span>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={messagePage >= messageTotalPages || messagesLoading}
-                onClick={() => {
-                  const nextPage = messagePage + 1
-                  setMessagePage(nextPage)
-                  void loadMessages(selectedId, nextPage)
-                }}
-              >
-                較新訊息
+                送出
               </Button>
             </div>
-          ) : null}
+          </div>
         </div>
-      ) : null}
+      </AppModal>
     </div>
   )
 }

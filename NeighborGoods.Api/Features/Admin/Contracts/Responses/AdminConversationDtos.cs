@@ -19,3 +19,31 @@ public sealed record AdminConversationListResponse(
     int PageSize,
     int TotalCount,
     int TotalPages);
+
+public sealed record AdminConversationByListingConversationItemDto(
+    Guid ConversationId,
+    string Participant1Id,
+    string Participant1DisplayName,
+    string Participant2Id,
+    string Participant2DisplayName,
+    int MessageCount,
+    DateTime? LastMessageAt
+);
+
+public sealed record AdminConversationByListingItemDto(
+    Guid ListingId,
+    string ListingTitle,
+    string SellerDisplayName,
+    string? ListingImageUrl,
+    int ConversationCount,
+    DateTime LastUpdatedAt,
+    IReadOnlyList<AdminConversationByListingConversationItemDto> Conversations
+);
+
+public sealed record AdminConversationByListingResponse(
+    IReadOnlyList<AdminConversationByListingItemDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages
+);
