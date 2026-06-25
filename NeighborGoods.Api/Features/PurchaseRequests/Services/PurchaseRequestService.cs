@@ -13,14 +13,14 @@ public sealed class PurchaseRequestService(
     IPurchaseRequestScheduledOperations purchaseRequestScheduledOperations,
     ISystemMessageRealtimePublisher systemMessageRealtimePublisher)
 {
-    private const string CreateRequestSystemMessage = "[????]???????????? 12 ??????";
-    private const string AcceptRequestSystemMessage = "[????]???????????????";
-    private const string RejectRequestSystemMessage = "[????]???????????";
-    private const string CancelRequestSystemMessage = "[????]???????????";
-    private const string ExpireRequestSystemMessage = "[????]???????????";
-    private const string ReminderRequestSystemMessage = "[????]??????? 1 ?????????";
-    private const string SellerMarkedCompletedSystemMessage = "[????]???????????????????????";
-    private const string BuyerConfirmedReceivedSystemMessage = "[????]????????????????";
+    private const string CreateRequestSystemMessage = "[系統發送]買家已送出購買請求，請於 12 小時內回覆。";
+    private const string AcceptRequestSystemMessage = "[系統發送]賣家已接受此交易，商品已保留。";
+    private const string RejectRequestSystemMessage = "[系統發送]賣家已婉拒此交易請求。";
+    private const string CancelRequestSystemMessage = "[系統發送]買家已取消此交易請求。";
+    private const string ExpireRequestSystemMessage = "[系統發送]此交易請求已逾時失效。";
+    private const string ReminderRequestSystemMessage = "[系統發送]此交易請求剩餘 1 小時，請盡快回覆。";
+    private const string SellerMarkedCompletedSystemMessage = "[系統發送]賣家已標記交易完成，等待買家確認收貨。";
+    private const string BuyerConfirmedReceivedSystemMessage = "[系統發送]買家已確認收貨，交易完成。";
 
     public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> CreateAsync(
         string currentUserId,
@@ -36,17 +36,17 @@ public sealed class PurchaseRequestService(
 
         if (listing is null)
         {
-            return (null, "LISTING_NOT_FOUND", "?????");
+            return (null, "LISTING_NOT_FOUND", "找不到商品");
         }
 
         if (string.Equals(listing.SellerId, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "SELF_PURCHASE_NOT_ALLOWED", "????????????????");
+            return (null, "SELF_PURCHASE_NOT_ALLOWED", "賣家不能對自己的商品送出購買請求");
         }
 
         if ((ListingStatus)listing.Status != ListingStatus.Active)
         {
-            return (null, "LISTING_NOT_AVAILABLE", "?????????????");
+            return (null, "LISTING_NOT_AVAILABLE", "此商品目前不可發起購買請求");
         }
 
         var buyerExists = await dbContext.AspNetUsers
@@ -54,7 +54,7 @@ public sealed class PurchaseRequestService(
             .AnyAsync(x => x.Id == currentUserId, cancellationToken);
         if (!buyerExists)
         {
-            return (null, "USER_NOT_FOUND", "?????");
+            return (null, "USER_NOT_FOUND", "找不到目前使用者");
         }
 
         var participant1Id = string.CompareOrdinal(currentUserId, listing.SellerId) < 0
@@ -93,7 +93,7 @@ public sealed class PurchaseRequestService(
                 cancellationToken);
         if (existingPending is not null)
         {
-            return (null, "PURCHASE_REQUEST_ALREADY_PENDING", "????????????????");
+            return (null, "PURCHASE_REQUEST_ALREADY_PENDING", "此商品已有待回覆的交易請求");
         }
 
         var request = new PurchaseRequest
@@ -124,7 +124,7 @@ public sealed class PurchaseRequestService(
         }
         catch (DbUpdateException)
         {
-            return (null, "PURCHASE_REQUEST_ALREADY_PENDING", "????????????????");
+            return (null, "PURCHASE_REQUEST_ALREADY_PENDING", "此商品已有待回覆的交易請求");
         }
 
         return (ToResponse(request, DateTime.UtcNow), null, null);
@@ -166,12 +166,12 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         if (!string.Equals(request.BuyerId, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "??????????");
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅買家本人可取消交易請求");
         }
 
         var now = DateTime.UtcNow;
@@ -206,14 +206,14 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         var isParticipant = string.Equals(request.BuyerId, currentUserId, StringComparison.Ordinal)
                             || string.Equals(request.SellerId, currentUserId, StringComparison.Ordinal);
         if (!isParticipant)
         {
-            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "??????????");
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "無權限查看此交易請求");
         }
 
         var now = DateTime.UtcNow;
@@ -222,7 +222,7 @@ public sealed class PurchaseRequestService(
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
             request.RespondedAt = now;
-            request.ResponseReason = "??????????";
+            request.ResponseReason = "逾時未回覆";
             await AddSystemMessageAsync(
                 request.ConversationId,
                 request.SellerId,
@@ -256,7 +256,7 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         var now = DateTime.UtcNow;
@@ -265,7 +265,7 @@ public sealed class PurchaseRequestService(
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
             request.RespondedAt = now;
-            request.ResponseReason = "??????????";
+            request.ResponseReason = "逾時未回覆";
             await AddSystemMessageAsync(
                 request.ConversationId,
                 request.SellerId,
@@ -381,36 +381,36 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         if (!string.Equals(request.SellerId, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "??????????");
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅賣家本人可標記交易完成");
         }
 
         if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Accepted)
         {
-            return (null, "PURCHASE_REQUEST_INVALID_STATE", "?????????");
+            return (null, "PURCHASE_REQUEST_INVALID_STATE", "此交易請求目前狀態不可操作");
         }
 
         var listing = await dbContext.Listings
             .FirstOrDefaultAsync(x => x.Id == request.ListingId, cancellationToken);
         if (listing is null)
         {
-            return (null, "LISTING_NOT_FOUND", "?????");
+            return (null, "LISTING_NOT_FOUND", "找不到商品");
         }
 
         if (!string.Equals(listing.SellerId, request.SellerId, StringComparison.Ordinal))
         {
-            return (null, "PURCHASE_REQUEST_SELLER_MISMATCH", "???????????????");
+            return (null, "PURCHASE_REQUEST_SELLER_MISMATCH", "交易請求與商品賣家不一致");
         }
 
         var now = DateTime.UtcNow;
         var targetStatus = ResolveCompletedListingStatus(listing);
         if (!ListingStatusRules.CanTransition((ListingStatus)listing.Status, targetStatus))
         {
-            return (null, "LISTING_INVALID_STATUS_TRANSITION", "????????");
+            return (null, "LISTING_INVALID_STATUS_TRANSITION", "目前商品狀態不可完成交易");
         }
 
         listing.Status = (int)targetStatus;
@@ -440,17 +440,17 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         if (!string.Equals(request.BuyerId, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "??????????");
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅買家本人可確認收貨");
         }
 
         if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.SellerMarkedCompleted)
         {
-            return (null, "PURCHASE_REQUEST_INVALID_STATE", "?????????");
+            return (null, "PURCHASE_REQUEST_INVALID_STATE", "此交易請求目前狀態不可操作");
         }
 
         var now = DateTime.UtcNow;
@@ -481,12 +481,12 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         if (!string.Equals(request.SellerId, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "??????????");
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅賣家本人可回覆交易請求");
         }
 
         var now = DateTime.UtcNow;
@@ -502,19 +502,19 @@ public sealed class PurchaseRequestService(
                 .FirstOrDefaultAsync(x => x.Id == request.ListingId, cancellationToken);
             if (listing is null)
             {
-                return (null, "LISTING_NOT_FOUND", "?????");
+                return (null, "LISTING_NOT_FOUND", "找不到商品");
             }
 
             if (!string.Equals(listing.SellerId, request.SellerId, StringComparison.Ordinal))
             {
-                return (null, "PURCHASE_REQUEST_SELLER_MISMATCH", "???????????????");
+                return (null, "PURCHASE_REQUEST_SELLER_MISMATCH", "交易請求與商品賣家不一致");
             }
 
             var currentStatus = (ListingStatus)listing.Status;
             if (currentStatus != ListingStatus.Reserved
                 && !ListingStatusRules.CanTransition(currentStatus, ListingStatus.Reserved))
             {
-                return (null, "LISTING_INVALID_STATUS_TRANSITION", "????????");
+                return (null, "LISTING_INVALID_STATUS_TRANSITION", "目前商品狀態不可接受交易請求");
             }
 
             listing.Status = (int)ListingStatus.Reserved;
@@ -573,7 +573,7 @@ public sealed class PurchaseRequestService(
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
             request.RespondedAt = now;
-            request.ResponseReason = "??????????";
+            request.ResponseReason = "逾時未回覆";
             await AddSystemMessageAsync(
                 request.ConversationId,
                 request.SellerId,
@@ -613,14 +613,14 @@ public sealed class PurchaseRequestService(
                 cancellationToken);
         if (pendingRequest is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         if (pendingRequest.ExpireAt <= now)
         {
             pendingRequest.Status = (int)PurchaseRequestStatus.Expired;
             pendingRequest.RespondedAt = now;
-            pendingRequest.ResponseReason = "??????????";
+            pendingRequest.ResponseReason = "逾時未回覆";
             await AddSystemMessageAsync(
                 pendingRequest.ConversationId,
                 pendingRequest.SellerId,
@@ -630,7 +630,7 @@ public sealed class PurchaseRequestService(
                 cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await systemMessageRealtimePublisher.PublishLatestSystemMessageAsync(pendingRequest.ConversationId, cancellationToken);
-            return (null, "PURCHASE_REQUEST_EXPIRED", "??????????");
+            return (null, "PURCHASE_REQUEST_EXPIRED", "此交易請求已逾時");
         }
 
         return (pendingRequest.Id, null, null);
@@ -656,7 +656,7 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
         if (request is null)
         {
-            return (null, "PURCHASE_REQUEST_NOT_FOUND", "???????");
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易請求");
         }
 
         return (request, null, null);
@@ -672,13 +672,13 @@ public sealed class PurchaseRequestService(
             .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
         if (conversation is null)
         {
-            return (null, "CONVERSATION_NOT_FOUND", "?????");
+            return (null, "CONVERSATION_NOT_FOUND", "找不到對話");
         }
 
         if (!string.Equals(conversation.Participant1Id, currentUserId, StringComparison.Ordinal)
             && !string.Equals(conversation.Participant2Id, currentUserId, StringComparison.Ordinal))
         {
-            return (null, "CONVERSATION_ACCESS_DENIED", "????????");
+            return (null, "CONVERSATION_ACCESS_DENIED", "無權限查看此對話");
         }
 
         return (conversation, null, null);
@@ -693,7 +693,7 @@ public sealed class PurchaseRequestService(
         if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Pending)
         {
             errorCode = "PURCHASE_REQUEST_NOT_PENDING";
-            errorMessage = "??????????";
+            errorMessage = "此交易請求已完成或失效";
             return false;
         }
 
@@ -701,9 +701,9 @@ public sealed class PurchaseRequestService(
         {
             request.Status = (int)PurchaseRequestStatus.Expired;
             request.RespondedAt = now;
-            request.ResponseReason = "??????????";
+            request.ResponseReason = "逾時未回覆";
             errorCode = "PURCHASE_REQUEST_EXPIRED";
-            errorMessage = "??????????";
+            errorMessage = "此交易請求已逾時";
             return false;
         }
 

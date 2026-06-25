@@ -6,8 +6,16 @@ import { AppModal } from '@/shared/ui/modal/AppModal'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
+const toLocalDate = (value: string) => {
+  const trimmed = value.trim()
+  // Backend may return UTC-like timestamps without timezone suffix.
+  // Treat those as UTC explicitly to avoid displaying UTC as local time.
+  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed) ? trimmed : `${trimmed}Z`
+  return new Date(normalized)
+}
+
 const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString('zh-TW', {
+  toLocalDate(value).toLocaleString('zh-TW', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

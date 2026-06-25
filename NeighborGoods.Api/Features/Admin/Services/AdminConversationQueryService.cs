@@ -6,6 +6,9 @@ namespace NeighborGoods.Api.Features.Admin.Services;
 
 public sealed class AdminConversationQueryService(NeighborGoodsDbContext dbContext)
 {
+    private const int AdminRoleCode = 3;
+    private const string AdminDisplayName = "管理員";
+
     public async Task<AdminConversationListResponse> ListConversationsAsync(
         int page,
         int pageSize,
@@ -128,7 +131,9 @@ public sealed class AdminConversationQueryService(NeighborGoodsDbContext dbConte
             Id = m.Id,
             ConversationId = conversationId,
             SenderId = m.SenderId,
-            SenderDisplayName = m.Sender?.DisplayName ?? "未知用戶",
+            SenderDisplayName = m.Sender is { Role: AdminRoleCode }
+                ? AdminDisplayName
+                : (m.Sender?.DisplayName ?? "未知用戶"),
             Content = m.Content,
             CreatedAt = m.CreatedAt
         }).ToList();

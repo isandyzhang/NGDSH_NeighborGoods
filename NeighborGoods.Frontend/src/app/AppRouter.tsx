@@ -61,8 +61,20 @@ const NotificationCenterPage = lazy(() =>
     default: module.NotificationCenterPage,
   })),
 )
-const AdminHomePage = lazy(() =>
-  import('@/features/admin/pages/AdminHomePage').then((module) => ({ default: module.AdminHomePage })),
+const AdminLayout = lazy(() =>
+  import('@/features/admin/layout/AdminLayout').then((module) => ({ default: module.AdminLayout })),
+)
+const AdminDashboardPage = lazy(() =>
+  import('@/features/admin/pages/AdminDashboardPage').then((module) => ({ default: module.AdminDashboardPage })),
+)
+const AdminAnnouncementsPage = lazy(() =>
+  import('@/features/admin/pages/AdminAnnouncementsPage').then((module) => ({ default: module.AdminAnnouncementsPage })),
+)
+const AdminListingsPage = lazy(() =>
+  import('@/features/admin/pages/AdminListingsPage').then((module) => ({ default: module.AdminListingsPage })),
+)
+const AdminMembersPage = lazy(() =>
+  import('@/features/admin/pages/AdminMembersPage').then((module) => ({ default: module.AdminMembersPage })),
 )
 const AdminConversationsPage = lazy(() =>
   import('@/features/admin/pages/AdminConversationsPage').then((module) => ({ default: module.AdminConversationsPage })),
@@ -217,9 +229,14 @@ export const AppRouter = () => {
           <Route path="/seller/:sellerId" element={<SellerPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<RequireAdmin />}>
-              <Route path="/admin" element={<AdminHomePage />} />
-              <Route path="/admin/conversations" element={<AdminConversationsPage />} />
-              <Route path="/admin/liff-debug" element={<LiffDebugPage mode="admin" />} />
+              <Route element={<AdminLayout />}>
+                <Route path="/admin" element={<AdminDashboardPage />} />
+                <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+                <Route path="/admin/listings" element={<AdminListingsPage />} />
+                <Route path="/admin/members" element={<AdminMembersPage />} />
+                <Route path="/admin/conversations" element={<AdminConversationsPage />} />
+                <Route path="/admin/liff-debug" element={<LiffDebugPage mode="admin" />} />
+              </Route>
             </Route>
             <Route path="/account" element={<AccountPage />} />
             <Route path="/profile" element={<Navigate to="/account" replace />} />

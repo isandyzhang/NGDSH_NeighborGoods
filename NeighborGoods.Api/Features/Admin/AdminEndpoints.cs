@@ -5,6 +5,9 @@ using NeighborGoods.Api.Features.Admin.Services;
 using NeighborGoods.Api.Features.Announcements.Contracts;
 using NeighborGoods.Api.Features.Announcements.Services;
 using NeighborGoods.Api.Features.Listing;
+using NeighborGoods.Api.Features.Listing.Contracts;
+using NeighborGoods.Api.Features.Messaging;
+using NeighborGoods.Api.Features.Messaging.Contracts.Responses;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Data;
@@ -17,6 +20,7 @@ public static class AdminEndpoints
 {
     private const int AdminRoleCode = 3;
     private const int TopSubmissionPendingCode = 0;
+    private const string AdminMessageDisplayName = "管理員";
 
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -38,6 +42,18 @@ public static class AdminEndpoints
 
         app.MapGet("/api/v1/admin/listings", GetAdminListingsAsync)
         .WithName("AdminGetListingsV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/listings/{id:guid}", GetAdminListingDetailAsync)
+        .WithName("AdminGetListingDetailV1")
+        .RequireAuthorization();
+
+        app.MapPatch("/api/v1/admin/listings/{id:guid}", UpdateAdminListingAsync)
+        .WithName("AdminUpdateListingV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/members", GetAdminMembersAsync)
+        .WithName("AdminGetMembersV1")
         .RequireAuthorization();
 
         app.MapGet("/api/v1/admin/announcements", GetAdminAnnouncementsAsync)
@@ -64,8 +80,16 @@ public static class AdminEndpoints
         .WithName("AdminGetConversationsV1")
         .RequireAuthorization();
 
+        app.MapGet("/api/v1/admin/conversations/by-listing", GetAdminConversationsByListingAsync)
+        .WithName("AdminGetConversationsByListingV1")
+        .RequireAuthorization();
+
         app.MapGet("/api/v1/admin/conversations/{conversationId:guid}/messages", GetAdminConversationMessagesAsync)
         .WithName("AdminGetConversationMessagesV1")
+        .RequireAuthorization();
+
+        app.MapPost("/api/v1/admin/conversations/{conversationId:guid}/messages", PostAdminConversationMessageAsync)
+        .WithName("AdminPostConversationMessageV1")
         .RequireAuthorization();
 
         return app;
@@ -86,10 +110,38 @@ public static class AdminEndpoints
         }
 
         var totalListings = await dbContext.Listings.AsNoTracking().CountAsync(ct);
+        var now = DateTime.UtcNow;
+        var sevenDaysAgo = now.AddDays(-7);
         var activeListings = await dbContext.Listings.AsNoTracking().CountAsync(x => x.Status == (int)ListingStatus.Active, ct);
-        var completedListings = await dbContext.Listings
-            .AsNoTracking()
-            .CountAsync(x => x.Status == (int)ListingStatus.Sold || x.Status == (int)ListingStatus.Donated || x.Status == (int)ListingStatus.GivenOrTraded, ct);
+        var soldListings = await dbContext.Listings.AsNoTracking().CountAsync(x => x.Status == (int)ListingStatus.Sold, ct);
+        var donatedListings = await dbContext.Listings.AsNoTracking().CountAsync(x => x.Status == (int)ListingStatus.Donated, ct);
+        var givenOrTradedListings = await dbContext.Listings.AsNoTracking().CountAsync(x => x.Status == (int)ListingStatus.GivenOrTraded, ct);
+        var activeListingsLast7Days = await dbContext.Listings.AsNoTracking()
+            .CountAsync(x => x.Status == (int)ListingStatus.Active && x.CreatedAt >= sevenDaysAgo, ct);
+        var soldListingsLast7Days = await dbContext.Listings.AsNoTracking()
+            .CountAsync(x => x.Status == (int)ListingStatus.Sold && x.UpdatedAt >= sevenDaysAgo, ct);
+        var donatedListingsLast7Days = await dbContext.Listings.AsNoTracking()
+            .CountAsync(x => x.Status == (int)ListingStatus.Donated && x.UpdatedAt >= sevenDaysAgo, ct);
+        var givenOrTradedListingsLast7Days = await dbContext.Listings.AsNoTracking()
+            .CountAsync(x => x.Status == (int)ListingStatus.GivenOrTraded && x.UpdatedAt >= sevenDaysAgo, ct);
+
+        var totalMembers = await dbContext.AspNetUsers.AsNoTracking().CountAsync(ct);
+        var passwordLoginMembers = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.PasswordHash != null && x.PasswordHash != "", ct);
+        var lineLoginMembers = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LineUserId != null && x.LineUserId != "", ct);
+        var emailBoundMembers = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.EmailConfirmed, ct);
+        var lineOfficialBoundMembers = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LineMessagingApiAuthorizedAt != null, ct);
+
+        var oneDayAgo = now.AddDays(-1);
+        var thirtyDaysAgo = now.AddDays(-30);
+        var activeMembers24h = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LastLoginAt != null && x.LastLoginAt >= oneDayAgo, ct);
+        var activeMembers7d = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LastLoginAt != null && x.LastLoginAt >= sevenDaysAgo, ct);
+        var activeMembers30d = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LastLoginAt != null && x.LastLoginAt >= thirtyDaysAgo, ct);
+        var emailedMembers24h = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.EmailNotificationLastSentAt != null && x.EmailNotificationLastSentAt >= oneDayAgo, ct);
+        var emailedMembers7d = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.EmailNotificationLastSentAt != null && x.EmailNotificationLastSentAt >= sevenDaysAgo, ct);
+        var emailedMembers30d = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.EmailNotificationLastSentAt != null && x.EmailNotificationLastSentAt >= thirtyDaysAgo, ct);
+        var lineNotifiedMembers24h = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LineNotificationLastSentAt != null && x.LineNotificationLastSentAt >= oneDayAgo, ct);
+        var lineNotifiedMembers7d = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LineNotificationLastSentAt != null && x.LineNotificationLastSentAt >= sevenDaysAgo, ct);
+        var lineNotifiedMembers30d = await dbContext.AspNetUsers.AsNoTracking().CountAsync(x => x.LineNotificationLastSentAt != null && x.LineNotificationLastSentAt >= thirtyDaysAgo, ct);
         var pendingTopSubmissions = await dbContext.ListingTopSubmissions.AsNoTracking().CountAsync(x => x.Status == TopSubmissionPendingCode, ct);
         var unreadAdminMessages = await dbContext.AdminMessages.AsNoTracking().CountAsync(x => !x.IsRead, ct);
 
@@ -113,7 +165,32 @@ public static class AdminEndpoints
             .ToListAsync(ct);
 
         var payload = new AdminDashboardResponse(
-            new AdminDashboardKpiResponse(totalListings, activeListings, completedListings, pendingTopSubmissions, unreadAdminMessages),
+            new AdminDashboardKpiResponse(
+                totalListings,
+                activeListings,
+                soldListings,
+                donatedListings,
+                givenOrTradedListings,
+                activeListingsLast7Days,
+                soldListingsLast7Days,
+                donatedListingsLast7Days,
+                givenOrTradedListingsLast7Days,
+                totalMembers,
+                passwordLoginMembers,
+                lineLoginMembers,
+                emailBoundMembers,
+                lineOfficialBoundMembers,
+                activeMembers24h,
+                activeMembers7d,
+                activeMembers30d,
+                emailedMembers24h,
+                emailedMembers7d,
+                emailedMembers30d,
+                lineNotifiedMembers24h,
+                lineNotifiedMembers7d,
+                lineNotifiedMembers30d,
+                pendingTopSubmissions,
+                unreadAdminMessages),
             latestListings,
             latestMessages,
             latestTopSubmissions);
@@ -317,6 +394,152 @@ public static class AdminEndpoints
         return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
     }
 
+    private static async Task<IResult> GetAdminListingDetailAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid id,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext), statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var item = await dbContext.Listings
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new AdminListingDetailResponse(
+                x.Id,
+                x.Title,
+                x.Description,
+                x.Category,
+                x.Condition,
+                Convert.ToInt32(x.Price),
+                x.Residence,
+                x.PickupLocation,
+                x.IsFree,
+                x.IsCharity,
+                x.IsTradeable,
+                x.Status,
+                x.SellerId,
+                x.Seller.DisplayName,
+                x.ListingImages
+                    .OrderBy(img => img.SortOrder)
+                    .Select(img => new AdminListingImageResponse(img.Id, img.ImageUrl, img.SortOrder))
+                    .ToList()))
+            .FirstOrDefaultAsync(ct);
+
+        if (item is null)
+        {
+            return Results.NotFound(ApiResponseFactory.Error("LISTING_NOT_FOUND", "找不到商品", httpContext));
+        }
+
+        return Results.Ok(ApiResponseFactory.Success(item, httpContext));
+    }
+
+    private static async Task<IResult> UpdateAdminListingAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid id,
+        AdminUpdateListingRequest request,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext), statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (!Enum.IsDefined(typeof(ListingStatus), request.Status))
+        {
+            return Results.BadRequest(ApiResponseFactory.Error("VALIDATION_ERROR", "無效的商品狀態代碼", httpContext));
+        }
+
+        var listing = await dbContext.Listings.Include(x => x.ListingImages).FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (listing is null)
+        {
+            return Results.NotFound(ApiResponseFactory.Error("LISTING_NOT_FOUND", "找不到商品", httpContext));
+        }
+
+        listing.Title = request.Title.Trim();
+        listing.Description = request.Description?.Trim() ?? string.Empty;
+        listing.Category = request.CategoryCode;
+        listing.Condition = request.ConditionCode;
+        listing.Price = request.IsFree ? 0 : Math.Max(request.Price, 0);
+        listing.Residence = request.ResidenceCode;
+        listing.PickupLocation = request.PickupLocationCode;
+        listing.IsFree = request.IsFree || request.Price == 0;
+        listing.IsCharity = request.IsCharity;
+        listing.IsTradeable = request.IsTradeable;
+        listing.Status = request.Status;
+        listing.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(ct);
+        return Results.Ok(ApiResponseFactory.Success(new { id, updated = true, status = listing.Status }, httpContext));
+    }
+
+    private static async Task<IResult> GetAdminMembersAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        string? q = null,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext), statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var normalizedPage = Math.Max(page, 1);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, 100);
+        var query = dbContext.AspNetUsers.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var keyword = q.Trim();
+            query = query.Where(x =>
+                EF.Functions.Like(x.DisplayName, $"%{keyword}%") ||
+                (x.Email != null && EF.Functions.Like(x.Email, $"%{keyword}%")) ||
+                (x.UserName != null && EF.Functions.Like(x.UserName, $"%{keyword}%")));
+        }
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .Select(x => new AdminMemberListItemResponse(
+                x.Id,
+                x.DisplayName,
+                x.UserName,
+                x.Email,
+                x.EmailConfirmed,
+                x.LineUserId,
+                x.LineContactId,
+                x.Role,
+                x.CreatedAt,
+                x.LastLoginAt,
+                x.LineMessagingApiAuthorizedAt,
+                x.LineNotificationPreference,
+                x.TopPinCredits,
+                x.IsQuickResponder,
+                x.PhoneNumber,
+                x.LockoutEnabled,
+                !string.IsNullOrWhiteSpace(x.PasswordHash)))
+            .ToListAsync(ct);
+
+        var payload = new AdminMemberListResponse(
+            items,
+            normalizedPage,
+            normalizedPageSize,
+            totalCount,
+            (int)Math.Ceiling(totalCount / (double)normalizedPageSize));
+        return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+    }
+
     private static async Task<IResult> GetAdminAnnouncementsAsync(
         HttpContext httpContext,
         ICurrentUserContext currentUser,
@@ -511,6 +734,27 @@ public static class AdminEndpoints
         return Results.Ok(ApiResponseFactory.Success(result, httpContext));
     }
 
+    private static async Task<IResult> GetAdminConversationsByListingAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        AdminConversationQueryService conversationQueryService,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default)
+    {
+        var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
+        if (!isAdmin)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var result = await conversationQueryService.ListByListingAsync(page, pageSize, ct);
+        return Results.Ok(ApiResponseFactory.Success(result, httpContext));
+    }
+
     private static async Task<IResult> GetAdminConversationMessagesAsync(
         HttpContext httpContext,
         ICurrentUserContext currentUser,
@@ -519,6 +763,7 @@ public static class AdminEndpoints
         Guid conversationId,
         int page = 1,
         int pageSize = 100,
+        string? q = null,
         CancellationToken ct = default)
     {
         var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
@@ -533,6 +778,7 @@ public static class AdminEndpoints
             conversationId,
             page,
             pageSize,
+            q,
             ct);
 
         if (!conversationExists)
@@ -543,6 +789,87 @@ public static class AdminEndpoints
         }
 
         return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+    }
+
+    private static async Task<IResult> PostAdminConversationMessageAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid conversationId,
+        AdminSendConversationMessageRequest request,
+        CancellationToken ct = default)
+    {
+        var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
+        if (!isAdmin)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var content = request.Content?.Trim() ?? string.Empty;
+        if (content.Length == 0)
+        {
+            return Results.BadRequest(ApiResponseFactory.Error("MESSAGE_VALIDATION_FAILED", "訊息內容不可為空白。", httpContext));
+        }
+
+        if (content.Length > MessagingConstants.MaxMessageContentLength)
+        {
+            return Results.BadRequest(
+                ApiResponseFactory.Error(
+                    "MESSAGE_VALIDATION_FAILED",
+                    $"訊息長度不可超過 {MessagingConstants.MaxMessageContentLength} 字元。",
+                    httpContext));
+        }
+
+        var conversation = await dbContext.Conversations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == conversationId, ct);
+        if (conversation is null)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("CONVERSATION_NOT_FOUND", "找不到對話", httpContext),
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        var senderId = currentUser.GetRequiredUserId();
+        var sender = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == senderId, ct);
+        if (sender is null)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("USER_NOT_FOUND", "找不到目前使用者", httpContext),
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var now = DateTime.UtcNow;
+        var message = new Data.LegacyEntities.Message
+        {
+            Id = Guid.NewGuid(),
+            ConversationId = conversationId,
+            SenderId = senderId,
+            Content = content,
+            CreatedAt = now
+        };
+
+        dbContext.Messages.Add(message);
+        await dbContext.Conversations
+            .Where(c => c.Id == conversationId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.UpdatedAt, now), ct);
+        await dbContext.SaveChangesAsync(ct);
+
+        var dto = new MessageItemDto
+        {
+            Id = message.Id,
+            ConversationId = message.ConversationId,
+            SenderId = senderId,
+            SenderDisplayName = AdminMessageDisplayName,
+            Content = message.Content,
+            CreatedAt = message.CreatedAt
+        };
+
+        return Results.Ok(ApiResponseFactory.Success(dto, httpContext));
     }
 
     private static AdminAnnouncementResponse ToAdminResponse(SiteAnnouncement entity) =>
