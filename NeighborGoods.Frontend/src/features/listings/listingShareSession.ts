@@ -132,6 +132,10 @@ export const listingShareEntryNeedsCleanup = (pathname: string, search: string):
   return false
 }
 
+/** 分享流程可開始：已在 `/` 且 URL 不需再清理（避免 messy liff.state 上搶跑 init） */
+export const isListingShareUrlReady = (pathname: string, search: string): boolean =>
+  pathname === '/' && !listingShareEntryNeedsCleanup(pathname, search)
+
 export const buildCleanListingShareEntrySearch = (search: string): string => {
   const raw = search.startsWith('?') ? search.slice(1) : search
   const params = new URLSearchParams(raw)

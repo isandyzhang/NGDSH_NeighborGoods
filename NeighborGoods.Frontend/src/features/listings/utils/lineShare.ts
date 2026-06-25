@@ -501,26 +501,8 @@ export const testLiffInitOnCurrentPage = async (): Promise<ListingPageLiffInitTe
   }
 }
 
-/** 分享頁專用：一律明確 init（對齊 LiffDebugPage.runLiffInitAttempt / LineNotifyLiffPage） */
-export const initLiffForFlexShare = async () => {
-  const liffId = getLineLiffId()
-  if (!liffId || !isLiffEndpointPath()) {
-    return null
-  }
-
-  resetLiffReadyCache()
-  const liffMod = await import('@line/liff')
-  const liff = liffMod.default
-  try {
-    await liff.init({ liffId })
-    liffReadyPromise = Promise.resolve(true)
-    return liff
-  } catch (err) {
-    liffReadyPromise = Promise.resolve(false)
-    console.warn('[listing flex share] liff.init failed', err)
-    return null
-  }
-}
+/** 分享頁專用：共用 ensureLiffReady 單例 init，避免與 LiffShareBootstrap 重複 liff.init() 失敗 */
+export const initLiffForFlexShare = () => ensureLiffReady()
 
 const openLineUrlShareWindow = (shareUrl: string) => {
   window.open(shareUrl, '_blank', 'noopener,noreferrer')
