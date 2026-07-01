@@ -172,6 +172,11 @@ export type AdminAdoWebhookEventListItem = {
   receivedAt: string
   bodyLength: number
   rawBodyPreview: string
+  eventType: string | null
+  workItemId: number | null
+  workItemTitle: string | null
+  summaryPreview: string | null
+  fieldResolveStatus: string
 }
 
 export type AdminAdoWebhookEventDetail = {
@@ -179,6 +184,15 @@ export type AdminAdoWebhookEventDetail = {
   receivedAt: string
   bodyLength: number
   rawBody: string
+  eventType: string | null
+  workItemId: number | null
+  workItemTitle: string | null
+  projectName: string | null
+  workItemUrl: string | null
+  summaryPreview: string | null
+  normalizedSummary: string | null
+  fieldResolveStatus: string
+  normalizeError: string | null
 }
 
 export type AdminAdoWebhookEventList = {

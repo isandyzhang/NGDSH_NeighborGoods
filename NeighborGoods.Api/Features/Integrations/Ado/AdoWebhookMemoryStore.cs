@@ -28,6 +28,26 @@ public sealed class AdoWebhookMemoryStore
         return entry.Id;
     }
 
+    public bool TryUpdate(Guid id, Func<AdoWebhookEventEntry, AdoWebhookEventEntry> transform)
+    {
+        lock (_lock)
+        {
+            var node = _events.First;
+            while (node is not null)
+            {
+                if (node.Value.Id == id)
+                {
+                    node.Value = transform(node.Value);
+                    return true;
+                }
+
+                node = node.Next;
+            }
+        }
+
+        return false;
+    }
+
     public AdoWebhookEventEntry? GetById(Guid id)
     {
         lock (_lock)

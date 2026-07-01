@@ -7,6 +7,7 @@ public static class AdoWebhookEndpoints
         app.MapPost("/api/v1/integrations/ado/webhook", async (
             HttpContext httpContext,
             AdoWebhookMemoryStore store,
+            AdoWebhookProcessor processor,
             ILoggerFactory loggerFactory,
             CancellationToken ct = default) =>
         {
@@ -19,6 +20,20 @@ public static class AdoWebhookEndpoints
                 "ADO webhook received: id={EventId} length={BodyLength}",
                 eventId,
                 body.Length);
+
+            try
+            {
+                await processor.ProcessAsync(eventId, body, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "ADO webhook normalization failed: id={EventId}", eventId);
+                store.TryUpdate(eventId, entry => entry with
+                {
+                    FieldResolveStatus = "failed",
+                    NormalizeError = ex.Message,
+                });
+            }
 
             return Results.Ok();
         })

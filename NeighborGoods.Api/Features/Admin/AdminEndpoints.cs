@@ -942,14 +942,30 @@ public static class AdminEndpoints
             entry.Id,
             entry.ReceivedAt,
             entry.RawBody.Length,
-            BuildRawBodyPreview(entry.RawBody));
+            !string.IsNullOrWhiteSpace(entry.SummaryPreview)
+                ? entry.SummaryPreview!
+                : BuildRawBodyPreview(entry.RawBody),
+            entry.EventType,
+            entry.WorkItemId,
+            entry.WorkItemTitle,
+            entry.SummaryPreview,
+            entry.FieldResolveStatus);
 
     private static AdoWebhookEventDetailDto ToDetailDto(AdoWebhookEventEntry entry) =>
         new(
             entry.Id,
             entry.ReceivedAt,
             entry.RawBody.Length,
-            entry.RawBody);
+            entry.RawBody,
+            entry.EventType,
+            entry.WorkItemId,
+            entry.WorkItemTitle,
+            entry.ProjectName,
+            entry.WorkItemUrl,
+            entry.SummaryPreview,
+            entry.NormalizedSummary,
+            entry.FieldResolveStatus,
+            entry.NormalizeError);
 
     private static string BuildRawBodyPreview(string rawBody)
     {
