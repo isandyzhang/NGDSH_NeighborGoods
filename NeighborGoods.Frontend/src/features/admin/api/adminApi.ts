@@ -167,6 +167,28 @@ export type AdminListingManagement = {
   }
 }
 
+export type AdminAdoWebhookEventListItem = {
+  id: string
+  receivedAt: string
+  bodyLength: number
+  rawBodyPreview: string
+}
+
+export type AdminAdoWebhookEventDetail = {
+  id: string
+  receivedAt: string
+  bodyLength: number
+  rawBody: string
+}
+
+export type AdminAdoWebhookEventList = {
+  items: AdminAdoWebhookEventListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
 export type AdminListingDetail = {
   id: string
   title: string
@@ -335,6 +357,16 @@ export const adminApi = {
 
   async listMembers(params?: { q?: string; page?: number; pageSize?: number }): Promise<AdminMemberList> {
     const response = await http.get<ApiResponse<AdminMemberList>>('/api/v1/admin/members', { params })
+    return unwrapApiResponse(response.data)
+  },
+
+  async listAdoWebhookEvents(params?: { page?: number; pageSize?: number }): Promise<AdminAdoWebhookEventList> {
+    const response = await http.get<ApiResponse<AdminAdoWebhookEventList>>('/api/v1/admin/ado-webhook-events', { params })
+    return unwrapApiResponse(response.data)
+  },
+
+  async getAdoWebhookEvent(id: string): Promise<AdminAdoWebhookEventDetail> {
+    const response = await http.get<ApiResponse<AdminAdoWebhookEventDetail>>(`/api/v1/admin/ado-webhook-events/${id}`)
     return unwrapApiResponse(response.data)
   },
 }
