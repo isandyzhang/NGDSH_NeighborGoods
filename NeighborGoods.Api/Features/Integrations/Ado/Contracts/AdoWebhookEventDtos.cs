@@ -9,7 +9,8 @@ public sealed record AdoWebhookEventListItemDto(
     int? WorkItemId,
     string? WorkItemTitle,
     string? SummaryPreview,
-    string FieldResolveStatus);
+    string FieldResolveStatus,
+    string LineNotifyStatus);
 
 public sealed record AdoWebhookEventDetailDto(
     Guid Id,
@@ -24,7 +25,8 @@ public sealed record AdoWebhookEventDetailDto(
     string? SummaryPreview,
     string? NormalizedSummary,
     string FieldResolveStatus,
-    string? NormalizeError);
+    string? NormalizeError,
+    string LineNotifyStatus);
 
 public sealed record AdoWebhookEventListResponse(
     IReadOnlyList<AdoWebhookEventListItemDto> Items,

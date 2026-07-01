@@ -12,4 +12,5 @@ public sealed record AdoWebhookEventEntry(
     string? SummaryPreview = null,
     string? NormalizedSummary = null,
     string FieldResolveStatus = "pending",
-    string? NormalizeError = null);
+    string? NormalizeError = null,
+    string LineNotifyStatus = "pending");

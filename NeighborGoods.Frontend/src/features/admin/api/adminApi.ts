@@ -177,6 +177,7 @@ export type AdminAdoWebhookEventListItem = {
   workItemTitle: string | null
   summaryPreview: string | null
   fieldResolveStatus: string
+  lineNotifyStatus: string
 }
 
 export type AdminAdoWebhookEventDetail = {
@@ -193,6 +194,7 @@ export type AdminAdoWebhookEventDetail = {
   normalizedSummary: string | null
   fieldResolveStatus: string
   normalizeError: string | null
+  lineNotifyStatus: string
 }
 
 export type AdminAdoWebhookEventList = {

@@ -78,6 +78,7 @@ builder.Services.Configure<AdoWebhookOptions>(builder.Configuration.GetSection(A
 builder.Services.AddSingleton<AdoWebhookMemoryStore>();
 builder.Services.AddHttpClient<AdoFieldsClient>();
 builder.Services.AddSingleton<AdoWebhookNormalizer>();
+builder.Services.AddScoped<AdoWebhookLineNotifier>();
 builder.Services.AddScoped<AdoWebhookProcessor>();
 builder.Services.AddScoped<LineWebhookService>();
 builder.Services.AddScoped<LineMenuQueryService>();

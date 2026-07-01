@@ -51,6 +51,19 @@ const formatResolveStatus = (status: string) => {
   }
 }
 
+const formatLineNotifyStatus = (status: string) => {
+  switch (status) {
+    case 'sent':
+      return '已送'
+    case 'skipped':
+      return '略過'
+    case 'failed':
+      return '失敗'
+    default:
+      return '處理中'
+  }
+}
+
 export const AdminWebhookEventsPage = () => {
   const [data, setData] = useState<AdminAdoWebhookEventList | null>(null)
   const [page, setPage] = useState(1)
@@ -139,6 +152,7 @@ export const AdminWebhookEventsPage = () => {
               <th className="px-4 py-3 font-medium">Work Item</th>
               <th className="px-4 py-3 font-medium">摘要</th>
               <th className="px-4 py-3 font-medium">欄位解析</th>
+              <th className="px-4 py-3 font-medium">LINE</th>
               <th className="px-4 py-3 font-medium" />
             </tr>
           </thead>
@@ -156,6 +170,7 @@ export const AdminWebhookEventsPage = () => {
                   </td>
                   <td className="max-w-md truncate px-4 py-3 text-text-subtle">{item.summaryPreview ?? item.rawBodyPreview}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-text-muted">{formatResolveStatus(item.fieldResolveStatus)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-text-muted">{formatLineNotifyStatus(item.lineNotifyStatus)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <button type="button" className="underline" onClick={() => void handleView(item.id)}>
                       查看
@@ -165,7 +180,7 @@ export const AdminWebhookEventsPage = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-text-muted">
+                <td colSpan={7} className="px-4 py-8 text-center text-text-muted">
                   尚無 webhook 紀錄
                 </td>
               </tr>
@@ -225,6 +240,7 @@ export const AdminWebhookEventsPage = () => {
                 <p>事件：{formatEventType(detail.eventType)}</p>
                 <p>Work Item：{detail.workItemId ? `#${detail.workItemId}` : '-'}</p>
                 <p>欄位解析：{formatResolveStatus(detail.fieldResolveStatus)}</p>
+                <p>LINE：{formatLineNotifyStatus(detail.lineNotifyStatus)}</p>
                 {detail.projectName ? <p>專案：{detail.projectName}</p> : null}
                 {detail.workItemUrl ? (
                   <p className="sm:col-span-2">

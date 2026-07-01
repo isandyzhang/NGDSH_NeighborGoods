@@ -949,7 +949,8 @@ public static class AdminEndpoints
             entry.WorkItemId,
             entry.WorkItemTitle,
             entry.SummaryPreview,
-            entry.FieldResolveStatus);
+            entry.FieldResolveStatus,
+            entry.LineNotifyStatus);
 
     private static AdoWebhookEventDetailDto ToDetailDto(AdoWebhookEventEntry entry) =>
         new(
@@ -965,7 +966,8 @@ public static class AdminEndpoints
             entry.SummaryPreview,
             entry.NormalizedSummary,
             entry.FieldResolveStatus,
-            entry.NormalizeError);
+            entry.NormalizeError,
+            entry.LineNotifyStatus);
 
     private static string BuildRawBodyPreview(string rawBody)
     {

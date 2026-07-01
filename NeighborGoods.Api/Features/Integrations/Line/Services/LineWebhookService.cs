@@ -14,7 +14,8 @@ public sealed class LineWebhookService(
     LineFlexMessageBuilder flexMessageBuilder,
     ILineMessageSender lineMessageSender,
     IMemoryCache memoryCache,
-    IOptions<LineMessagingOptions> lineMessagingOptions)
+    IOptions<LineMessagingOptions> lineMessagingOptions,
+    ILogger<LineWebhookService> logger)
 {
     private static readonly TimeSpan MenuActionCooldown = TimeSpan.FromSeconds(3);
     private readonly LineMessagingOptions _options = lineMessagingOptions.Value;
@@ -31,6 +32,14 @@ public sealed class LineWebhookService(
 
         foreach (var evt in ParseEvents(body))
         {
+            if (!string.IsNullOrWhiteSpace(evt.GroupId))
+            {
+                logger.LogInformation(
+                    "LINE group webhook: groupId={GroupId}, eventType={EventType}",
+                    evt.GroupId,
+                    evt.Type);
+            }
+
             if (string.IsNullOrWhiteSpace(evt.UserId))
             {
                 continue;
@@ -283,6 +292,7 @@ public sealed class LineWebhookService(
                 : string.Empty;
 
             string? userId = null;
+            string? groupId = null;
             string? replyToken = eventElement.TryGetProperty("replyToken", out var replyTokenElement)
                 ? replyTokenElement.GetString()
                 : null;
@@ -290,10 +300,21 @@ public sealed class LineWebhookService(
             string? messageType = null;
             string? messageText = null;
 
-            if (eventElement.TryGetProperty("source", out var sourceElement) &&
-                sourceElement.TryGetProperty("userId", out var userIdElement))
+            if (eventElement.TryGetProperty("source", out var sourceElement))
             {
-                userId = userIdElement.GetString();
+                if (sourceElement.TryGetProperty("userId", out var userIdElement))
+                {
+                    userId = userIdElement.GetString();
+                }
+
+                var sourceType = sourceElement.TryGetProperty("type", out var sourceTypeElement)
+                    ? sourceTypeElement.GetString()
+                    : null;
+                if (string.Equals(sourceType, "group", StringComparison.OrdinalIgnoreCase)
+                    && sourceElement.TryGetProperty("groupId", out var groupIdElement))
+                {
+                    groupId = groupIdElement.GetString();
+                }
             }
 
             if (eventElement.TryGetProperty("postback", out var postbackElement)
@@ -312,7 +333,7 @@ public sealed class LineWebhookService(
                     : null;
             }
 
-            result.Add(new LineWebhookEventItem(type, userId, replyToken, postbackData, messageType, messageText));
+            result.Add(new LineWebhookEventItem(type, userId, groupId, replyToken, postbackData, messageType, messageText));
         }
 
         return result;
@@ -321,6 +342,7 @@ public sealed class LineWebhookService(
     private sealed record LineWebhookEventItem(
         string Type,
         string? UserId,
+        string? GroupId,
         string? ReplyToken,
         string? PostbackData,
         string? MessageType,

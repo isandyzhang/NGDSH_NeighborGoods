@@ -6,6 +6,7 @@ public sealed class AdoWebhookProcessor(
     AdoFieldsClient fieldsClient,
     AdoWebhookNormalizer normalizer,
     AdoWebhookMemoryStore store,
+    AdoWebhookLineNotifier lineNotifier,
     IOptions<AdoWebhookOptions> options,
     ILogger<AdoWebhookProcessor> logger)
 {
@@ -37,6 +38,8 @@ public sealed class AdoWebhookProcessor(
             };
         }
 
+        var lineNotifyStatus = await lineNotifier.TryNotifyAsync(result, cancellationToken);
+
         var updated = store.TryUpdate(eventId, entry => entry with
         {
             EventType = result.EventType,
@@ -48,6 +51,7 @@ public sealed class AdoWebhookProcessor(
             NormalizedSummary = result.NormalizedSummary,
             FieldResolveStatus = HasPatConfigured() ? result.FieldResolveStatus : PreferSkippedStatus(result.FieldResolveStatus),
             NormalizeError = result.NormalizeError,
+            LineNotifyStatus = lineNotifyStatus,
         });
 
         if (!updated)
