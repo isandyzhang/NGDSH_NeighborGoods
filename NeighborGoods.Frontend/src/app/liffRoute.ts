@@ -12,6 +12,13 @@ import { resolveLineLiffId } from '@/app/lineLiffId'
 const normalizeLiffQuery = (search: string) =>
   !search || search === '?' ? '' : search.startsWith('?') ? search : `?${search}`
 
+const hasLiffOAuthReturnParams = (params: URLSearchParams) =>
+  params.has('code') ||
+  params.has('state') ||
+  params.has('liffClientId') ||
+  params.has('liffRedirectUri') ||
+  params.has('liff.hback')
+
 /**
  * path 格式：liff.line.me/{liffId}/listings（圖文選單、Flex 按鈕；手機實測較穩）。
  */
@@ -199,6 +206,11 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
     return hasListingSharePending()
   }
 
+  // liff.login 回到 `/` 時會帶 OAuth 參數但不保留 `listingShare=1`，需接回 pending 分享流程。
+  if (hasLiffOAuthReturnParams(params) && hasListingSharePending() && !hasLineBindingPending()) {
+    return true
+  }
+
   return false
 }
 
@@ -221,7 +233,7 @@ export const isLineNotifyBindingEntry = (pathname: string, search: string): bool
   }
 
   // OAuth return (?code=...) drops bindToken from URL; session keeps binding on `/`.
-  return pathname === '/' && hasLineBindingPending()
+  return pathname === '/' && hasLineBindingPending() && !isListingShareEntry(pathname, search)
 }
 
 /** Redirect URI for liff.login — root only; bindToken lives in sessionStorage across OAuth. */
