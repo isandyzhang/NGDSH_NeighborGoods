@@ -1,7 +1,9 @@
-import { hasLineBindingPending } from '@/features/account/lineBindingSession'
+import { hasLineBindingPending, readLineBindingPending } from '@/features/account/lineBindingSession'
 import {
   hasListingSharePending,
+  hasListingShareOAuthReturnParams,
   liffStateImpliesListingShare,
+  readListingSharePending,
   resolveListingShareParams,
 } from '@/features/listings/listingShareSession'
 
@@ -83,6 +85,16 @@ const buildListingTargetFromParams = (params: URLSearchParams): string | null =>
   const lineAction = params.get('lineAction')?.trim()
   const search = lineAction ? `?lineAction=${lineAction}` : ''
   return `/listings/${listingId}${search}`
+}
+
+const isLatestPendingLiffFlowListingShare = (): boolean => {
+  const listingPending = readListingSharePending()
+  if (!listingPending) {
+    return false
+  }
+
+  const bindingPending = readLineBindingPending()
+  return !bindingPending || listingPending.savedAt >= bindingPending.savedAt
 }
 
 const parseLiffStateTarget = (liffState: string): string | null => {
@@ -199,6 +211,10 @@ export const isListingShareEntry = (pathname: string, search: string): boolean =
     return hasListingSharePending()
   }
 
+  if (hasListingShareOAuthReturnParams(params)) {
+    return isLatestPendingLiffFlowListingShare()
+  }
+
   return false
 }
 
@@ -220,8 +236,16 @@ export const isLineNotifyBindingEntry = (pathname: string, search: string): bool
     }
   }
 
-  // OAuth return (?code=...) drops bindToken from URL; session keeps binding on `/`.
-  return pathname === '/' && hasLineBindingPending()
+  // OAuth return (?code=...) drops bindToken/listingShare from URL; resume the newest pending flow.
+  if (pathname !== '/' || !hasLineBindingPending()) {
+    return false
+  }
+
+  if (hasListingShareOAuthReturnParams(params) && isLatestPendingLiffFlowListingShare()) {
+    return false
+  }
+
+  return true
 }
 
 /** Redirect URI for liff.login — root only; bindToken lives in sessionStorage across OAuth. */

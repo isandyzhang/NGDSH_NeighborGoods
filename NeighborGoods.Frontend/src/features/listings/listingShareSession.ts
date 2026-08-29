@@ -4,6 +4,9 @@ import type { ShareListingOptions } from '@/features/listings/utils/lineShare'
 const STORAGE_KEY = 'neighborGoods.listingSharePending'
 const LIFF_OAUTH_PRESERVE_KEYS = ['code', 'state', 'liffClientId', 'liffRedirectUri', 'liff.hback'] as const
 
+export const hasListingShareOAuthReturnParams = (params: URLSearchParams): boolean =>
+  LIFF_OAUTH_PRESERVE_KEYS.some((key) => params.has(key))
+
 const isListingShareFlag = (params: URLSearchParams) =>
   params.get('listingShare') === '1' || params.get('listingsShare') === '1'
 
@@ -165,6 +168,14 @@ export const resolveListingShareParams = (
     if (pending) {
       return pending
     }
+  }
+
+  if (
+    hasListingShareOAuthReturnParams(params) &&
+    !params.get('listingId')?.trim() &&
+    !liffStateParams?.get('listingId')?.trim()
+  ) {
+    return readListingSharePending()
   }
 
   const listingId = params.get('listingId') ?? liffStateParams?.get('listingId') ?? ''
