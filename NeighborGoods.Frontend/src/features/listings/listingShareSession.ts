@@ -83,6 +83,14 @@ export const readListingSharePending = (): ListingSharePendingSession | null => 
 
 export const hasListingSharePending = (): boolean => readRaw() !== null
 
+const hasLiffOAuthReturnParams = (params: URLSearchParams) =>
+  LIFF_OAUTH_PRESERVE_KEYS.some((key) => params.has(key))
+
+export const isListingSharePendingResume = (search: string): boolean => {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  return hasLiffOAuthReturnParams(params) && hasListingSharePending()
+}
+
 export const clearListingSharePending = () => {
   if (typeof sessionStorage !== 'undefined') {
     sessionStorage.removeItem(STORAGE_KEY)
@@ -153,6 +161,13 @@ export const resolveListingShareParams = (
 ): (ShareListingOptions & { returnTo: string }) | null => {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const liffStateParams = params.get('liff.state') ? liffStateQueryParams(params.get('liff.state') ?? '') : null
+
+  if (hasLiffOAuthReturnParams(params)) {
+    const pending = readListingSharePending()
+    if (pending) {
+      return pending
+    }
+  }
 
   const lineAction = params.get('lineAction') ?? liffStateParams?.get('lineAction')
   const listingShareFlag = params.get('listingShare') ?? liffStateParams?.get('listingShare')
