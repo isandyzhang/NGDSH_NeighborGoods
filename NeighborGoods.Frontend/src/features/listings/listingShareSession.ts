@@ -153,6 +153,12 @@ export const resolveListingShareParams = (
 ): (ShareListingOptions & { returnTo: string }) | null => {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const liffStateParams = params.get('liff.state') ? liffStateQueryParams(params.get('liff.state') ?? '') : null
+  if (LIFF_OAUTH_PRESERVE_KEYS.some((key) => params.has(key))) {
+    const pending = readListingSharePending()
+    if (pending) {
+      return pending
+    }
+  }
 
   const lineAction = params.get('lineAction') ?? liffStateParams?.get('lineAction')
   const listingShareFlag = params.get('listingShare') ?? liffStateParams?.get('listingShare')
