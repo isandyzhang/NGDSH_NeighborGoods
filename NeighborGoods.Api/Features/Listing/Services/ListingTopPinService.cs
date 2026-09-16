@@ -41,7 +41,7 @@ public sealed class ListingTopPinService(NeighborGoodsDbContext dbContext, ICurr
         user.TopPinCredits -= 1;
         listing.IsPinned = true;
         listing.PinnedStartDate = now;
-        listing.PinnedEndDate = now.AddDays(7);
+        listing.PinnedEndDate = now.AddDays(ListingConstants.TopPinDurationDays);
         listing.UpdatedAt = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -5,6 +5,7 @@ using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Data;
 using NeighborGoods.Data.LegacyEntities;
+using NeighborGoods.Data.Listings;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Listing.Services;
@@ -29,7 +30,7 @@ public sealed class ListingCommandService(
         if (imageFiles.Count > ListingImageUploadRules.MaxImageCount)
         {
             throw new ArgumentException(
-                $"Image count exceeds maximum allowed ({ListingImageUploadRules.MaxImageCount}).",
+                $"圖片數量不可超過 {ListingImageUploadRules.MaxImageCount} 張。",
                 nameof(imageFiles));
         }
 
@@ -123,7 +124,7 @@ public sealed class ListingCommandService(
                 StatusCodes.Status403Forbidden);
         }
 
-        var (price, isFree) = NormalizePriceAndFreeForUpdate(request.Price, request.IsFree);
+        var (price, isFree) = ListingPriceRules.Normalize(request.Price, request.IsFree);
 
         entity.Title = request.Title.Trim();
         entity.Description = request.Description?.Trim() ?? string.Empty;
@@ -149,7 +150,7 @@ public sealed class ListingCommandService(
                 var trimmed = token.Trim();
                 var images = entity.ListingImages
                     .Where(img =>
-                        ListingBlobPath.StoredImageMatchesDeleteToken(
+                        ListingBlobPath.StoredImageMatchesToken(
                             img.ImageUrl,
                             trimmed,
                             raw => ResolveImageUrlForMatch(raw)))
@@ -253,7 +254,9 @@ public sealed class ListingCommandService(
             .CountAsync(x => x.ListingId == listingId, cancellationToken);
         if (existingImageCount >= ListingImageUploadRules.MaxImageCount)
         {
-            throw new ArgumentException("Image count exceeds maximum allowed (5).", nameof(file));
+            throw new ArgumentException(
+                $"圖片數量不可超過 {ListingImageUploadRules.MaxImageCount} 張。",
+                nameof(file));
         }
 
         var nextSortOrder = await dbContext.ListingImages
@@ -322,7 +325,7 @@ public sealed class ListingCommandService(
                 StatusCodes.Status409Conflict);
         }
 
-        var (price, isFree) = NormalizePriceAndFreeForCreate(request.Price, request.IsFree);
+        var (price, isFree) = ListingPriceRules.Normalize(request.Price, request.IsFree);
 
         if (request.UseTopPin && seller.TopPinCredits <= 0)
         {
@@ -357,7 +360,7 @@ public sealed class ListingCommandService(
             seller.TopPinCredits -= 1;
             entity.IsPinned = true;
             entity.PinnedStartDate = now;
-            entity.PinnedEndDate = now.AddDays(7);
+            entity.PinnedEndDate = now.AddDays(ListingConstants.TopPinDurationDays);
         }
 
         return (entity, seller);
@@ -382,18 +385,18 @@ public sealed class ListingCommandService(
     {
         if (file.Length <= 0)
         {
-            throw new ArgumentException("Image file is required.", nameof(file));
+            throw new ArgumentException("請選擇商品圖片。", nameof(file));
         }
 
         if (file.Length > ListingImageUploadRules.MaxFileSize)
         {
-            throw new ArgumentException("Image file size exceeds 5MB limit.", nameof(file));
+            throw new ArgumentException("圖片大小不可超過 5MB。", nameof(file));
         }
 
         var contentType = file.ContentType?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(contentType) || !ListingImageUploadRules.AllowedContentTypes.Contains(contentType))
         {
-            throw new ArgumentException("Unsupported image content type.", nameof(file));
+            throw new ArgumentException("不支援的圖片格式。", nameof(file));
         }
     }
 
@@ -403,83 +406,35 @@ public sealed class ListingCommandService(
             ? storedRaw
             : blobStorage.BuildPublicUrl(storedRaw);
 
-    private static (decimal Price, bool IsFree) NormalizePriceAndFreeForCreate(int requestPrice, bool requestIsFree)
+    private Task EnsureActiveCategoryExistsAsync(int categoryCode, CancellationToken cancellationToken) =>
+        EnsureActiveLookupExistsAsync<ListingCategory>(categoryCode, "分類", nameof(categoryCode), cancellationToken);
+
+    private Task EnsureActiveConditionExistsAsync(int conditionCode, CancellationToken cancellationToken) =>
+        EnsureActiveLookupExistsAsync<ListingCondition>(conditionCode, "品況", nameof(conditionCode), cancellationToken);
+
+    private Task EnsureActiveResidenceExistsAsync(int residenceCode, CancellationToken cancellationToken) =>
+        EnsureActiveLookupExistsAsync<ListingResidence>(residenceCode, "社宅", nameof(residenceCode), cancellationToken);
+
+    private Task EnsureActivePickupLocationExistsAsync(int pickupLocationCode, CancellationToken cancellationToken) =>
+        EnsureActiveLookupExistsAsync<ListingPickupLocation>(
+            pickupLocationCode,
+            "面交地點",
+            nameof(pickupLocationCode),
+            cancellationToken);
+
+    private async Task EnsureActiveLookupExistsAsync<TEntity>(
+        int code,
+        string displayName,
+        string paramName,
+        CancellationToken cancellationToken)
+        where TEntity : class, IListingLookup
     {
-        var price = requestPrice;
-        var isFree = requestIsFree;
-        if (price > 0 && isFree)
-        {
-            isFree = false;
-        }
-        else if (price == 0)
-        {
-            isFree = true;
-        }
-        else if (isFree && price > 0)
-        {
-            price = 0;
-        }
-
-        return (price, isFree);
-    }
-
-    private static (decimal Price, bool IsFree) NormalizePriceAndFreeForUpdate(int requestPrice, bool requestIsFree)
-    {
-        var price = requestPrice;
-        var isFree = requestIsFree;
-        if (price == 0)
-        {
-            isFree = true;
-        }
-        else if (isFree)
-        {
-            price = 0;
-        }
-
-        return (price, isFree);
-    }
-
-    private async Task EnsureActiveCategoryExistsAsync(int categoryCode, CancellationToken cancellationToken)
-    {
-        var exists = await dbContext.ListingCategories.AnyAsync(
-            c => c.Id == categoryCode && c.IsActive,
+        var exists = await dbContext.Set<TEntity>().AnyAsync(
+            c => c.Id == code && c.IsActive,
             cancellationToken);
         if (!exists)
         {
-            throw new ArgumentException("Invalid or inactive category.", nameof(categoryCode));
-        }
-    }
-
-    private async Task EnsureActiveConditionExistsAsync(int conditionCode, CancellationToken cancellationToken)
-    {
-        var exists = await dbContext.ListingConditions.AnyAsync(
-            c => c.Id == conditionCode && c.IsActive,
-            cancellationToken);
-        if (!exists)
-        {
-            throw new ArgumentException("Invalid or inactive condition.", nameof(conditionCode));
-        }
-    }
-
-    private async Task EnsureActiveResidenceExistsAsync(int residenceCode, CancellationToken cancellationToken)
-    {
-        var exists = await dbContext.ListingResidences.AnyAsync(
-            c => c.Id == residenceCode && c.IsActive,
-            cancellationToken);
-        if (!exists)
-        {
-            throw new ArgumentException("Invalid or inactive residence.", nameof(residenceCode));
-        }
-    }
-
-    private async Task EnsureActivePickupLocationExistsAsync(int pickupLocationCode, CancellationToken cancellationToken)
-    {
-        var exists = await dbContext.ListingPickupLocations.AnyAsync(
-            c => c.Id == pickupLocationCode && c.IsActive,
-            cancellationToken);
-        if (!exists)
-        {
-            throw new ArgumentException("Invalid or inactive pickup location.", nameof(pickupLocationCode));
+            throw new ArgumentException($"無效或已停用的{displayName}。", paramName);
         }
     }
 
@@ -499,12 +454,12 @@ public sealed class ListingCommandService(
     {
         if (string.IsNullOrWhiteSpace(title))
         {
-            throw new ArgumentException("Title is required.", nameof(title));
+            throw new ArgumentException("請填寫標題。", nameof(title));
         }
 
         if (price < 0)
         {
-            throw new ArgumentException("Price cannot be negative.", nameof(price));
+            throw new ArgumentException("價格不可為負數。", nameof(price));
         }
     }
 
@@ -542,7 +497,7 @@ public sealed class ListingCommandService(
         foreach (var token in normalizedTokens)
         {
             var match = remaining.FirstOrDefault(img =>
-                ListingBlobPath.StoredImageMatchesDeleteToken(
+                ListingBlobPath.StoredImageMatchesToken(
                     img.ImageUrl,
                     token,
                     raw => ResolveImageUrlForMatch(raw)));

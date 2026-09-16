@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { CircleCheck } from 'lucide-react'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { listingApi, type ListingDetail } from '@/features/listings/api/listingApi'
+import { formatListingPrice } from '@/features/listings/utils/listingFormat'
 import { PurchaseConfirmModal } from '@/features/listings/components/PurchaseConfirmModal'
 import { TradeActionConfirmModal } from '@/features/messaging/components/TradeActionConfirmModal'
 import { messagingApi, type ConversationPurchaseRequest, type MessageItem } from '@/features/messaging/api/messagingApi'
@@ -93,13 +94,6 @@ const getPurchaseRequestStatusText = (status: number) => {
     default:
       return '未知狀態'
   }
-}
-
-const formatPrice = (item: ListingDetail) => {
-  if (item.isFree) {
-    return '免費'
-  }
-  return `NT$ ${item.price.toLocaleString()}`
 }
 
 export const ChatPage = () => {
@@ -483,7 +477,7 @@ export const ChatPage = () => {
                   )}
                 </div>
                 <h3 className="line-clamp-2 text-base font-semibold text-text-main">{listingDetail.title}</h3>
-                <p className="text-lg font-bold text-text-main">{formatPrice(listingDetail)}</p>
+                <p className="text-lg font-bold text-text-main">{formatListingPrice(listingDetail)}</p>
                 <p className="text-sm text-text-subtle">
                   {listingDetail.categoryName}・{listingDetail.conditionName}
                 </p>

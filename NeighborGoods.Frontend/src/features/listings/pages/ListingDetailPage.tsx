@@ -26,6 +26,7 @@ import {
   type LiffShareDiagnostics,
   type ShareListingResult,
 } from '@/features/listings/utils/lineShare'
+import { formatCountdown, formatListingPrice, getPendingRemainingSeconds } from '@/features/listings/utils/listingFormat'
 import { useAuth } from '@/features/auth/components/AuthProvider'
 import { messagingApi } from '@/features/messaging/api/messagingApi'
 import { ApiClientError } from '@/shared/types/api'
@@ -36,29 +37,6 @@ import { EmptyState } from '@/shared/ui/EmptyState'
 import { AppModal } from '@/shared/ui/modal/AppModal'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
-
-const formatPrice = (item: ListingDetail) => {
-  if (item.isFree) {
-    return '免費'
-  }
-
-  return `NT$ ${item.price.toLocaleString()}`
-}
-
-const formatCountdown = (seconds: number) => {
-  const normalized = Math.max(0, Math.floor(seconds))
-  const hours = Math.floor(normalized / 3600)
-  const minutes = Math.floor((normalized % 3600) / 60)
-  const remainingSeconds = normalized % 60
-  return [hours, minutes, remainingSeconds].map((value) => value.toString().padStart(2, '0')).join(':')
-}
-
-const parseApiDateToMs = (value: string) => {
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
-  const normalized = hasTimezone ? value : `${value}Z`
-  const parsed = Date.parse(normalized)
-  return Number.isNaN(parsed) ? null : parsed
-}
 
 export const ListingDetailPage = () => {
   const navigate = useNavigate()
@@ -136,22 +114,22 @@ export const ListingDetailPage = () => {
     }
   }, [item])
 
-  const pendingExpireAtMs = item?.pendingPurchaseRequestExpireAt
-    ? parseApiDateToMs(item.pendingPurchaseRequestExpireAt)
-    : null
-  const pendingRemainingFromNow =
-    pendingExpireAtMs == null ? null : Math.max(0, Math.floor((pendingExpireAtMs - countdownNowMs) / 1000))
-  const pendingRemainingFromServer = item?.pendingPurchaseRequestRemainingSeconds ?? null
-  const pendingRemainingSeconds =
-    pendingRemainingFromNow ?? (pendingRemainingFromServer == null ? null : Math.max(0, pendingRemainingFromServer))
+  const pendingRemainingSeconds = getPendingRemainingSeconds(
+    item?.pendingPurchaseRequestExpireAt,
+    item?.pendingPurchaseRequestRemainingSeconds,
+    countdownNowMs,
+  )
   const hasPendingPurchaseRequest = pendingRemainingSeconds != null && pendingRemainingSeconds > 0
+  const hasInProgressTrade = Boolean(item?.inProgress) && !hasPendingPurchaseRequest
   const isOwnListing = !!item && tokens?.userId === item.seller.id
   const canPurchase = item
-    ? canPurchaseListing(item.statusCode, { hasPendingPurchaseRequest })
+    ? canPurchaseListing(item.statusCode, { hasPendingPurchaseRequest, hasInProgressTrade })
     : false
   const canEdit = item ? isOwnListing && canEditListing(item.statusCode) : false
   const canShare = item ? canShareListing(item.statusCode) : false
-  const detailOverlay = item ? getListingDetailOverlay(item.statusCode, hasPendingPurchaseRequest) : null
+  const detailOverlay = item
+    ? getListingDetailOverlay(item.statusCode, hasPendingPurchaseRequest, hasInProgressTrade)
+    : null
   const showExpiredPanel = !!item && isOwnListing && isAutoExpiredListing(item.statusCode, item.autoExpiredAt)
   const showUnavailableBanner =
     !!item && shouldShowUnavailableBanner(item.statusCode) && !showExpiredPanel
@@ -297,7 +275,7 @@ export const ListingDetailPage = () => {
     return {
       listingId: targetItem.id,
       listingTitle: targetItem.title,
-      priceLabel: formatPrice(targetItem),
+      priceLabel: formatListingPrice(targetItem),
       categoryName: targetItem.categoryName,
       conditionName: targetItem.conditionName,
       residenceName: targetItem.residenceName,
@@ -386,6 +364,13 @@ export const ListingDetailPage = () => {
         <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
           <p className="text-xl font-semibold tracking-wide">交易處理中</p>
           <p className="text-3xl font-bold tabular-nums">{formatCountdown(pendingRemainingSeconds ?? 0)}</p>
+        </motion.div>
+      ) : detailOverlay === 'inProgress' ? (
+        <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+          <p className="text-xl font-semibold tracking-wide">交易進行中</p>
+          <p className="text-base text-white/90">
+            {item?.inProgressStage === 5 ? '待買家確認收貨' : '已同意，等待完成交易'}
+          </p>
         </motion.div>
       ) : detailOverlay === 'reserved' ? (
         <motion.div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
@@ -510,7 +495,7 @@ export const ListingDetailPage = () => {
                           免費
                         </span>
                       ) : (
-                        <span className="text-3xl font-bold text-text-main md:text-4xl lg:text-3xl">{formatPrice(item)}</span>
+                        <span className="text-3xl font-bold text-text-main md:text-4xl lg:text-3xl">{formatListingPrice(item)}</span>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

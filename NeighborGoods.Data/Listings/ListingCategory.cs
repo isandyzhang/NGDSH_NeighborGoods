@@ -1,6 +1,6 @@
 namespace NeighborGoods.Data.Listings;
 
-public sealed class ListingCategory
+public sealed class ListingCategory : IListingLookup
 {
     public int Id { get; set; }
     public string CodeKey { get; set; } = string.Empty;

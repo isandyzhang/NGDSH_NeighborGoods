@@ -7,6 +7,7 @@ public static class ListingConstants
 {
     public const int MaxActiveListingsPerUser = 10;
     public const int MinSearchTermLength = 2;
+    public const int TopPinDurationDays = 7;
     public const int ListingExpiryDays = ListingExpiryConstants.ExpiryDays;
     public const int ListingExpiryBatchSize = ListingExpiryConstants.BatchSize;
 }

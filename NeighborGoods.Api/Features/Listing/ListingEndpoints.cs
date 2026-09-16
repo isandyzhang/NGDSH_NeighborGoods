@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Features.Listing.Services;
 using NeighborGoods.Api.Shared.ApiContracts;
+using NeighborGoods.Api.Shared.Contracts;
 using NeighborGoods.Data;
 using NeighborGoods.Api.Shared.Security;
 
@@ -74,18 +75,7 @@ public static class ListingEndpoints
             };
 
             var result = await service.QueryAsync(request, currentUser.UserId, ct);
-            var payload = new
-            {
-                items = result.Items,
-                pagination = new
-                {
-                    page = result.Page,
-                    pageSize = result.PageSize,
-                    totalCount = result.Total,
-                    totalPages = (int)Math.Ceiling(result.Total / (double)result.PageSize)
-                }
-            };
-            return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+            return Results.Ok(ApiResponseFactory.Success(ToPagedPayload(result), httpContext));
         })
         .WithName("GetListingsV1")
         .WithSummary("商品列表（可累加篩選）")
@@ -101,18 +91,7 @@ public static class ListingEndpoints
         {
             var request = new ListingQueryRequest { Page = page, PageSize = pageSize };
             var result = await service.QueryMineAsync(request, ct);
-            var payload = new
-            {
-                items = result.Items,
-                pagination = new
-                {
-                    page = result.Page,
-                    pageSize = result.PageSize,
-                    totalCount = result.Total,
-                    totalPages = (int)Math.Ceiling(result.Total / (double)result.PageSize)
-                }
-            };
-            return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+            return Results.Ok(ApiResponseFactory.Success(ToPagedPayload(result), httpContext));
         })
         .WithName("GetMyListingsV1")
         .WithSummary("我的商品（賣家本人所有狀態）")
@@ -125,14 +104,16 @@ public static class ListingEndpoints
             Guid id,
             CancellationToken ct = default) =>
         {
-            var userId = currentUser.GetRequiredUserId();
-            var (data, errorCode, errorMessage) = await service.FavoriteAsync(userId, id, ct);
-            if (data is null)
+            try
             {
-                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+                var userId = currentUser.GetRequiredUserId();
+                var data = await service.FavoriteAsync(userId, id, ct);
+                return Results.Ok(ApiResponseFactory.Success(data, httpContext));
             }
-
-            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
         })
         .WithName("FavoriteListingV1")
         .RequireAuthorization();
@@ -144,14 +125,16 @@ public static class ListingEndpoints
             Guid id,
             CancellationToken ct = default) =>
         {
-            var userId = currentUser.GetRequiredUserId();
-            var (data, errorCode, errorMessage) = await service.UnfavoriteAsync(userId, id, ct);
-            if (data is null)
+            try
             {
-                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+                var userId = currentUser.GetRequiredUserId();
+                var data = await service.UnfavoriteAsync(userId, id, ct);
+                return Results.Ok(ApiResponseFactory.Success(data, httpContext));
             }
-
-            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
         })
         .WithName("UnfavoriteListingV1")
         .RequireAuthorization();
@@ -163,13 +146,15 @@ public static class ListingEndpoints
             Guid id,
             CancellationToken ct = default) =>
         {
-            var (data, errorCode, errorMessage) = await service.GetFavoriteStatusAsync(currentUser.UserId, id, ct);
-            if (data is null)
+            try
             {
-                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+                var data = await service.GetFavoriteStatusAsync(currentUser.UserId, id, ct);
+                return Results.Ok(ApiResponseFactory.Success(data, httpContext));
             }
-
-            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
         })
         .WithName("GetListingFavoriteStatusV1");
 
@@ -184,18 +169,7 @@ public static class ListingEndpoints
         {
             var userId = currentUser.GetRequiredUserId();
             var result = await service.GetMyFavoritesAsync(userId, page, pageSize, categoryCode, ct);
-            var payload = new
-            {
-                items = result.Items,
-                pagination = new
-                {
-                    page = result.Page,
-                    pageSize = result.PageSize,
-                    totalCount = result.Total,
-                    totalPages = (int)Math.Ceiling(result.Total / (double)result.PageSize)
-                }
-            };
-            return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+            return Results.Ok(ApiResponseFactory.Success(ToPagedPayload(result), httpContext));
         })
         .WithName("GetMyFavoriteListingsV1")
         .RequireAuthorization();
@@ -218,13 +192,7 @@ public static class ListingEndpoints
             {
                 seller = result.Seller,
                 items = result.Items,
-                pagination = new
-                {
-                    page = result.Page,
-                    pageSize = result.PageSize,
-                    totalCount = result.Total,
-                    totalPages = (int)Math.Ceiling(result.Total / (double)result.PageSize)
-                }
+                pagination = ToPagination(result.Page, result.PageSize, result.Total)
             };
             return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
         })
@@ -266,13 +234,15 @@ public static class ListingEndpoints
                     statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var (data, errorCode, errorMessage) = await service.GetPushTargetsAsync(categoryCode, listingId, limit, ct);
-            if (data is null)
+            try
             {
-                return ToFavoriteErrorResult(httpContext, errorCode!, errorMessage!);
+                var data = await service.GetPushTargetsAsync(categoryCode, listingId, limit, ct);
+                return Results.Ok(ApiResponseFactory.Success(data, httpContext));
             }
-
-            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
         })
         .WithName("GetFavoritePushTargetsV1")
         .RequireAuthorization();
@@ -421,196 +391,96 @@ public static class ListingEndpoints
         .WithName("DeleteListingV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/reserve", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/reserve", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.ReserveAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.ReserveAsync, ct))
         .WithName("ReserveListingV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/activate", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/activate", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.ActivateAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.ActivateAsync, ct))
         .WithName("ActivateListingV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/sold", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/sold", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.MarkSoldAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.MarkSoldAsync, ct))
         .WithName("MarkListingSoldV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/inactive", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/inactive", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.SetInactiveAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.SetInactiveAsync, ct))
         .WithName("SetListingInactiveV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/archive", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/archive", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.SetInactiveAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.SetInactiveAsync, ct))
         .WithName("ArchiveListingV1")
         .WithSummary("已下架（與 Web Inactive 一致；舊名 archive 仍可用）")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/donated", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/donated", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.MarkDonatedAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.MarkDonatedAsync, ct))
         .WithName("MarkListingDonatedV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/given-or-traded", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/given-or-traded", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.MarkGivenOrTradedAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.MarkGivenOrTradedAsync, ct))
         .WithName("MarkListingGivenOrTradedV1")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/reactivate", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/reactivate", (
             HttpContext httpContext,
             ListingStatusService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.ReactivateAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.ReactivateAsync, ct))
         .WithName("ReactivateListingV1")
         .WithSummary("重新上架（僅已下架）")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/renew", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/renew", (
             HttpContext httpContext,
             ListingRenewalService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.RenewAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.RenewAsync, ct))
         .WithName("RenewListingV1")
         .WithSummary("延續刊登（14 天到期非活躍商品）")
         .RequireAuthorization();
 
-        app.MapPatch("/api/v1/listings/{id:guid}/mark-sold-from-expiry", async (
+        app.MapPatch("/api/v1/listings/{id:guid}/mark-sold-from-expiry", (
             HttpContext httpContext,
             ListingRenewalService service,
             Guid id,
-            CancellationToken ct = default) =>
-        {
-            try
-            {
-                var outcome = await service.MarkSoldFromAutoExpiredAsync(id, ct);
-                return ToStatusActionResult(outcome, id, httpContext);
-            }
-            catch (ListingAccessException ex)
-            {
-                return ToListingAccessResult(ex, httpContext);
-            }
-        })
+            CancellationToken ct) =>
+            ExecuteStatusAction(httpContext, id, service.MarkSoldFromAutoExpiredAsync, ct))
         .WithName("MarkSoldFromExpiryListingV1")
         .WithSummary("標記已成交（僅系統到期非活躍商品）")
         .RequireAuthorization();
@@ -718,27 +588,41 @@ public static class ListingEndpoints
         return values.Length == 0 ? null : values;
     }
 
+    private static object ToPagedPayload<T>(PagedResult<T> result) => new
+    {
+        items = result.Items,
+        pagination = ToPagination(result.Page, result.PageSize, result.Total)
+    };
+
+    private static object ToPagination(int page, int pageSize, int total) => new
+    {
+        page,
+        pageSize,
+        totalCount = total,
+        totalPages = (int)Math.Ceiling(total / (double)pageSize)
+    };
+
+    private static async Task<IResult> ExecuteStatusAction(
+        HttpContext httpContext,
+        Guid id,
+        Func<Guid, CancellationToken, Task<ListingStatusChangeOutcome>> action,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var outcome = await action(id, cancellationToken);
+            return ToStatusActionResult(outcome, id, httpContext);
+        }
+        catch (ListingAccessException ex)
+        {
+            return ToListingAccessResult(ex, httpContext);
+        }
+    }
+
     private static IResult ToListingAccessResult(ListingAccessException ex, HttpContext httpContext) =>
         Results.Json(
             ApiResponseFactory.Error(ex.Code, ex.Message, httpContext),
             statusCode: ex.StatusCode);
-
-    private static IResult ToFavoriteErrorResult(HttpContext httpContext, string code, string message)
-    {
-        var statusCode = code switch
-        {
-            "LISTING_NOT_FOUND" => StatusCodes.Status404NotFound,
-            "CATEGORY_NOT_FOUND" => StatusCodes.Status404NotFound,
-            "LISTING_NOT_AVAILABLE" => StatusCodes.Status409Conflict,
-            "LISTING_FAVORITE_OWN_LISTING_NOT_ALLOWED" => StatusCodes.Status409Conflict,
-            "FORBIDDEN" => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return Results.Json(
-            ApiResponseFactory.Error(code, message, httpContext),
-            statusCode: statusCode);
-    }
 
     private static IResult ToStatusActionResult(ListingStatusChangeOutcome outcome, Guid id, HttpContext httpContext)
     {

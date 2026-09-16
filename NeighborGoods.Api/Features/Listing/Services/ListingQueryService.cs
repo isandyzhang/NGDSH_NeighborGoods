@@ -70,6 +70,13 @@ public sealed class ListingQueryService(
             .ToList();
         var mainImageUrl = resolvedImageUrls.FirstOrDefault();
         var pendingSummary = await GetPendingPurchaseRequestSummaryAsync(id, now, cancellationToken);
+        var inProgressStageMap = await GetInProgressPurchaseRequestStageMapAsync([id], cancellationToken);
+        var favoriteCountMap = await GetFavoriteCountMapAsync([id], cancellationToken);
+        var viewerFavoritedIds = await GetViewerFavoritedListingIdsAsync(
+            currentUserContext.UserId,
+            [id],
+            cancellationToken);
+        var hasInProgress = inProgressStageMap.TryGetValue(id, out var inProgressStage);
 
         var loginActivity = SellerLoginActivityResolver.Resolve(seller.LastLoginAt, now);
 
@@ -108,6 +115,10 @@ public sealed class ListingQueryService(
             listing.PinnedEndDate,
             pendingSummary?.ExpireAt,
             pendingSummary?.RemainingSeconds,
+            hasInProgress,
+            hasInProgress ? inProgressStage : null,
+            favoriteCountMap.GetValueOrDefault(id),
+            viewerFavoritedIds.Contains(id),
             listing.ListedAt,
             listing.AutoExpiredAt,
             listing.CreatedAt,
@@ -559,67 +570,35 @@ public sealed class ListingQueryService(
             total);
     }
 
-    private async Task<Dictionary<int, string>> GetCategoryMapAsync(CancellationToken cancellationToken)
+    private Task<Dictionary<int, string>> GetCategoryMapAsync(CancellationToken cancellationToken) =>
+        GetLookupMapAsync(CategoryLookupCacheKey, dbContext.ListingCategories, cancellationToken);
+
+    private Task<Dictionary<int, string>> GetConditionMapAsync(CancellationToken cancellationToken) =>
+        GetLookupMapAsync(ConditionLookupCacheKey, dbContext.ListingConditions, cancellationToken);
+
+    private Task<Dictionary<int, string>> GetResidenceMapAsync(CancellationToken cancellationToken) =>
+        GetLookupMapAsync(ResidenceLookupCacheKey, dbContext.ListingResidences, cancellationToken);
+
+    private Task<Dictionary<int, string>> GetPickupLocationMapAsync(CancellationToken cancellationToken) =>
+        GetLookupMapAsync(PickupLocationLookupCacheKey, dbContext.ListingPickupLocations, cancellationToken);
+
+    private async Task<Dictionary<int, string>> GetLookupMapAsync<TEntity>(
+        string cacheKey,
+        IQueryable<TEntity> source,
+        CancellationToken cancellationToken)
+        where TEntity : class, IListingLookup
     {
-        if (memoryCache.TryGetValue<Dictionary<int, string>>(CategoryLookupCacheKey, out var cached) && cached is not null)
+        if (memoryCache.TryGetValue<Dictionary<int, string>>(cacheKey, out var cached) && cached is not null)
         {
             return cached;
         }
 
-        var map = await dbContext.ListingCategories.AsNoTracking()
+        var map = await source.AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
 
-        memoryCache.Set(CategoryLookupCacheKey, map, LookupCacheDuration);
-        return map;
-    }
-
-    private async Task<Dictionary<int, string>> GetConditionMapAsync(CancellationToken cancellationToken)
-    {
-        if (memoryCache.TryGetValue<Dictionary<int, string>>(ConditionLookupCacheKey, out var cached) && cached is not null)
-        {
-            return cached;
-        }
-
-        var map = await dbContext.ListingConditions.AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.SortOrder)
-            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
-
-        memoryCache.Set(ConditionLookupCacheKey, map, LookupCacheDuration);
-        return map;
-    }
-
-    private async Task<Dictionary<int, string>> GetResidenceMapAsync(CancellationToken cancellationToken)
-    {
-        if (memoryCache.TryGetValue<Dictionary<int, string>>(ResidenceLookupCacheKey, out var cached) && cached is not null)
-        {
-            return cached;
-        }
-
-        var map = await dbContext.ListingResidences.AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.SortOrder)
-            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
-
-        memoryCache.Set(ResidenceLookupCacheKey, map, LookupCacheDuration);
-        return map;
-    }
-
-    private async Task<Dictionary<int, string>> GetPickupLocationMapAsync(CancellationToken cancellationToken)
-    {
-        if (memoryCache.TryGetValue<Dictionary<int, string>>(PickupLocationLookupCacheKey, out var cached) && cached is not null)
-        {
-            return cached;
-        }
-
-        var map = await dbContext.ListingPickupLocations.AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.SortOrder)
-            .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
-
-        memoryCache.Set(PickupLocationLookupCacheKey, map, LookupCacheDuration);
+        memoryCache.Set(cacheKey, map, LookupCacheDuration);
         return map;
     }
 

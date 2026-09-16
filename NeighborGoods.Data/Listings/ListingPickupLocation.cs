@@ -1,6 +1,6 @@
 namespace NeighborGoods.Data.Listings;
 
-public sealed class ListingPickupLocation
+public sealed class ListingPickupLocation : IListingLookup
 {
     public int Id { get; set; }
     public string CodeKey { get; set; } = string.Empty;

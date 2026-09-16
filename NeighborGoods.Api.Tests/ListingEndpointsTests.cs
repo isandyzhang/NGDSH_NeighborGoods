@@ -240,6 +240,9 @@ public sealed class ListingEndpointsTests
         Assert.Equal(
             "https://blob.local.test/listing/listings/11111111-1111-1111-1111-111111111111/1-new-path.jpg",
             imageUrls[1].GetString());
+        Assert.False(data.GetProperty("inProgress").GetBoolean());
+        Assert.Equal(0, data.GetProperty("favoriteCount").GetInt32());
+        Assert.False(data.GetProperty("isFavorited").GetBoolean());
     }
 
     [Fact]

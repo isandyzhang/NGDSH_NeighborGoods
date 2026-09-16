@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listingApi, type FavoriteListingItem } from '@/features/listings/api/listingApi'
+import { formatListingPrice } from '@/features/listings/utils/listingFormat'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { EmptyState } from '@/shared/ui/EmptyState'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
-
-const formatPrice = (item: Pick<FavoriteListingItem, 'isFree' | 'price'>) => (item.isFree ? '免費' : `NT$ ${item.price.toLocaleString()}`)
 
 export const FavoritesPage = () => {
   const [items, setItems] = useState<FavoriteListingItem[]>([])
@@ -100,7 +99,7 @@ export const FavoritesPage = () => {
                 </Link>
                 <div className="flex flex-wrap gap-2 text-sm text-text-subtle">
                   <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">{item.categoryName}</span>
-                  <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">{formatPrice(item)}</span>
+                  <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">{formatListingPrice(item)}</span>
                 </div>
                 <p className="text-sm text-text-muted">
                   收藏於 {new Date(item.favoritedAt).toLocaleDateString('zh-TW')}

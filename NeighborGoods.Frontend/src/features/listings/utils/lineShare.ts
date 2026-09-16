@@ -9,7 +9,6 @@ import {
 /** LIFF shareTargetPicker 接受的 Flex 訊息型別 */
 type ListingLiffFlexMessage = Extract<SendMessagesParams[number], { type: 'flex' }>
 
-const LINE_SHARE_BASE_URL = 'https://social-plugins.line.me/lineit/share'
 const LINE_SHARE_PREFIX = '各位好厝邊大家好！我要分享一個超棒的東西，如果有興趣請來網站看看喔！'
 const LINE_TEXT_SHARE_BASE_URL = 'https://line.me/R/msg/text/?'
 
@@ -106,17 +105,6 @@ export type LiffShareDiagnostics = {
   errorMessage: string | null
 }
 
-export type LiffShareRuntimeStatus = {
-  liffIdConfigured: boolean
-  liffReady: boolean
-  isLoggedIn: boolean
-  isInClient: boolean
-  shareTargetPickerAvailable: boolean
-  contextType: string | null
-  errorCode: string | null
-  errorMessage: string | null
-}
-
 export const LINE_FLEX_SHARE_LABEL = '分享商品卡片到 LINE'
 export const LINE_TEXT_SHARE_LABEL = '分享到 LINE'
 export const LINE_FLEX_COMMUNITY_NOTICE = '此卡片無法發送給社群'
@@ -141,16 +129,6 @@ export const canOfferLineFlexShare = async (): Promise<boolean> => {
 
 export const buildListingUrl = (listingId: string, origin: string = window.location.origin) =>
   `${origin}/listings/${listingId}`
-
-export const buildLineShareUrl = (listingId: string, listingTitle: string, origin?: string) => {
-  const listingUrl = buildListingUrl(listingId, origin)
-  const shareText = `${LINE_SHARE_PREFIX}${listingTitle} ${listingUrl}`.trim()
-
-  const encodedUrl = encodeURIComponent(listingUrl)
-  const encodedText = encodeURIComponent(shareText)
-
-  return `${LINE_SHARE_BASE_URL}?url=${encodedUrl}&text=${encodedText}`
-}
 
 export const buildLineTextShareUrl = (listingId: string, listingTitle: string, origin?: string) => {
   const listingUrl = buildListingUrl(listingId, origin)
@@ -334,23 +312,6 @@ export const buildListingFlexMessage = ({
   } as ListingLiffFlexMessage
 }
 
-/** 供 LINE Flex Simulator 貼上測試（範例資料） */
-export const buildListingFlexSimulatorSample = () =>
-  JSON.stringify(
-    buildListingFlexMessage({
-      listingId: '00000000-0000-0000-0000-000000000001',
-      listingTitle: '二手書桌＋椅組',
-      priceLabel: 'NT$ 800',
-      categoryName: '家具',
-      residenceName: '台北社宅',
-      conditionName: '狀況良好',
-      imageUrl: 'https://developers-resource.landpress.line.me/fx/clip/clip4.jpg',
-      origin: 'https://www.neighborgoodstw.com',
-    }).contents,
-    null,
-    2,
-  )
-
 let liffReadyPromise: Promise<boolean> | null = null
 
 /** LIFF Endpoint 為 `/`；在非根路徑 init 會失敗（除錯頁在 `/` 手動 init 才會成功）。 */
@@ -444,63 +405,6 @@ const buildListingShareLoginRedirectUri = () => {
   return `${origin}/`
 }
 
-export type ListingPageLiffInitTestResult = {
-  ok: boolean
-  pathname: string
-  liffIdSuffix: string
-  isInClient: boolean
-  shareTargetPickerAvailable: boolean
-  isLoggedIn: boolean
-  version: string | null
-  errorMessage: string | null
-}
-
-/** 在「目前這個 pathname」強制嘗試 liff.init（除錯用；商品頁 /listings/:id 預期常失敗） */
-export const testLiffInitOnCurrentPage = async (): Promise<ListingPageLiffInitTestResult> => {
-  const liffId = getLineLiffId()
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
-  const base: ListingPageLiffInitTestResult = {
-    ok: false,
-    pathname,
-    liffIdSuffix: liffId ? liffId.slice(-8) : '(none)',
-    isInClient: false,
-    shareTargetPickerAvailable: false,
-    isLoggedIn: false,
-    version: null,
-    errorMessage: null,
-  }
-
-  if (!liffId) {
-    return { ...base, errorMessage: 'VITE_LINE_LIFF_ID 未設定' }
-  }
-
-  resetLiffReadyCache()
-
-  try {
-    const liffMod = await import('@line/liff')
-    const liff = liffMod.default
-    await liff.init({ liffId })
-    liffReadyPromise = Promise.resolve(true)
-
-    return {
-      ok: true,
-      pathname,
-      liffIdSuffix: liffId.slice(-8),
-      isInClient: liff.isInClient(),
-      shareTargetPickerAvailable: safeSharePickerAvailable(liff),
-      isLoggedIn: liff.isLoggedIn(),
-      version: liff.getVersion(),
-      errorMessage: null,
-    }
-  } catch (err) {
-    liffReadyPromise = Promise.resolve(false)
-    return {
-      ...base,
-      errorMessage: err instanceof Error ? err.message : String(err),
-    }
-  }
-}
-
 /** 分享頁專用：一律明確 init（對齊 LiffDebugPage.runLiffInitAttempt / LineNotifyLiffPage） */
 export const initLiffForFlexShare = async () => {
   const liffId = getLineLiffId()
@@ -540,10 +444,6 @@ const openLineTextShare = (options: ShareListingOptions): ShareListingResult => 
 /** 文字／連結分享（不依 LIFF init，適合主按鈕） */
 export const shareListingAsLineText = (options: ShareListingOptions): ShareListingResult =>
   openLineTextShare(options)
-
-/** @deprecated 請改用 shareListingAsLineText 或 startListingFlexShare */
-export const shareListingToLine = async (options: ShareListingOptions): Promise<ShareListingResult> =>
-  shareListingAsLineText(options)
 
 export type StartListingFlexShareResult =
   | { started: true }
@@ -709,56 +609,3 @@ export const getLiffShareDiagnostics = async (): Promise<LiffShareDiagnostics> =
   }
 }
 
-export const getLiffShareRuntimeStatus = async (): Promise<LiffShareRuntimeStatus> => {
-  if (!getLineLiffId()) {
-    return {
-      liffIdConfigured: false,
-      liffReady: false,
-      isLoggedIn: false,
-      isInClient: false,
-      shareTargetPickerAvailable: false,
-      contextType: null,
-      errorCode: 'LIFF_ID_MISSING',
-      errorMessage: 'VITE_LINE_LIFF_ID 未設定',
-    }
-  }
-
-  try {
-    const liff = await ensureLiffReady()
-    if (!liff) {
-      return {
-        liffIdConfigured: true,
-        liffReady: false,
-        isLoggedIn: false,
-        isInClient: false,
-        shareTargetPickerAvailable: false,
-        contextType: null,
-        errorCode: 'LIFF_INIT_FAILED',
-        errorMessage: 'LIFF 初始化失敗',
-      }
-    }
-
-    return {
-      liffIdConfigured: true,
-      liffReady: true,
-      isLoggedIn: liff.isLoggedIn(),
-      isInClient: liff.isInClient(),
-      shareTargetPickerAvailable: safeSharePickerAvailable(liff),
-      contextType: liff.getContext()?.type ?? null,
-      errorCode: null,
-      errorMessage: null,
-    }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'LIFF 狀態檢查發生未知錯誤'
-    return {
-      liffIdConfigured: true,
-      liffReady: false,
-      isLoggedIn: false,
-      isInClient: false,
-      shareTargetPickerAvailable: false,
-      contextType: null,
-      errorCode: 'LIFF_RUNTIME_STATUS_EXCEPTION',
-      errorMessage,
-    }
-  }
-}

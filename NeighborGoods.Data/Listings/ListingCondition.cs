@@ -1,6 +1,6 @@
 namespace NeighborGoods.Data.Listings;
 
-public sealed class ListingCondition
+public sealed class ListingCondition : IListingLookup
 {
     public int Id { get; set; }
     public string CodeKey { get; set; } = string.Empty;

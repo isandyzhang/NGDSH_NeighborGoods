@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { listingApi, type SellerListingItem, type SellerSummary } from '@/features/listings/api/listingApi'
+import { formatListingPrice } from '@/features/listings/utils/listingFormat'
 import { SellerActivityStatus } from '@/features/seller/components/SellerActivityStatus'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
@@ -17,8 +18,6 @@ const statusText: Record<number, string> = {
   4: '已下架',
   5: '已易物',
 }
-
-const formatPrice = (item: Pick<SellerListingItem, 'isFree' | 'price'>) => (item.isFree ? '免費' : `NT$ ${item.price.toLocaleString()}`)
 
 export const SellerPage = () => {
   const { sellerId = '' } = useParams()
@@ -121,7 +120,7 @@ export const SellerPage = () => {
                 </Link>
                 <div className="flex flex-wrap gap-2 text-sm text-text-subtle">
                   <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">{item.categoryName}</span>
-                  <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">{formatPrice(item)}</span>
+                  <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">{formatListingPrice(item)}</span>
                   <span className="rounded-full border border-[#D8C0A3] bg-[#F8EFE4] px-3 py-1">
                     {statusText[item.statusCode] ?? '未知狀態'}
                   </span>

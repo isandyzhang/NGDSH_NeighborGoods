@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { accountApi } from '@/features/account/api/accountApi'
-import { listingApi, type ListingMutationPayload } from '@/features/listings/api/listingApi'
+import { listingApi, type ListingCreateFormState } from '@/features/listings/api/listingApi'
 import { ListingExpiredActionPanel } from '@/features/listings/components/ListingExpiredActionPanel'
+import { ListingFormFields } from '@/features/listings/components/ListingFormFields'
 import { isAutoExpiredListing, isEffectivelyPinned } from '@/features/listings/constants/listingStatus'
 import { TOP_PIN_FOCUS_QUERY } from '@/features/listings/constants/topPin'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
-import { ExpandableSelectField } from '@/shared/ui/ExpandableSelectField'
-import { Input } from '@/shared/ui/Input'
 
 export const EditListingPage = () => {
   const navigate = useNavigate()
   const { id = '' } = useParams()
   const [searchParams] = useSearchParams()
-  const [form, setForm] = useState<ListingMutationPayload | null>(null)
+  const [form, setForm] = useState<ListingCreateFormState | null>(null)
   const [categories, setCategories] = useState<LookupItem[]>([])
   const [conditions, setConditions] = useState<LookupItem[]>([])
   const [residences, setResidences] = useState<LookupItem[]>([])
@@ -37,27 +36,6 @@ export const EditListingPage = () => {
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const galleryInputRef = useRef<HTMLInputElement | null>(null)
   const topPinSectionRef = useRef<HTMLElement | null>(null)
-  const toggleButtonClass = (tone: 'blue' | 'red' | 'green', active: boolean) => {
-    if (tone === 'blue') {
-      return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
-        active
-          ? '!border-transparent !bg-[#5E5AB5] !text-white hover:!bg-[#504B9E]'
-          : 'border-border bg-surface text-[#4f463f] hover:bg-surface-2'
-      }`
-    }
-    if (tone === 'red') {
-      return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
-        active
-          ? '!border-transparent !bg-[#B45B4D] !text-white hover:!bg-[#9F4E41]'
-          : 'border-border bg-surface text-[#4f463f] hover:bg-surface-2'
-      }`
-    }
-    return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
-      active
-        ? '!border-transparent !bg-[#2F7D4E] !text-white hover:!bg-[#276A43]'
-        : 'border-border bg-surface text-[#4f463f] hover:bg-surface-2'
-    }`
-  }
 
   useEffect(() => {
     if (!id) {
@@ -137,7 +115,7 @@ export const EditListingPage = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!form || !id) {
+    if (!form || !id || form.categoryCode === null || form.conditionCode === null || form.residenceCode === null || form.pickupLocationCode === null) {
       return
     }
 
@@ -146,8 +124,16 @@ export const EditListingPage = () => {
     try {
       const imageUrlsInOrder = existingImageUrls.filter((url) => !imageUrlsToDelete.includes(url))
       await listingApi.update(id, {
-        ...form,
+        title: form.title,
+        description: form.description,
+        categoryCode: form.categoryCode!,
+        conditionCode: form.conditionCode!,
+        residenceCode: form.residenceCode!,
+        pickupLocationCode: form.pickupLocationCode!,
         price: form.isFree ? 0 : form.price,
+        isFree: form.isFree,
+        isCharity: form.isCharity,
+        isTradeable: form.isTradeable,
       }, imageUrlsToDelete, imageUrlsInOrder)
       navigate(`/listings/${id}?from=edit`)
     } catch (err) {
@@ -242,108 +228,10 @@ export const EditListingPage = () => {
             {showExpiredPanel ? (
               <ListingExpiredActionPanel listingId={id} onCompleted={() => void reloadDetail()} />
             ) : null}
-            <Input
-              label="標題"
-              value={form.title}
-              onChange={(event) => setForm((current) => (current ? { ...current, title: event.target.value } : current))}
-              maxLength={80}
-              className="py-3 text-xl"
-              labelClassName="text-[1.45rem] font-bold text-text-main"
-              required
-            />
-            <label className="flex flex-col gap-2 text-lg text-text-subtle">
-              <span className="text-[1.45rem] font-bold leading-tight text-text-main">描述</span>
-              <textarea
-                className="min-h-32 w-full rounded-xl border border-border bg-surface px-3 py-3 text-xl text-text-main outline-none transition placeholder:text-text-muted focus:border-brand"
-                value={form.description}
-                onChange={(event) =>
-                  setForm((current) => (current ? { ...current, description: event.target.value } : current))
-                }
-                maxLength={1000}
-              />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ExpandableSelectField
-                label="分類"
-                value={form.categoryCode}
-                options={categories}
-                onChange={(next) =>
-                  setForm((current) => (current && next !== null ? { ...current, categoryCode: next } : current))
-                }
-              />
-              <ExpandableSelectField
-                label="品況"
-                value={form.conditionCode}
-                options={conditions}
-                onChange={(next) =>
-                  setForm((current) => (current && next !== null ? { ...current, conditionCode: next } : current))
-                }
-              />
-              <ExpandableSelectField
-                label="社宅"
-                value={form.residenceCode}
-                options={residences}
-                onChange={(next) =>
-                  setForm((current) => (current && next !== null ? { ...current, residenceCode: next } : current))
-                }
-              />
-              <ExpandableSelectField
-                label="面交地點"
-                value={form.pickupLocationCode}
-                options={pickupLocations}
-                onChange={(next) =>
-                  setForm((current) =>
-                    current && next !== null ? { ...current, pickupLocationCode: next } : current,
-                  )
-                }
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <button
-                type="button"
-                aria-pressed={form.isFree}
-                className={toggleButtonClass('green', form.isFree)}
-                onClick={() =>
-                  setForm((current) =>
-                    current ? { ...current, isFree: !current.isFree, price: !current.isFree ? 0 : current.price } : current,
-                  )
-                }
-              >
-                免費
-              </button>
-              <button
-                type="button"
-                aria-pressed={form.isCharity}
-                className={toggleButtonClass('red', form.isCharity)}
-                onClick={() => setForm((current) => (current ? { ...current, isCharity: !current.isCharity } : current))}
-              >
-                愛心捐贈
-              </button>
-              <button
-                type="button"
-                aria-pressed={form.isTradeable}
-                className={toggleButtonClass('blue', form.isTradeable)}
-                onClick={() => setForm((current) => (current ? { ...current, isTradeable: !current.isTradeable } : current))}
-              >
-                以物易物
-              </button>
-            </div>
-
-            <Input
-              label="價格（NT$）"
-              type="number"
-              value={form.price}
-              min={0}
-              disabled={form.isFree}
-              className="py-3 text-xl"
-              labelClassName="text-[1.45rem] font-bold text-text-main"
-              onChange={(event) =>
-                setForm((current) =>
-                  current ? { ...current, price: Number.isNaN(Number(event.target.value)) ? 0 : Number(event.target.value) } : current,
-                )
-              }
-              required={!form.isFree}
+            <ListingFormFields
+              form={form}
+              lookups={{ categories, conditions, residences, pickupLocations }}
+              onChange={(patch) => setForm((current) => (current ? { ...current, ...patch } : current))}
             />
 
             <div className="space-y-3">

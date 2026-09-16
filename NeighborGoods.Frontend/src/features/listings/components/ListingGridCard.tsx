@@ -4,37 +4,15 @@ import { motion } from 'framer-motion'
 import { Rocket } from 'lucide-react'
 import { type ListingItem } from '@/features/listings/api/listingApi'
 import { canPurchaseListing, LISTING_STATUS, isAutoExpiredListing, isEffectivelyPinned } from '@/features/listings/constants/listingStatus'
+import { formatCountdown, formatListingPrice, getPendingRemainingSeconds } from '@/features/listings/utils/listingFormat'
 import { Button } from '@/shared/ui/Button'
-
-const formatPrice = (item: ListingItem) => {
-  if (item.isFree) {
-    return '免費'
-  }
-
-  return `NT$ ${item.price.toLocaleString()}`
-}
-
-const formatCountdown = (seconds: number) => {
-  const normalized = Math.max(0, Math.floor(seconds))
-  const hours = Math.floor(normalized / 3600)
-  const minutes = Math.floor((normalized % 3600) / 60)
-  const remainingSeconds = normalized % 60
-  return [hours, minutes, remainingSeconds].map((value) => value.toString().padStart(2, '0')).join(':')
-}
-
-const parseApiDateToMs = (value: string) => {
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
-  const normalized = hasTimezone ? value : `${value}Z`
-  const parsed = Date.parse(normalized)
-  return Number.isNaN(parsed) ? null : parsed
-}
 
 type Props = {
   item: ListingItem
   countdownNowMs: number
   isOwnListing: boolean
   isLiked: boolean
-  displayInterestCount: number
+  favoriteCount: number
   favoriteBusy: boolean
   conversationBusy: boolean
   purchaseBusy: boolean
@@ -53,7 +31,7 @@ export const ListingGridCard = memo(({
   countdownNowMs,
   isOwnListing,
   isLiked,
-  displayInterestCount,
+  favoriteCount,
   favoriteBusy,
   conversationBusy,
   purchaseBusy,
@@ -66,12 +44,11 @@ export const ListingGridCard = memo(({
   onStartConversation,
   onOpenPurchaseConfirm,
 }: Props) => {
-  const pendingExpireAt = item.pendingPurchaseRequestExpireAt
-  const pendingRemainingFromServer = item.pendingPurchaseRequestRemainingSeconds
-  const pendingExpireAtMs = pendingExpireAt === null ? null : parseApiDateToMs(pendingExpireAt)
-  const pendingRemainingFromNow = pendingExpireAtMs == null ? null : Math.max(0, Math.floor((pendingExpireAtMs - countdownNowMs) / 1000))
-  const pendingRemainingSeconds =
-    pendingRemainingFromNow ?? (pendingRemainingFromServer == null ? null : Math.max(0, pendingRemainingFromServer))
+  const pendingRemainingSeconds = getPendingRemainingSeconds(
+    item.pendingPurchaseRequestExpireAt,
+    item.pendingPurchaseRequestRemainingSeconds,
+    countdownNowMs,
+  )
   const hasPendingPurchaseRequest = pendingRemainingSeconds != null && pendingRemainingSeconds > 0
   const hasInProgressTrade = item.inProgress && !hasPendingPurchaseRequest
   const isReservedListing = item.statusCode === LISTING_STATUS.Reserved
@@ -161,7 +138,7 @@ export const ListingGridCard = memo(({
               {item.title}
             </Link>
             <div className="flex items-center justify-between">
-              <span className={`text-lg font-semibold ${item.isFree ? 'text-[#3C8A65]' : 'text-text-subtle'}`}>{formatPrice(item)}</span>
+              <span className={`text-lg font-semibold ${item.isFree ? 'text-[#3C8A65]' : 'text-text-subtle'}`}>{formatListingPrice(item)}</span>
               {!isOwnListing ? (
                 <button
                   type="button"
@@ -182,7 +159,7 @@ export const ListingGridCard = memo(({
                     <path d="M12 20.4C11.2 19.7 4.5 14.2 4.5 9.4C4.5 7.1 6.3 5.3 8.6 5.3C10 5.3 11.2 6 12 7.1C12.8 6 14 5.3 15.4 5.3C17.7 5.3 19.5 7.1 19.5 9.4C19.5 14.2 12.8 19.7 12 20.4Z" />
                   </svg>
                   <span className={`text-lg font-semibold transition-colors duration-200 ${isLiked ? 'text-[#B45B4D]' : 'text-text-muted'}`}>
-                    {displayInterestCount}
+                    {favoriteCount}
                   </span>
                 </button>
               ) : (

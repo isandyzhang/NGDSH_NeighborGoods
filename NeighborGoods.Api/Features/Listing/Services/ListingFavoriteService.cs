@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Infrastructure.Storage;
@@ -10,7 +11,7 @@ public sealed class ListingFavoriteService(
     NeighborGoodsDbContext dbContext,
     IBlobStorage blobStorage)
 {
-    public async Task<(FavoriteToggleDto? Data, string? ErrorCode, string? ErrorMessage)> FavoriteAsync(
+    public async Task<FavoriteToggleDto> FavoriteAsync(
         string userId,
         Guid listingId,
         CancellationToken cancellationToken = default)
@@ -22,17 +23,23 @@ public sealed class ListingFavoriteService(
             .FirstOrDefaultAsync(cancellationToken);
         if (listing is null)
         {
-            return (null, "LISTING_NOT_FOUND", "找不到商品");
+            throw new ListingAccessException("LISTING_NOT_FOUND", "找不到商品", StatusCodes.Status404NotFound);
         }
 
         if (!IsVisibleStatus(listing.Status))
         {
-            return (null, "LISTING_NOT_AVAILABLE", "此商品目前無法收藏");
+            throw new ListingAccessException(
+                "LISTING_NOT_AVAILABLE",
+                "此商品目前無法收藏",
+                StatusCodes.Status409Conflict);
         }
 
         if (string.Equals(listing.SellerId, userId, StringComparison.Ordinal))
         {
-            return (null, "LISTING_FAVORITE_OWN_LISTING_NOT_ALLOWED", "不可收藏自己的商品");
+            throw new ListingAccessException(
+                "LISTING_FAVORITE_OWN_LISTING_NOT_ALLOWED",
+                "不可收藏自己的商品",
+                StatusCodes.Status409Conflict);
         }
 
         var existing = await dbContext.ListingFavorites
@@ -60,10 +67,10 @@ public sealed class ListingFavoriteService(
         var favoriteCount = await dbContext.ListingFavorites
             .CountAsync(x => x.ListingId == listingId, cancellationToken);
 
-        return (new FavoriteToggleDto(listingId, true, favoriteCount, existing.CreatedAt), null, null);
+        return new FavoriteToggleDto(listingId, true, favoriteCount, existing.CreatedAt);
     }
 
-    public async Task<(FavoriteToggleDto? Data, string? ErrorCode, string? ErrorMessage)> UnfavoriteAsync(
+    public async Task<FavoriteToggleDto> UnfavoriteAsync(
         string userId,
         Guid listingId,
         CancellationToken cancellationToken = default)
@@ -73,7 +80,7 @@ public sealed class ListingFavoriteService(
             .AnyAsync(x => x.Id == listingId, cancellationToken);
         if (!listingExists)
         {
-            return (null, "LISTING_NOT_FOUND", "找不到商品");
+            throw new ListingAccessException("LISTING_NOT_FOUND", "找不到商品", StatusCodes.Status404NotFound);
         }
 
         var favorite = await dbContext.ListingFavorites
@@ -88,10 +95,10 @@ public sealed class ListingFavoriteService(
         var favoriteCount = await dbContext.ListingFavorites
             .CountAsync(x => x.ListingId == listingId, cancellationToken);
 
-        return (new FavoriteToggleDto(listingId, false, favoriteCount, null), null, null);
+        return new FavoriteToggleDto(listingId, false, favoriteCount, null);
     }
 
-    public async Task<(FavoriteStatusDto? Data, string? ErrorCode, string? ErrorMessage)> GetFavoriteStatusAsync(
+    public async Task<FavoriteStatusDto> GetFavoriteStatusAsync(
         string? userId,
         Guid listingId,
         CancellationToken cancellationToken = default)
@@ -101,7 +108,7 @@ public sealed class ListingFavoriteService(
             .AnyAsync(x => x.Id == listingId, cancellationToken);
         if (!listingExists)
         {
-            return (null, "LISTING_NOT_FOUND", "找不到商品");
+            throw new ListingAccessException("LISTING_NOT_FOUND", "找不到商品", StatusCodes.Status404NotFound);
         }
 
         var favoriteCount = await dbContext.ListingFavorites
@@ -113,7 +120,7 @@ public sealed class ListingFavoriteService(
                 .AnyAsync(x => x.ListingId == listingId && x.UserId == userId, cancellationToken);
         }
 
-        return (new FavoriteStatusDto(listingId, favoriteCount, isFavorited), null, null);
+        return new FavoriteStatusDto(listingId, favoriteCount, isFavorited);
     }
 
     public async Task<PagedResult<MyFavoriteListItemDto>> GetMyFavoritesAsync(
@@ -213,7 +220,7 @@ public sealed class ListingFavoriteService(
         return new InterestProfileDto(userId, normalizedDays, categories, DateTime.UtcNow);
     }
 
-    public async Task<(PushTargetsResultDto? Data, string? ErrorCode, string? ErrorMessage)> GetPushTargetsAsync(
+    public async Task<PushTargetsResultDto> GetPushTargetsAsync(
         int categoryCode,
         Guid? listingId,
         int limit,
@@ -226,7 +233,7 @@ public sealed class ListingFavoriteService(
             .FirstOrDefaultAsync(cancellationToken);
         if (categoryName is null)
         {
-            return (null, "CATEGORY_NOT_FOUND", "找不到商品分類");
+            throw new ListingAccessException("CATEGORY_NOT_FOUND", "找不到商品分類", StatusCodes.Status404NotFound);
         }
 
         string? sellerId = null;
@@ -239,7 +246,7 @@ public sealed class ListingFavoriteService(
                 .FirstOrDefaultAsync(cancellationToken);
             if (sellerId is null)
             {
-                return (null, "LISTING_NOT_FOUND", "找不到商品");
+                throw new ListingAccessException("LISTING_NOT_FOUND", "找不到商品", StatusCodes.Status404NotFound);
             }
         }
 
@@ -302,7 +309,7 @@ public sealed class ListingFavoriteService(
                 candidate.Score));
         }
 
-        return (new PushTargetsResultDto(listingId, categoryCode, categoryName, targets), null, null);
+        return new PushTargetsResultDto(listingId, categoryCode, categoryName, targets);
     }
 
     private async Task<Dictionary<Guid, string?>> GetCoverImageMapAsync(

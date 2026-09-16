@@ -1,0 +1,2 @@
+export const LISTING_IMAGE_MAX_COUNT = 5
+export const LISTING_IMAGE_MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024

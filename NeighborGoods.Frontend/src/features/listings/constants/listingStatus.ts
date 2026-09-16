@@ -1,3 +1,5 @@
+import { parseApiDateToMs } from '@/features/listings/utils/listingFormat'
+
 /** 與後端 ListingStatus 整數語意一致 */
 export const LISTING_STATUS = {
   Active: 0,
@@ -49,14 +51,18 @@ export const canPurchaseListing = (
   return true
 }
 
-export type ListingDetailOverlay = 'pending' | 'reserved' | null
+export type ListingDetailOverlay = 'pending' | 'inProgress' | 'reserved' | null
 
 export const getListingDetailOverlay = (
   statusCode: number,
   hasPendingPurchaseRequest: boolean,
+  hasInProgressTrade = false,
 ): ListingDetailOverlay => {
   if (hasPendingPurchaseRequest) {
     return 'pending'
+  }
+  if (hasInProgressTrade) {
+    return 'inProgress'
   }
   if (statusCode === LISTING_STATUS.Reserved) {
     return 'reserved'
@@ -68,16 +74,6 @@ export const shouldShowUnavailableBanner = (statusCode: number) =>
   statusCode !== LISTING_STATUS.Active
 
 export const canShareListing = (statusCode: number) => statusCode === LISTING_STATUS.Active
-
-const parseApiDateToMs = (value: string | null | undefined) => {
-  if (!value) {
-    return null
-  }
-  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
-  const normalized = hasTimezone ? value : `${value}Z`
-  const parsed = Date.parse(normalized)
-  return Number.isNaN(parsed) ? null : parsed
-}
 
 export const isEffectivelyPinned = (
   isPinned: boolean,

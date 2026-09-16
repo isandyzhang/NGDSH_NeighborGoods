@@ -6,8 +6,10 @@ import {
   canEditListing,
   isAutoExpiredListing,
   isTerminalListingStatus,
+  LISTING_STATUS,
   LISTING_STATUS_LABEL,
 } from '@/features/listings/constants/listingStatus'
+import { formatListingPrice } from '@/features/listings/utils/listingFormat'
 import { ApiClientError } from '@/shared/types/api'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -29,11 +31,11 @@ const getSecondaryActions = (item: MyListingItem): { key: StatusActionKey; label
   }
 
   switch (statusCode) {
-    case 0:
+    case LISTING_STATUS.Active:
       return [{ key: 'inactive', label: '下架' }, { key: 'sold', label: '標記已售出' }, ...extras]
-    case 1:
+    case LISTING_STATUS.Reserved:
       return [{ key: 'activate', label: '恢復上架' }, { key: 'inactive', label: '下架' }, { key: 'sold', label: '標記已售出' }, ...extras]
-    case 4:
+    case LISTING_STATUS.Inactive:
       if (isAutoExpiredListing(statusCode, autoExpiredAt)) {
         return []
       }
@@ -54,9 +56,11 @@ export const MyListingsPage = () => {
     donatedCount: 0,
   })
   const summary = useMemo(() => {
-    const activeCount = items.filter((item) => item.statusCode === 0).length
-    const soldCount = items.filter((item) => item.statusCode === 2).length
-    const donatedCount = items.filter((item) => item.statusCode === 3 || item.statusCode === 5).length
+    const activeCount = items.filter((item) => item.statusCode === LISTING_STATUS.Active).length
+    const soldCount = items.filter((item) => item.statusCode === LISTING_STATUS.Sold).length
+    const donatedCount = items.filter(
+      (item) => item.statusCode === LISTING_STATUS.Donated || item.statusCode === LISTING_STATUS.GivenOrTraded,
+    ).length
     return { activeCount, soldCount, donatedCount }
   }, [items])
 
@@ -218,7 +222,7 @@ export const MyListingsPage = () => {
                       {item.categoryName}
                     </span>
                     <span className="inline-flex items-center rounded-full border border-[#D8C0A3] bg-[#F3E7D8] px-3 py-1 text-lg font-semibold text-text-main">
-                      {item.isFree ? '免費' : `NT$ ${item.price.toLocaleString()}`}
+                      {formatListingPrice(item)}
                     </span>
                   </div>
                   <p className="text-lg text-text-subtle">

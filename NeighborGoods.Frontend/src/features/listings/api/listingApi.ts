@@ -34,18 +34,21 @@ export type ListingItem = {
   inProgressStage: number | null
   /** 同一商品下的對話螺紋數（後端欄位 interestCount） */
   interestCount: number
+  /** 收藏人數 */
   favoriteCount: number
   isFavorited: boolean
 }
 
+type ListingPagination = {
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
 type ListPayload = {
   items: ListingItem[]
-  pagination: {
-    page: number
-    pageSize: number
-    totalCount: number
-    totalPages: number
-  }
+  pagination: ListingPagination
 }
 
 export type MyListingItem = {
@@ -73,12 +76,7 @@ export type MyListingItem = {
 
 type MyListPayload = {
   items: MyListingItem[]
-  pagination: {
-    page: number
-    pageSize: number
-    totalCount: number
-    totalPages: number
-  }
+  pagination: ListingPagination
 }
 
 export type FavoriteListingItem = {
@@ -94,12 +92,7 @@ export type FavoriteListingItem = {
 
 type FavoriteListPayload = {
   items: FavoriteListingItem[]
-  pagination: {
-    page: number
-    pageSize: number
-    totalCount: number
-    totalPages: number
-  }
+  pagination: ListingPagination
 }
 
 export type SellerSummary = {
@@ -143,12 +136,7 @@ export type InterestProfile = {
 type SellerListingsPayload = {
   seller: SellerSummary
   items: SellerListingItem[]
-  pagination: {
-    page: number
-    pageSize: number
-    totalCount: number
-    totalPages: number
-  }
+  pagination: ListingPagination
 }
 
 export type FavoriteTogglePayload = {
@@ -200,6 +188,10 @@ export type ListingDetail = {
   pinnedEndDate: string | null
   pendingPurchaseRequestExpireAt: string | null
   pendingPurchaseRequestRemainingSeconds: number | null
+  inProgress: boolean
+  inProgressStage: number | null
+  favoriteCount: number
+  isFavorited: boolean
   listedAt: string
   autoExpiredAt: string | null
   createdAt: string

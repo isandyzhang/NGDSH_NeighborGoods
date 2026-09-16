@@ -5,13 +5,13 @@ import {
   type CreatedListingSummary,
 } from '@/features/listings/components/CreateListingSuccessModal'
 import { FirstListingSellerWelcomeModal } from '@/features/listings/components/FirstListingSellerWelcomeModal'
+import { ListingFormFields, type ListingFormHighlightField } from '@/features/listings/components/ListingFormFields'
 import { hasSeenFirstListingSellerWelcome } from '@/features/listings/constants/firstListingSellerWelcome'
+import { LISTING_IMAGE_MAX_COUNT, LISTING_IMAGE_MAX_FILE_SIZE_BYTES } from '@/features/listings/constants/listingLimits'
 import { lookupApi, type LookupItem } from '@/features/lookups/api/lookupApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
-import { ExpandableSelectField } from '@/shared/ui/ExpandableSelectField'
-import { Input } from '@/shared/ui/Input'
 
 const invalidBorderClass = '!border-2 !border-[#dc2626] transition-colors duration-300 ease-out'
 
@@ -28,15 +28,7 @@ const defaultForm: ListingCreateFormState = {
   isTradeable: false,
 }
 
-type ValidationField =
-  | 'title'
-  | 'category'
-  | 'condition'
-  | 'residence'
-  | 'pickupLocation'
-  | 'price'
-  | 'images'
-
+type ValidationField = ListingFormHighlightField | 'images'
 
 const resolveLookupName = (items: LookupItem[], code: number | null) =>
   code === null ? '' : (items.find((item) => item.id === code)?.displayName ?? '')
@@ -82,27 +74,6 @@ export const CreateListingPage = () => {
   const pickupLocationFieldRef = useRef<HTMLDivElement | null>(null)
   const priceFieldRef = useRef<HTMLDivElement | null>(null)
   const imagesFieldRef = useRef<HTMLDivElement | null>(null)
-  const toggleButtonClass = (tone: 'blue' | 'red' | 'green', active: boolean) => {
-    if (tone === 'blue') {
-      return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
-        active
-          ? '!border-transparent !bg-[#5E5AB5] !text-white hover:!bg-[#504B9E]'
-          : 'border-border bg-surface text-[#4f463f] hover:bg-surface-2'
-      }`
-    }
-    if (tone === 'red') {
-      return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
-        active
-          ? '!border-transparent !bg-[#B45B4D] !text-white hover:!bg-[#9F4E41]'
-          : 'border-border bg-surface text-[#4f463f] hover:bg-surface-2'
-      }`
-    }
-    return `min-h-[3.2rem] rounded-xl border px-4 py-2 text-[1.45rem] font-semibold transition ${
-      active
-        ? '!border-transparent !bg-[#2F7D4E] !text-white hover:!bg-[#276A43]'
-        : 'border-border bg-surface text-[#4f463f] hover:bg-surface-2'
-    }`
-  }
 
   useEffect(() => {
     let disposed = false
@@ -119,6 +90,10 @@ export const CreateListingPage = () => {
       setConditions(cond)
       setResidences(r)
       setPickupLocations(pick)
+    }).catch(() => {
+      if (!disposed) {
+        setError('載入選項失敗，請稍後再試')
+      }
     })
     return () => {
       disposed = true
@@ -188,7 +163,10 @@ export const CreateListingPage = () => {
     if (!form.isFree && (!Number.isFinite(form.price) || form.price < 0)) {
       issues.push('price')
     }
-    if (images.length <= 0) {
+    if (images.length <= 0 || images.length > LISTING_IMAGE_MAX_COUNT) {
+      issues.push('images')
+    }
+    if (images.some((file) => file.size > LISTING_IMAGE_MAX_FILE_SIZE_BYTES)) {
       issues.push('images')
     }
 
@@ -231,11 +209,6 @@ export const CreateListingPage = () => {
       focusTarget?.focus({ preventScroll: true })
     }, 320)
   }
-
-  const inputHighlightClass = (field: ValidationField) =>
-    highlightField === field ? invalidBorderClass : ''
-
-  const isSelectInvalid = (field: ValidationField) => highlightField === field
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -295,125 +268,30 @@ export const CreateListingPage = () => {
 
       <Card>
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-          <div ref={titleFieldRef}>
-            <Input
-              label="標題"
-              value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              placeholder="例如：九成新電鍋"
-              maxLength={80}
-              className={`py-3 text-xl ${inputHighlightClass('title')}`}
-              labelClassName="text-[1.45rem] font-bold text-text-main"
-            />
-          </div>
-          <label className="flex flex-col gap-2 text-lg text-text-subtle">
-            <span className="text-[1.45rem] font-bold leading-tight text-text-main">描述</span>
-            <textarea
-              className="min-h-32 w-full rounded-xl border border-border bg-surface px-3 py-3 text-xl text-text-main outline-none transition placeholder:text-text-muted focus:border-brand"
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="補充商品狀況、使用年限、注意事項..."
-              maxLength={1000}
-            />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div ref={categoryFieldRef}>
-              <ExpandableSelectField
-                label="分類"
-                value={form.categoryCode}
-                options={categories}
-                onChange={(value) => setForm((current) => ({ ...current, categoryCode: value }))}
-                invalid={isSelectInvalid('category')}
-                includeEmptyOption
-                placeholder="-"
-              />
-            </div>
-            <div ref={conditionFieldRef}>
-              <ExpandableSelectField
-                label="品況"
-                value={form.conditionCode}
-                options={conditions}
-                onChange={(value) => setForm((current) => ({ ...current, conditionCode: value }))}
-                invalid={isSelectInvalid('condition')}
-                includeEmptyOption
-                placeholder="-"
-              />
-            </div>
-            <div ref={residenceFieldRef}>
-              <ExpandableSelectField
-                label="社宅"
-                value={form.residenceCode}
-                options={residences}
-                onChange={(value) => setForm((current) => ({ ...current, residenceCode: value }))}
-                invalid={isSelectInvalid('residence')}
-                includeEmptyOption
-                placeholder="-"
-              />
-            </div>
-            <div ref={pickupLocationFieldRef}>
-              <ExpandableSelectField
-                label="面交地點"
-                value={form.pickupLocationCode}
-                options={pickupLocations}
-                onChange={(value) => setForm((current) => ({ ...current, pickupLocationCode: value }))}
-                invalid={isSelectInvalid('pickupLocation')}
-                includeEmptyOption
-                placeholder="-"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <button
-              type="button"
-              aria-pressed={form.isFree}
-              className={toggleButtonClass('green', form.isFree)}
-              onClick={() =>
-                setForm((current) => ({ ...current, isFree: !current.isFree, price: !current.isFree ? 0 : current.price }))
-              }
-            >
-              免費
-            </button>
-            <button
-              type="button"
-              aria-pressed={form.isCharity}
-              className={toggleButtonClass('red', form.isCharity)}
-              onClick={() => setForm((current) => ({ ...current, isCharity: !current.isCharity }))}
-            >
-              愛心捐贈
-            </button>
-            <button
-              type="button"
-              aria-pressed={form.isTradeable}
-              className={toggleButtonClass('blue', form.isTradeable)}
-              onClick={() => setForm((current) => ({ ...current, isTradeable: !current.isTradeable }))}
-            >
-              以物易物
-            </button>
-          </div>
-
-          <div ref={priceFieldRef}>
-            <Input
-              label="價格（NT$）"
-              type="number"
-              value={form.price}
-              min={0}
-              disabled={form.isFree}
-              className={`py-3 text-xl ${inputHighlightClass('price')}`}
-              labelClassName="text-[1.45rem] font-bold text-text-main"
-              onChange={(event) =>
-                setForm((current) => ({ ...current, price: Number.isNaN(Number(event.target.value)) ? 0 : Number(event.target.value) }))
-              }
-            />
-          </div>
+          <ListingFormFields
+            form={form}
+            lookups={{ categories, conditions, residences, pickupLocations }}
+            onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            highlightField={highlightField === 'images' ? null : highlightField}
+            fieldRefs={{
+              title: titleFieldRef,
+              category: categoryFieldRef,
+              condition: conditionFieldRef,
+              residence: residenceFieldRef,
+              pickupLocation: pickupLocationFieldRef,
+              price: priceFieldRef,
+            }}
+            includeEmptyOptions
+          />
 
           <div
             ref={imagesFieldRef}
             tabIndex={-1}
             className="flex flex-col gap-2 text-lg text-text-subtle"
           >
-            <span className="text-[1.45rem] font-bold leading-tight text-text-main">商品照片（至少 1 張）</span>
+            <span className="text-[1.45rem] font-bold leading-tight text-text-main">
+              商品照片（至少 1 張，最多 {LISTING_IMAGE_MAX_COUNT} 張）
+            </span>
             <input
               ref={cameraInputRef}
               type="file"

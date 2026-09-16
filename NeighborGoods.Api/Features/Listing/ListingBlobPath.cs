@@ -29,10 +29,10 @@ public static class ListingBlobPath
         return s;
     }
 
-    public static bool StoredImageMatchesDeleteToken(string storedRaw, string deleteToken, Func<string, string> resolvePublicUrl)
+    public static bool StoredImageMatchesToken(string storedRaw, string token, Func<string, string> resolvePublicUrl)
     {
         var a = storedRaw.Trim();
-        var b = deleteToken.Trim();
+        var b = token.Trim();
         if (string.Equals(a, b, StringComparison.Ordinal))
         {
             return true;

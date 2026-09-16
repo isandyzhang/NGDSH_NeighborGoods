@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ListingLineShareButton } from '@/features/listings/components/ListingLineShareButton'
 import type { ShareListingOptions } from '@/features/listings/utils/lineShare'
+import { formatListingPrice } from '@/features/listings/utils/listingFormat'
 import { AppModal } from '@/shared/ui/modal/AppModal'
 import { Button } from '@/shared/ui/Button'
 
@@ -20,9 +21,6 @@ type CreateListingSuccessModalProps = {
   onClose: () => void
 }
 
-const formatSharePrice = (listing: CreatedListingSummary) =>
-  listing.isFree ? '免費' : `NT$ ${listing.price.toLocaleString()}`
-
 export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateListingSuccessModalProps) => {
   const navigate = useNavigate()
 
@@ -33,7 +31,7 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
     return {
       listingId: listing.id,
       listingTitle: listing.title,
-      priceLabel: formatSharePrice(listing),
+      priceLabel: formatListingPrice(listing),
       categoryName: listing.categoryName,
       conditionName: listing.conditionName,
     }
