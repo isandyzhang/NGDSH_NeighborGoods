@@ -5,6 +5,7 @@ import { Rocket } from 'lucide-react'
 import { type ListingItem } from '@/features/listings/api/listingApi'
 import { canPurchaseListing, LISTING_STATUS, isAutoExpiredListing, isEffectivelyPinned } from '@/features/listings/constants/listingStatus'
 import { formatCountdown, formatListingPrice, getPendingRemainingSeconds } from '@/features/listings/utils/listingFormat'
+import { ListingMetaPills } from '@/features/listings/components/ListingMetaPills'
 import { Button } from '@/shared/ui/Button'
 
 type Props = {
@@ -128,8 +129,12 @@ export const ListingGridCard = memo(({
           </div>
 
           <div className="space-y-1 px-4 pb-4 pt-4">
-            <p className="text-xs font-medium tracking-wide text-text-muted">{item.conditionName}</p>
-            <p className="text-xs font-medium tracking-wide text-text-muted">社宅：{item.residenceName}</p>
+            <ListingMetaPills
+              conditionCode={item.conditionCode}
+              conditionName={item.conditionName}
+              residenceCode={item.residenceCode}
+              residenceName={item.residenceName}
+            />
             <Link
               to={`/listings/${item.id}?from=listings`}
               className="block truncate text-2xl font-semibold text-text-main underline-offset-2 hover:underline"

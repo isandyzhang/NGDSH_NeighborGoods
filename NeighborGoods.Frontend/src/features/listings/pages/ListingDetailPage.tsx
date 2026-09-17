@@ -8,6 +8,7 @@ import { listingApi, type ListingDetail } from '@/features/listings/api/listingA
 import { SellerActivityStatus } from '@/features/seller/components/SellerActivityStatus'
 import { ListingImageCarousel } from '@/features/listings/components/ListingImageCarousel'
 import { ListingExpiredActionPanel } from '@/features/listings/components/ListingExpiredActionPanel'
+import { getConditionPillClassName, getResidencePillClassName } from '@/features/listings/components/ListingMetaPills'
 import {
   canEditListing,
   canPurchaseListing,
@@ -502,10 +503,10 @@ export const ListingDetailPage = () => {
                       <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
                         {item.categoryName}
                       </span>
-                      <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                      <span className={getConditionPillClassName(item.conditionCode, 'md')}>
                         {item.conditionName}
                       </span>
-                      <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
+                      <span className={getResidencePillClassName(item.residenceCode, 'md')}>
                         {item.residenceName}
                       </span>
                       <span className="rounded-full bg-[#E5D9C8] px-3 py-1 text-base font-semibold text-text-subtle md:text-lg">
