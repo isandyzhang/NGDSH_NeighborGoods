@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -313,68 +311,6 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
     }
 
     [Fact]
-    public async Task LineWebhook_InvalidSignature_ReturnsUnauthorized()
-    {
-        using var factory = new ListingApiFactory(fixture.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var webhookBody = """
-            {
-              "events": []
-            }
-            """;
-        var webhookRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/integrations/line/webhook")
-        {
-            Content = new StringContent(webhookBody, Encoding.UTF8, "application/json")
-        };
-        webhookRequest.Headers.Add("X-Line-Signature", "invalid-signature");
-
-        var response = await client.SendAsync(webhookRequest);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task LineWebhook_PostbackMyMessages_RepliesFlexMessage()
-    {
-        using var factory = new ListingApiFactory(fixture.ConnectionString);
-        using var client = factory.CreateClient();
-        const string lineUserId = "line-user-webhook-001";
-
-        await using (var scope = factory.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
-            var user = await db.AspNetUsers.FirstAsync(x => x.NormalizedUserName == "OTHER");
-            user.LineMessagingApiUserId = lineUserId;
-            user.LineMessagingApiAuthorizedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-        }
-
-        var webhookBody = $$"""
-            {
-              "events": [
-                {
-                  "type": "postback",
-                  "replyToken": "reply-token-1",
-                  "source": { "userId": "{{lineUserId}}" },
-                  "postback": { "data": "action=myMessages" }
-                }
-              ]
-            }
-            """;
-        var webhookRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/integrations/line/webhook")
-        {
-            Content = new StringContent(webhookBody, Encoding.UTF8, "application/json")
-        };
-        webhookRequest.Headers.Add("X-Line-Signature", ComputeSignature(webhookBody, "line-msg-test-secret"));
-
-        var response = await client.SendAsync(webhookRequest);
-        response.EnsureSuccessStatusCode();
-
-        Assert.Single(FakeLineMessageSender.ReplyFlexMessages);
-        Assert.Contains("我的訊息", FakeLineMessageSender.ReplyFlexMessages[0].AltText);
-    }
-
-    [Fact]
     public async Task LinePreferences_PatchThenGet_ReturnsUpdatedFlags()
     {
         using var factory = new ListingApiFactory(fixture.ConnectionString);
@@ -430,11 +366,5 @@ public sealed class AccountEndpointsTests(SqlServerContainerFixture fixture)
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var accessToken = body.GetProperty("data").GetProperty("accessToken").GetString();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-    }
-
-    private static string ComputeSignature(string body, string secret)
-    {
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        return Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(body)));
     }
 }

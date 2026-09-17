@@ -18,27 +18,14 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 
 ## Actions configured in this script
 
-- Row 1, Area 1: open listings entry (`uri`)
-  - If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all four URI areas use path links `liff.line.me/{LiffId}/listings` etc.
-  - Otherwise fallback to `$WebBaseUrl` + path
-- Row 1, Area 2: postback `action=myListings`
-- Row 1, Area 3: postback `action=myMessages`
-- Row 2, Area 1: open `$WebBaseUrl/listings/create` (`uri`)
-- Row 2, Area 2: open `$WebBaseUrl/account` (`uri`, or LIFF path `/account`)
-- Row 2, Area 3: open `$WebBaseUrl/favorites` (`uri`)
-
-Postback values are aligned with current backend webhook routing.
-
-Current webhook reply behavior:
-
-- `action=myListings`
-  - Reply a Flex carousel first (max 5 listing cards)
-  - Each card includes listing status, favorite count, and a LIFF deep link to `/listings/{id}` when `LineMessagingApi:LiffId` is set
-  - Ordering priority: has unread messages > recently changed status (proxied by latest update time) > latest updated/created
-- `action=myMessages`
-  - Reply unread summary first
-  - Include up to 3 quick links to unread conversations (`/messages/{conversationId}`)
-  - Include a fallback button to `/messages`
+- If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all areas use path links `liff.line.me/{LiffId}/listings` etc.
+- Otherwise fallback to `$WebBaseUrl` + path
+- Row 1, Area 1: open listings (`uri` `/listings`)
+- Row 1, Area 2: open my listings (`uri` `/my-listings`)
+- Row 1, Area 3: open messages (`uri` `/messages`)
+- Row 2, Area 1: open create listing (`uri` `/listings/create`)
+- Row 2, Area 2: open account (`uri` `/account`)
+- Row 2, Area 3: open favorites (`uri` `/favorites`)
 
 ## Example usage
 
@@ -63,7 +50,7 @@ pwsh "./infra/line/line-richmenu.ps1" `
 - The script creates a new rich menu each run.
 - Recommended release flow:
   1. Run in test/staging OA account first
-  2. Verify image map and postback behavior
+  2. Verify image map and URI links
   3. Run in production OA account
 
 ## Deployment strategy (IaC + CI/CD)
@@ -81,7 +68,7 @@ For production maintenance, prefer version-controlled deployment instead of manu
    - `Line__ChannelId`
 3. In pipeline, run rich menu deployment after backend/frontend deploy
    - Deploy to staging first
-   - Smoke-test postback actions
+   - Smoke-test URI menu areas
    - Deploy to production
 4. Rollback strategy
    - Keep previous richMenuId in deployment output/log
@@ -117,7 +104,7 @@ Optional GitHub Actions variables (set in `production` Environment):
 
 ## LINE 官方通知綁定（LIFF）
 
-「我的帳號」綁定官方通知改為在 LINE 內開 LIFF 完成，不再依 webhook follow 自動寫入 pending。
+「我的帳號」綁定官方通知改為在 LINE 內開 LIFF 完成。
 
 - **LIFF**：在 **LINE Login channel**（與網站 LINE 登入同一個）建立 LIFF，Endpoint URL 為 `{WebBaseUrl}/`（網站根目錄；須 HTTPS；本機可用 tunnel）。同一 LIFF 兼用深層連結與綁定流程。
 - **深層連結**：圖文選單、官方 Flex 按鈕（含未綁定提示「前往個人設定」）使用 path 格式 `liff.line.me/{liffId}/account` 等；`RootEntry` 仍支援舊 `?liff.state=`。商品 Flex「查看商品」：`liff.line.me/{liffId}/listings/{id}?from=listings`。

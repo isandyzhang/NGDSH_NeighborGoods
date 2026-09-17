@@ -74,8 +74,6 @@ The API is organized by feature modules and mapped in `Program.cs`.
   - `GET /api/v1/auth/line/callback`
 - Realtime:
   - `GET /hubs/messages` (SignalR)
-- LINE webhook:
-  - `POST /api/v1/integrations/line/webhook`
 
 ## 4. Local Development
 
@@ -225,12 +223,6 @@ az deployment group create \
 LINE Login callback URL should be frontend route:
 
 - `https://www.neighborgoodstw.com/auth/line/callback`
-
-LINE Messaging API webhook URL should be backend endpoint:
-
-- `https://api.neighborgoodstw.com/api/v1/integrations/line/webhook`
-
-Do not mix callback and webhook URLs.
 
 ## 9. Security Requirements
 
