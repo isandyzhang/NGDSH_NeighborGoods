@@ -70,6 +70,9 @@ const AdminDashboardPage = lazy(() =>
 const AdminAnnouncementsPage = lazy(() =>
   import('@/features/admin/pages/AdminAnnouncementsPage').then((module) => ({ default: module.AdminAnnouncementsPage })),
 )
+const AdminHousingPage = lazy(() =>
+  import('@/features/admin/pages/AdminHousingPage').then((module) => ({ default: module.AdminHousingPage })),
+)
 const AdminListingsPage = lazy(() =>
   import('@/features/admin/pages/AdminListingsPage').then((module) => ({ default: module.AdminListingsPage })),
 )
@@ -78,9 +81,6 @@ const AdminMembersPage = lazy(() =>
 )
 const AdminConversationsPage = lazy(() =>
   import('@/features/admin/pages/AdminConversationsPage').then((module) => ({ default: module.AdminConversationsPage })),
-)
-const AdminWebhookEventsPage = lazy(() =>
-  import('@/features/admin/pages/AdminWebhookEventsPage').then((module) => ({ default: module.AdminWebhookEventsPage })),
 )
 const LiffDebugPage = lazy(() =>
   import('@/features/admin/pages/LiffDebugPage').then((module) => ({ default: module.LiffDebugPage })),
@@ -235,10 +235,10 @@ export const AppRouter = () => {
               <Route element={<AdminLayout />}>
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+                <Route path="/admin/housing" element={<AdminHousingPage />} />
                 <Route path="/admin/listings" element={<AdminListingsPage />} />
                 <Route path="/admin/members" element={<AdminMembersPage />} />
                 <Route path="/admin/conversations" element={<AdminConversationsPage />} />
-                <Route path="/admin/webhook-events" element={<AdminWebhookEventsPage />} />
                 <Route path="/admin/liff-debug" element={<LiffDebugPage mode="admin" />} />
               </Route>
             </Route>

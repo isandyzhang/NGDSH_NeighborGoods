@@ -193,6 +193,9 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.CodeKey).HasMaxLength(64).IsRequired();
             entity.Property(e => e.DisplayName).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.City).HasMaxLength(32);
+            entity.Property(e => e.District).HasMaxLength(32);
+            entity.Property(e => e.Notes).HasMaxLength(500);
             entity.HasIndex(e => e.CodeKey).IsUnique();
         });
 
@@ -204,6 +207,12 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.CodeKey).HasMaxLength(64).IsRequired();
             entity.Property(e => e.DisplayName).HasMaxLength(128).IsRequired();
             entity.HasIndex(e => e.CodeKey).IsUnique();
+            entity.HasIndex(e => e.ResidenceId, "IX_ListingPickupLocations_ResidenceId");
+
+            entity.HasOne(d => d.Residence)
+                .WithMany(p => p.PickupLocations)
+                .HasForeignKey(d => d.ResidenceId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ListingEntity>(entity =>

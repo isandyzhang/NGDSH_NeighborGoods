@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NeighborGoods.Data;
 
@@ -11,9 +12,11 @@ using NeighborGoods.Data;
 namespace NeighborGoods.Data.Migrations
 {
     [DbContext(typeof(NeighborGoodsDbContext))]
-    partial class NeighborGoodsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260917072400_AddListingLastExposedAt")]
+    partial class AddListingLastExposedAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -886,9 +889,6 @@ namespace NeighborGoods.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<int?>("ResidenceId")
-                        .HasColumnType("int");
-
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
@@ -897,8 +897,6 @@ namespace NeighborGoods.Data.Migrations
                     b.HasIndex("CodeKey")
                         .IsUnique();
 
-                    b.HasIndex(new[] { "ResidenceId" }, "IX_ListingPickupLocations_ResidenceId");
-
                     b.ToTable("ListingPickupLocations", (string)null);
                 });
 
@@ -906,10 +904,6 @@ namespace NeighborGoods.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .HasColumnType("int");
-
-                    b.Property<string>("City")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
 
                     b.Property<string>("CodeKey")
                         .IsRequired()
@@ -921,16 +915,8 @@ namespace NeighborGoods.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<string>("District")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
@@ -1309,21 +1295,12 @@ namespace NeighborGoods.Data.Migrations
 
             modelBuilder.Entity("NeighborGoods.Data.Listings.ListingPickupLocation", b =>
                 {
-                    b.HasOne("NeighborGoods.Data.Listings.ListingResidence", "Residence")
-                        .WithMany("PickupLocations")
-                        .HasForeignKey("ResidenceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Listings");
-
-                    b.Navigation("Residence");
                 });
 
             modelBuilder.Entity("NeighborGoods.Data.Listings.ListingResidence", b =>
                 {
                     b.Navigation("Listings");
-
-                    b.Navigation("PickupLocations");
                 });
 #pragma warning restore 612, 618
         }

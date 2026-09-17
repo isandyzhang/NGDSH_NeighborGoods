@@ -33,10 +33,11 @@ public static class LookupEndpoints
         app.MapGet("/api/v1/lookups/pickup-locations", async (
             HttpContext httpContext,
             LookupReadService lookupReadService,
+            int? residenceId = null,
             CancellationToken ct = default) =>
         {
-            var rows = await lookupReadService.GetPickupLocationsAsync(ct);
-            var items = ToJsonRows(rows);
+            var rows = await lookupReadService.GetPickupLocationsAsync(residenceId, ct);
+            var items = ToJsonRows(rows, includeResidenceId: true);
             return Results.Ok(ApiResponseFactory.Success(items, httpContext));
         })
         .WithName("GetListingPickupLocationsLookupV1")
@@ -57,12 +58,26 @@ public static class LookupEndpoints
         return app;
     }
 
-    private static List<object> ToJsonRows(IReadOnlyList<CachedLookupDto> rows)
+    private static List<object> ToJsonRows(IReadOnlyList<CachedLookupDto> rows, bool includeResidenceId = false)
     {
         var list = new List<object>(rows.Count);
         foreach (var r in rows)
         {
-            list.Add(new { id = r.Id, codeKey = r.CodeKey, displayName = r.DisplayName, sortOrder = r.SortOrder });
+            if (includeResidenceId)
+            {
+                list.Add(new
+                {
+                    id = r.Id,
+                    codeKey = r.CodeKey,
+                    displayName = r.DisplayName,
+                    sortOrder = r.SortOrder,
+                    residenceId = r.ResidenceId,
+                });
+            }
+            else
+            {
+                list.Add(new { id = r.Id, codeKey = r.CodeKey, displayName = r.DisplayName, sortOrder = r.SortOrder });
+            }
         }
 
         return list;

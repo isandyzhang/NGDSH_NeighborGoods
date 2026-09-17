@@ -167,44 +167,6 @@ export type AdminListingManagement = {
   }
 }
 
-export type AdminAdoWebhookEventListItem = {
-  id: string
-  receivedAt: string
-  bodyLength: number
-  rawBodyPreview: string
-  eventType: string | null
-  workItemId: number | null
-  workItemTitle: string | null
-  summaryPreview: string | null
-  fieldResolveStatus: string
-  lineNotifyStatus: string
-}
-
-export type AdminAdoWebhookEventDetail = {
-  id: string
-  receivedAt: string
-  bodyLength: number
-  rawBody: string
-  eventType: string | null
-  workItemId: number | null
-  workItemTitle: string | null
-  projectName: string | null
-  workItemUrl: string | null
-  summaryPreview: string | null
-  normalizedSummary: string | null
-  fieldResolveStatus: string
-  normalizeError: string | null
-  lineNotifyStatus: string
-}
-
-export type AdminAdoWebhookEventList = {
-  items: AdminAdoWebhookEventListItem[]
-  page: number
-  pageSize: number
-  totalCount: number
-  totalPages: number
-}
-
 export type AdminListingDetail = {
   id: string
   title: string
@@ -251,6 +213,62 @@ export type AdminMemberList = {
   pageSize: number
   totalCount: number
   totalPages: number
+}
+
+export type AdminResidence = {
+  id: number
+  codeKey: string
+  displayName: string
+  city: string | null
+  district: string | null
+  notes: string | null
+  sortOrder: number
+  isActive: boolean
+  listingCount: number
+  pickupLocationCount: number
+}
+
+export type UpsertAdminResidencePayload = {
+  displayName: string
+  city: string | null
+  district: string | null
+  notes: string | null
+  sortOrder: number
+  isActive: boolean
+}
+
+export type AdminPickupLocation = {
+  id: number
+  codeKey: string
+  displayName: string
+  residenceId: number | null
+  residenceName: string | null
+  sortOrder: number
+  isActive: boolean
+  listingCount: number
+  isProtected: boolean
+}
+
+export type UpsertAdminPickupLocationPayload = {
+  displayName: string
+  residenceId: number | null
+  sortOrder: number
+  isActive: boolean
+}
+
+export type AdminCategory = {
+  id: number
+  codeKey: string
+  displayName: string
+  sortOrder: number
+  isActive: boolean
+  listingCount: number
+}
+
+export type UpsertAdminCategoryPayload = {
+  displayName: string
+  sortOrder: number
+  isActive: boolean
 }
 
 export const adminApi = {
@@ -376,13 +394,80 @@ export const adminApi = {
     return unwrapApiResponse(response.data)
   },
 
-  async listAdoWebhookEvents(params?: { page?: number; pageSize?: number }): Promise<AdminAdoWebhookEventList> {
-    const response = await http.get<ApiResponse<AdminAdoWebhookEventList>>('/api/v1/admin/ado-webhook-events', { params })
+  async listResidences(): Promise<AdminResidence[]> {
+    const response = await http.get<ApiResponse<AdminResidence[]>>('/api/v1/admin/residences')
     return unwrapApiResponse(response.data)
   },
 
-  async getAdoWebhookEvent(id: string): Promise<AdminAdoWebhookEventDetail> {
-    const response = await http.get<ApiResponse<AdminAdoWebhookEventDetail>>(`/api/v1/admin/ado-webhook-events/${id}`)
+  async createResidence(payload: UpsertAdminResidencePayload): Promise<AdminResidence> {
+    const response = await http.post<ApiResponse<AdminResidence>>('/api/v1/admin/residences', payload)
     return unwrapApiResponse(response.data)
+  },
+
+  async updateResidence(id: number, payload: UpsertAdminResidencePayload): Promise<AdminResidence> {
+    const response = await http.patch<ApiResponse<AdminResidence>>(`/api/v1/admin/residences/${id}`, payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async setResidenceEnabled(id: number, isEnabled: boolean): Promise<AdminResidence> {
+    const response = await http.patch<ApiResponse<AdminResidence>>(`/api/v1/admin/residences/${id}/enabled`, { isEnabled })
+    return unwrapApiResponse(response.data)
+  },
+
+  async deleteResidence(id: number): Promise<void> {
+    const response = await http.delete<ApiResponse<{ id: number; deleted: boolean }>>(`/api/v1/admin/residences/${id}`)
+    unwrapApiResponse(response.data)
+  },
+
+  async listPickupLocations(params?: { residenceId?: number; sharedOnly?: boolean }): Promise<AdminPickupLocation[]> {
+    const response = await http.get<ApiResponse<AdminPickupLocation[]>>('/api/v1/admin/pickup-locations', { params })
+    return unwrapApiResponse(response.data)
+  },
+
+  async createPickupLocation(payload: UpsertAdminPickupLocationPayload): Promise<AdminPickupLocation> {
+    const response = await http.post<ApiResponse<AdminPickupLocation>>('/api/v1/admin/pickup-locations', payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async updatePickupLocation(id: number, payload: UpsertAdminPickupLocationPayload): Promise<AdminPickupLocation> {
+    const response = await http.patch<ApiResponse<AdminPickupLocation>>(`/api/v1/admin/pickup-locations/${id}`, payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async setPickupLocationEnabled(id: number, isEnabled: boolean): Promise<AdminPickupLocation> {
+    const response = await http.patch<ApiResponse<AdminPickupLocation>>(`/api/v1/admin/pickup-locations/${id}/enabled`, {
+      isEnabled,
+    })
+    return unwrapApiResponse(response.data)
+  },
+
+  async deletePickupLocation(id: number): Promise<void> {
+    const response = await http.delete<ApiResponse<{ id: number; deleted: boolean }>>(`/api/v1/admin/pickup-locations/${id}`)
+    unwrapApiResponse(response.data)
+  },
+
+  async listCategories(): Promise<AdminCategory[]> {
+    const response = await http.get<ApiResponse<AdminCategory[]>>('/api/v1/admin/categories')
+    return unwrapApiResponse(response.data)
+  },
+
+  async createCategory(payload: UpsertAdminCategoryPayload): Promise<AdminCategory> {
+    const response = await http.post<ApiResponse<AdminCategory>>('/api/v1/admin/categories', payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async updateCategory(id: number, payload: UpsertAdminCategoryPayload): Promise<AdminCategory> {
+    const response = await http.patch<ApiResponse<AdminCategory>>(`/api/v1/admin/categories/${id}`, payload)
+    return unwrapApiResponse(response.data)
+  },
+
+  async setCategoryEnabled(id: number, isEnabled: boolean): Promise<AdminCategory> {
+    const response = await http.patch<ApiResponse<AdminCategory>>(`/api/v1/admin/categories/${id}/enabled`, { isEnabled })
+    return unwrapApiResponse(response.data)
+  },
+
+  async deleteCategory(id: number): Promise<void> {
+    const response = await http.delete<ApiResponse<{ id: number; deleted: boolean }>>(`/api/v1/admin/categories/${id}`)
+    unwrapApiResponse(response.data)
   },
 }

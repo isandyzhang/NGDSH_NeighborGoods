@@ -6,10 +6,11 @@ export type LookupItem = {
   codeKey: string
   displayName: string
   sortOrder: number
+  residenceId?: number | null
 }
 
-const getLookup = async (path: string): Promise<LookupItem[]> => {
-  const response = await http.get<ApiResponse<LookupItem[]>>(path)
+const getLookup = async (path: string, params?: Record<string, string | number | undefined>): Promise<LookupItem[]> => {
+  const response = await http.get<ApiResponse<LookupItem[]>>(path, { params })
   return unwrapApiResponse(response.data)
 }
 
@@ -17,5 +18,8 @@ export const lookupApi = {
   categories: () => getLookup('/api/v1/lookups/categories'),
   conditions: () => getLookup('/api/v1/lookups/conditions'),
   residences: () => getLookup('/api/v1/lookups/residences'),
-  pickupLocations: () => getLookup('/api/v1/lookups/pickup-locations'),
+  pickupLocations: (residenceId?: number | null) =>
+    getLookup('/api/v1/lookups/pickup-locations', {
+      residenceId: residenceId ?? 0,
+    }),
 }

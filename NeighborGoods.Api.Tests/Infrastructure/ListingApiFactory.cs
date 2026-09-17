@@ -81,6 +81,13 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [SiteAnnouncements]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [LineBindingPending]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Listings]");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingPickupLocations] WHERE [Id] > 12");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingResidences] WHERE [Id] > 3");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingCategories] WHERE [Id] > 9");
+            dbContext.Database.ExecuteSqlRaw("UPDATE [ListingPickupLocations] SET [IsActive] = 0 WHERE [Id] IN (0, 1, 2)");
+            dbContext.Database.ExecuteSqlRaw("UPDATE [ListingPickupLocations] SET [IsActive] = 1 WHERE [Id] BETWEEN 3 AND 12");
+            dbContext.Database.ExecuteSqlRaw("UPDATE [ListingResidences] SET [IsActive] = 1, [City] = NULL, [District] = NULL, [Notes] = NULL");
+            dbContext.Database.ExecuteSqlRaw("UPDATE [ListingCategories] SET [IsActive] = 1");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AspNetUserRoles]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AspNetUserClaims]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AspNetUserLogins]");

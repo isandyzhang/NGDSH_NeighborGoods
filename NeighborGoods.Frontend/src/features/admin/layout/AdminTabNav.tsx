@@ -3,10 +3,10 @@ import { NavLink } from 'react-router-dom'
 const tabs = [
   { label: '首頁', to: '/admin' },
   { label: '跑馬燈', to: '/admin/announcements' },
+  { label: '社宅管理', to: '/admin/housing' },
   { label: '商品列表', to: '/admin/listings' },
   { label: '會員管理', to: '/admin/members' },
   { label: '聊天室檢查', to: '/admin/conversations' },
-  { label: 'Webhook 紀錄', to: '/admin/webhook-events' },
 ]
 
 export const AdminTabNav = () => {

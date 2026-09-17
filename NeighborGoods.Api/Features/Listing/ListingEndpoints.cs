@@ -80,7 +80,7 @@ public static class ListingEndpoints
         .WithName("GetListingsV1")
         .WithSummary("商品列表（可累加篩選）")
         .WithDescription(
-            "可選 query：isFree、isCharity、isTradeable、categoryCode/categoryCodes、conditionCode/conditionCodes、residenceCode/residenceCodes、minPrice、maxPrice、excludeUserId。codes 支援逗號分隔多選。關鍵字 q 長度須 >= 2 才套用 LIKE。僅當 isFree/isCharity/isTradeable 為 true 時套用；多個同時帶入為 AND。列表排序：置頂中優先，再依建立時間。");
+            "可選 query：isFree、isCharity、isTradeable、categoryCode/categoryCodes、conditionCode/conditionCodes、residenceCode/residenceCodes、minPrice、maxPrice、excludeUserId。codes 支援逗號分隔多選。關鍵字 q 長度須 >= 2 才套用 LIKE。僅當 isFree/isCharity/isTradeable 為 true 時套用；多個同時帶入為 AND。列表排序：置頂中優先，再依 LastExposedAt（無則 ListedAt）新到舊。");
 
         app.MapGet("/api/v1/listings/mine", async (
             HttpContext httpContext,

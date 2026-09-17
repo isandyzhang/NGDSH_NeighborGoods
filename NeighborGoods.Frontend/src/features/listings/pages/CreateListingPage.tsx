@@ -77,28 +77,43 @@ export const CreateListingPage = () => {
 
   useEffect(() => {
     let disposed = false
-    void Promise.all([
-      lookupApi.categories(),
-      lookupApi.conditions(),
-      lookupApi.residences(),
-      lookupApi.pickupLocations(),
-    ]).then(([c, cond, r, pick]) => {
-      if (disposed) {
-        return
-      }
-      setCategories(c)
-      setConditions(cond)
-      setResidences(r)
-      setPickupLocations(pick)
-    }).catch(() => {
-      if (!disposed) {
-        setError('載入選項失敗，請稍後再試')
-      }
-    })
+    void Promise.all([lookupApi.categories(), lookupApi.conditions(), lookupApi.residences()])
+      .then(([c, cond, r]) => {
+        if (disposed) {
+          return
+        }
+        setCategories(c)
+        setConditions(cond)
+        setResidences(r)
+      })
+      .catch(() => {
+        if (!disposed) {
+          setError('載入選項失敗，請稍後再試')
+        }
+      })
     return () => {
       disposed = true
     }
   }, [])
+
+  useEffect(() => {
+    let disposed = false
+    void lookupApi
+      .pickupLocations(form.residenceCode)
+      .then((pick) => {
+        if (!disposed) {
+          setPickupLocations(pick)
+        }
+      })
+      .catch(() => {
+        if (!disposed) {
+          setError('載入面交地點失敗，請稍後再試')
+        }
+      })
+    return () => {
+      disposed = true
+    }
+  }, [form.residenceCode])
 
   const imagePreviews = useMemo(
     () =>

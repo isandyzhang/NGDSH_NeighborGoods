@@ -2,8 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Admin.Contracts.Requests;
 using NeighborGoods.Api.Features.Admin.Contracts.Responses;
 using NeighborGoods.Api.Features.Admin.Services;
-using NeighborGoods.Api.Features.Integrations.Ado;
-using NeighborGoods.Api.Features.Integrations.Ado.Contracts;
 using NeighborGoods.Api.Features.Announcements.Contracts;
 using NeighborGoods.Api.Features.Announcements.Services;
 using NeighborGoods.Api.Features.Listing;
@@ -92,14 +90,6 @@ public static class AdminEndpoints
 
         app.MapPost("/api/v1/admin/conversations/{conversationId:guid}/messages", PostAdminConversationMessageAsync)
         .WithName("AdminPostConversationMessageV1")
-        .RequireAuthorization();
-
-        app.MapGet("/api/v1/admin/ado-webhook-events", GetAdminAdoWebhookEventsAsync)
-        .WithName("AdminGetAdoWebhookEventsV1")
-        .RequireAuthorization();
-
-        app.MapGet("/api/v1/admin/ado-webhook-events/{id:guid}", GetAdminAdoWebhookEventDetailAsync)
-        .WithName("AdminGetAdoWebhookEventDetailV1")
         .RequireAuthorization();
 
         return app;
@@ -470,6 +460,16 @@ public static class AdminEndpoints
         if (listing is null)
         {
             return Results.NotFound(ApiResponseFactory.Error("LISTING_NOT_FOUND", "找不到商品", httpContext));
+        }
+
+        var pickupAllowed = await dbContext.ListingPickupLocations.AsNoTracking().AnyAsync(
+            x => x.Id == request.PickupLocationCode
+                && x.IsActive
+                && (x.ResidenceId == null || x.ResidenceId == request.ResidenceCode),
+            ct);
+        if (!pickupAllowed)
+        {
+            return Results.BadRequest(ApiResponseFactory.Error("VALIDATION_ERROR", "面交地點不屬於所選社宅或已停用", httpContext));
         }
 
         listing.Title = request.Title.Trim();
@@ -880,105 +880,6 @@ public static class AdminEndpoints
         };
 
         return Results.Ok(ApiResponseFactory.Success(dto, httpContext));
-    }
-
-    private const int AdoWebhookPreviewLength = 80;
-
-    private static async Task<IResult> GetAdminAdoWebhookEventsAsync(
-        HttpContext httpContext,
-        ICurrentUserContext currentUser,
-        NeighborGoodsDbContext dbContext,
-        AdoWebhookMemoryStore store,
-        int page = 1,
-        int pageSize = 20,
-        CancellationToken ct = default)
-    {
-        if (!await IsAdminAsync(currentUser, dbContext, ct))
-        {
-            return Results.Json(
-                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-
-        var normalizedPage = Math.Max(page, 1);
-        var normalizedPageSize = Math.Clamp(pageSize, 1, 100);
-        var (items, totalCount) = store.List(normalizedPage, normalizedPageSize);
-        var payload = new AdoWebhookEventListResponse(
-            items.Select(ToListItemDto).ToList(),
-            normalizedPage,
-            normalizedPageSize,
-            totalCount,
-            totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)normalizedPageSize));
-
-        return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
-    }
-
-    private static async Task<IResult> GetAdminAdoWebhookEventDetailAsync(
-        HttpContext httpContext,
-        ICurrentUserContext currentUser,
-        NeighborGoodsDbContext dbContext,
-        AdoWebhookMemoryStore store,
-        Guid id,
-        CancellationToken ct = default)
-    {
-        if (!await IsAdminAsync(currentUser, dbContext, ct))
-        {
-            return Results.Json(
-                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-
-        var entry = store.GetById(id);
-        if (entry is null)
-        {
-            return Results.NotFound(ApiResponseFactory.Error("ADO_WEBHOOK_EVENT_NOT_FOUND", "找不到 webhook 紀錄", httpContext));
-        }
-
-        return Results.Ok(ApiResponseFactory.Success(ToDetailDto(entry), httpContext));
-    }
-
-    private static AdoWebhookEventListItemDto ToListItemDto(AdoWebhookEventEntry entry) =>
-        new(
-            entry.Id,
-            entry.ReceivedAt,
-            entry.RawBody.Length,
-            !string.IsNullOrWhiteSpace(entry.SummaryPreview)
-                ? entry.SummaryPreview!
-                : BuildRawBodyPreview(entry.RawBody),
-            entry.EventType,
-            entry.WorkItemId,
-            entry.WorkItemTitle,
-            entry.SummaryPreview,
-            entry.FieldResolveStatus,
-            entry.LineNotifyStatus);
-
-    private static AdoWebhookEventDetailDto ToDetailDto(AdoWebhookEventEntry entry) =>
-        new(
-            entry.Id,
-            entry.ReceivedAt,
-            entry.RawBody.Length,
-            entry.RawBody,
-            entry.EventType,
-            entry.WorkItemId,
-            entry.WorkItemTitle,
-            entry.ProjectName,
-            entry.WorkItemUrl,
-            entry.SummaryPreview,
-            entry.NormalizedSummary,
-            entry.FieldResolveStatus,
-            entry.NormalizeError,
-            entry.LineNotifyStatus);
-
-    private static string BuildRawBodyPreview(string rawBody)
-    {
-        if (string.IsNullOrEmpty(rawBody))
-        {
-            return string.Empty;
-        }
-
-        return rawBody.Length <= AdoWebhookPreviewLength
-            ? rawBody
-            : rawBody[..AdoWebhookPreviewLength];
     }
 
     private static AdminAnnouncementResponse ToAdminResponse(SiteAnnouncement entity) =>

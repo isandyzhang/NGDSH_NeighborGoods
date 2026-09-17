@@ -26,6 +26,7 @@ public sealed class Listing
     public DateTime? PinnedStartDate { get; set; }
     public int Status { get; set; }
     public DateTime ListedAt { get; set; }
+    public DateTime? LastExposedAt { get; set; }
     public DateTime? AutoExpiredAt { get; set; }
     public DateTime? ExpiryNoticeSentAt { get; set; }
     public DateTime CreatedAt { get; set; }

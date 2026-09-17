@@ -4,6 +4,7 @@ using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Features.PurchaseRequests;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.Contracts;
+using NeighborGoods.Api.Features.Lookups;
 using NeighborGoods.Data;
 using NeighborGoods.Api.Shared.Security;
 using NeighborGoods.Data.Listings;
@@ -17,10 +18,10 @@ public sealed class ListingQueryService(
     ICurrentUserContext currentUserContext)
 {
     private static readonly TimeSpan LookupCacheDuration = TimeSpan.FromMinutes(5);
-    private const string CategoryLookupCacheKey = "listing-lookups:categories";
-    private const string ConditionLookupCacheKey = "listing-lookups:conditions";
-    private const string ResidenceLookupCacheKey = "listing-lookups:residences";
-    private const string PickupLocationLookupCacheKey = "listing-lookups:pickup-locations";
+    private const string CategoryLookupCacheKey = LookupCacheKeys.ListingCategories;
+    private const string ConditionLookupCacheKey = LookupCacheKeys.ListingConditions;
+    private const string ResidenceLookupCacheKey = LookupCacheKeys.ListingResidences;
+    private const string PickupLocationLookupCacheKey = LookupCacheKeys.ListingPickupLocations;
 
     public async Task<ListingDetailDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -227,7 +228,7 @@ public sealed class ListingQueryService(
                 && x.IsPinned
                 && x.PinnedEndDate.HasValue
                 && x.PinnedEndDate.Value.Date >= todayUtc)
-            .ThenByDescending(x => x.ListedAt);
+            .ThenByDescending(x => x.LastExposedAt ?? x.ListedAt);
 
         var total = await queryable.CountAsync(cancellationToken);
         var listings = await queryable
@@ -594,8 +595,6 @@ public sealed class ListingQueryService(
         }
 
         var map = await source.AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.SortOrder)
             .ToDictionaryAsync(c => c.Id, c => c.DisplayName, cancellationToken);
 
         memoryCache.Set(cacheKey, map, LookupCacheDuration);

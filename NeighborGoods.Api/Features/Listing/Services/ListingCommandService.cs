@@ -103,7 +103,7 @@ public sealed class ListingCommandService(
         await EnsureActiveCategoryExistsAsync(request.CategoryCode, cancellationToken);
         await EnsureActiveConditionExistsAsync(request.ConditionCode, cancellationToken);
         await EnsureActiveResidenceExistsAsync(request.ResidenceCode, cancellationToken);
-        await EnsureActivePickupLocationExistsAsync(request.PickupLocationCode, cancellationToken);
+        await EnsurePickupLocationAllowedAsync(request.ResidenceCode, request.PickupLocationCode, cancellationToken);
 
         var entity = await dbContext.Listings
             .Include(x => x.ListingImages)
@@ -292,7 +292,7 @@ public sealed class ListingCommandService(
         await EnsureActiveCategoryExistsAsync(request.CategoryCode, cancellationToken);
         await EnsureActiveConditionExistsAsync(request.ConditionCode, cancellationToken);
         await EnsureActiveResidenceExistsAsync(request.ResidenceCode, cancellationToken);
-        await EnsureActivePickupLocationExistsAsync(request.PickupLocationCode, cancellationToken);
+        await EnsurePickupLocationAllowedAsync(request.ResidenceCode, request.PickupLocationCode, cancellationToken);
         var sellerId = currentUserContext.GetRequiredUserId();
         var seller = await dbContext.AspNetUsers
             .FirstOrDefaultAsync(x => x.Id == sellerId, cancellationToken);
@@ -415,12 +415,24 @@ public sealed class ListingCommandService(
     private Task EnsureActiveResidenceExistsAsync(int residenceCode, CancellationToken cancellationToken) =>
         EnsureActiveLookupExistsAsync<ListingResidence>(residenceCode, "社宅", nameof(residenceCode), cancellationToken);
 
-    private Task EnsureActivePickupLocationExistsAsync(int pickupLocationCode, CancellationToken cancellationToken) =>
-        EnsureActiveLookupExistsAsync<ListingPickupLocation>(
-            pickupLocationCode,
-            "面交地點",
-            nameof(pickupLocationCode),
-            cancellationToken);
+    private async Task EnsurePickupLocationAllowedAsync(
+        int residenceCode,
+        int pickupLocationCode,
+        CancellationToken cancellationToken)
+    {
+        var pickup = await dbContext.ListingPickupLocations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == pickupLocationCode && c.IsActive, cancellationToken);
+        if (pickup is null)
+        {
+            throw new ArgumentException("無效或已停用的面交地點。", nameof(pickupLocationCode));
+        }
+
+        if (pickup.ResidenceId is not null && pickup.ResidenceId != residenceCode)
+        {
+            throw new ArgumentException("面交地點不屬於所選社宅。", nameof(pickupLocationCode));
+        }
+    }
 
     private async Task EnsureActiveLookupExistsAsync<TEntity>(
         int code,

@@ -10,4 +10,6 @@ public static class ListingConstants
     public const int TopPinDurationDays = 7;
     public const int ListingExpiryDays = ListingExpiryConstants.ExpiryDays;
     public const int ListingExpiryBatchSize = ListingExpiryConstants.BatchSize;
+    public const int LoginExposureCooldownHours = 24;
+    public const int LoginExposureMinListingAgeHours = 24;
 }

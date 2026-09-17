@@ -168,7 +168,7 @@ public sealed class ListingEndpointsTests
     }
 
     [Fact]
-    public async Task GetLookupPickupLocations_ReturnsSeededList()
+    public async Task GetLookupPickupLocations_ReturnsActiveLocations()
     {
         using var factory = new ListingApiFactory(_fixture.ConnectionString);
         using var client = factory.CreateClient();
@@ -178,7 +178,26 @@ public sealed class ListingEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(body.GetProperty("success").GetBoolean());
-        Assert.Equal(4, body.GetProperty("data").GetArrayLength());
+        Assert.Equal(10, body.GetProperty("data").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task GetLookupPickupLocations_WithResidenceId_ReturnsScopedAndShared()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/lookups/pickup-locations?residenceId=2");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = body.GetProperty("data");
+        Assert.Equal(4, items.GetArrayLength());
+        var names = items.EnumerateArray().Select(x => x.GetProperty("displayName").GetString()).ToHashSet();
+        Assert.Contains("北棟管理室", names);
+        Assert.Contains("南棟管理室", names);
+        Assert.Contains("風雨操場", names);
+        Assert.Contains("私訊", names);
     }
 
     [Fact]
@@ -316,6 +335,33 @@ public sealed class ListingEndpointsTests
             price = 100,
             residenceCode = 2,
             pickupLocationCode = 99
+        };
+
+        using var form = BuildCreateListingForm(request);
+        var response = await client.PostAsync("/api/v1/listings", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(body.GetProperty("success").GetBoolean());
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task PostListing_PickupLocationFromOtherResidence_ReturnsBadRequest()
+    {
+        using var factory = new ListingApiFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
+
+        var request = new
+        {
+            title = "跨社宅面交",
+            description = "測試",
+            categoryCode = 1,
+            conditionCode = 1,
+            price = 100,
+            residenceCode = 2,
+            pickupLocationCode = 4
         };
 
         using var form = BuildCreateListingForm(request);

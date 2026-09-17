@@ -121,7 +121,7 @@ export const ListingFormFields = ({
             label="社宅"
             value={form.residenceCode}
             options={lookups.residences}
-            onChange={(value) => onChange({ residenceCode: value })}
+            onChange={(value) => onChange({ residenceCode: value, pickupLocationCode: null })}
             invalid={isSelectInvalid('residence')}
             includeEmptyOption={includeEmptyOptions}
             placeholder="-"

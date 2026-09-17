@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Api.Features.Auth.Contracts.Requests;
 using NeighborGoods.Api.Features.Auth.Contracts.Responses;
 using NeighborGoods.Api.Features.Auth.Services;
+using NeighborGoods.Api.Features.Listing.Services;
 using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Data;
 using NeighborGoods.Data.LegacyEntities;
@@ -17,6 +18,7 @@ public static class AuthEndpoints
             LoginRequest request,
             PasswordAuthService passwordAuthService,
             NeighborGoodsDbContext dbContext,
+            LoginListingExposureService loginListingExposureService,
             ITokenService tokenService,
             CancellationToken ct = default) =>
         {
@@ -28,7 +30,9 @@ public static class AuthEndpoints
                     statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            user.LastLoginAt = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+            await loginListingExposureService.TryBoostOldestAsync(user.Id, user.LastLoginAt, now, ct);
+            user.LastLoginAt = now;
             await dbContext.SaveChangesAsync(ct);
 
             var tokens = await tokenService.IssueAsync(user, ct);
@@ -92,6 +96,7 @@ public static class AuthEndpoints
             ILineOAuthStateStore stateStore,
             ILineOAuthClient lineOAuthClient,
             NeighborGoodsDbContext dbContext,
+            LoginListingExposureService loginListingExposureService,
             ITokenService tokenService,
             CancellationToken ct = default) =>
         {
@@ -114,7 +119,9 @@ public static class AuthEndpoints
                 dbContext.AspNetUsers.Add(user);
             }
 
-            user.LastLoginAt = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+            await loginListingExposureService.TryBoostOldestAsync(user.Id, user.LastLoginAt, now, ct);
+            user.LastLoginAt = now;
             await dbContext.SaveChangesAsync(ct);
 
             var tokens = await tokenService.IssueAsync(user, ct);

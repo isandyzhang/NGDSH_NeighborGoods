@@ -50,17 +50,15 @@ export const EditListingPage = () => {
       lookupApi.categories(),
       lookupApi.conditions(),
       lookupApi.residences(),
-      lookupApi.pickupLocations(),
       accountApi.me(),
     ])
-      .then(([detail, c, cond, r, pick, me]) => {
+      .then(([detail, c, cond, r, me]) => {
         if (disposed) {
           return
         }
         setCategories(c)
         setConditions(cond)
         setResidences(r)
-        setPickupLocations(pick)
         setForm({
           title: detail.title,
           description: detail.description ?? '',
@@ -96,6 +94,30 @@ export const EditListingPage = () => {
       disposed = true
     }
   }, [id])
+
+  useEffect(() => {
+    if (!form) {
+      return
+    }
+
+    let disposed = false
+    void lookupApi
+      .pickupLocations(form.residenceCode)
+      .then((pick) => {
+        if (!disposed) {
+          setPickupLocations(pick)
+        }
+      })
+      .catch((err: unknown) => {
+        if (!disposed) {
+          setError(err instanceof ApiClientError ? err.message : '載入面交地點失敗')
+        }
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [form?.residenceCode])
 
   useEffect(() => {
     const shouldFocusTopPin = searchParams.get('focus') === TOP_PIN_FOCUS_QUERY
