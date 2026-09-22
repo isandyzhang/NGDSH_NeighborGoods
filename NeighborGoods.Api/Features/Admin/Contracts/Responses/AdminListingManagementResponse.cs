@@ -13,6 +13,7 @@ public sealed record AdminListingManagementItemResponse(
     bool IsFree,
     int Status,
     bool IsPinned,
+    int PurchaseRequestCount,
     DateTime CreatedAt
 );
 

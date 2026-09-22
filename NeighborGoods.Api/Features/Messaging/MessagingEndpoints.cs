@@ -263,6 +263,30 @@ public static class MessagingEndpoints
         .RequireAuthorization()
         .RequireRateLimiting("MessagingWrite");
 
+        app.MapPost("/api/v1/conversations/{conversationId:guid}/purchase-request/cancel-by-seller-and-relist", async (
+            HttpContext httpContext,
+            ICurrentUserContext currentUser,
+            PurchaseRequestService service,
+            Guid conversationId,
+            CancellationToken ct = default) =>
+        {
+            var userId = currentUser.GetRequiredUserId();
+            var (data, errorCode, errorMessage) = await service.CancelAcceptedBySellerAndRelistAsync(
+                userId,
+                conversationId,
+                ct);
+            if (data is null)
+            {
+                return MessagingError(httpContext, errorCode!, errorMessage!);
+            }
+
+            return Results.Ok(ApiResponseFactory.Success(data, httpContext));
+        })
+        .WithName("CancelAcceptedConversationPurchaseRequestBySellerAndRelistV1")
+        .WithSummary("Seller cancels an accepted transaction and relists the item")
+        .RequireAuthorization()
+        .RequireRateLimiting("MessagingWrite");
+
         app.MapPost("/api/v1/conversations/{conversationId:guid}/purchase-request/complete-by-seller", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,

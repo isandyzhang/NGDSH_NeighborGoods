@@ -13,6 +13,7 @@ public sealed class PurchaseRequestService(
     IPurchaseRequestScheduledOperations purchaseRequestScheduledOperations,
     ISystemMessageRealtimePublisher systemMessageRealtimePublisher)
 {
+    private const string SellerCancelledAcceptedRequestSystemMessage = "[系統發送]賣家已取消交易，商品已重新上架。";
     private const string CreateRequestSystemMessage = "[系統發送]買家已送出購買請求，請於 12 小時內回覆。";
     private const string AcceptRequestSystemMessage = "[系統發送]賣家已接受此交易，商品已保留。";
     private const string RejectRequestSystemMessage = "[系統發送]賣家已婉拒此交易請求。";
@@ -364,6 +365,71 @@ public sealed class PurchaseRequestService(
         }
 
         return await ConfirmReceivedByBuyerAsync(currentUserId, request.Id, cancellationToken);
+    }
+
+    public async Task<(PurchaseRequestResponse? Data, string? ErrorCode, string? ErrorMessage)> CancelAcceptedBySellerAndRelistAsync(
+        string currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var (conversation, conversationErrorCode, conversationErrorMessage) = await EnsureConversationParticipantAsync(
+            currentUserId,
+            conversationId,
+            cancellationToken);
+        if (conversation is null)
+        {
+            return (null, conversationErrorCode, conversationErrorMessage);
+        }
+
+        var request = await dbContext.PurchaseRequests
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
+        if (request is null)
+        {
+            return (null, "PURCHASE_REQUEST_NOT_FOUND", "找不到交易申請");
+        }
+
+        if (!string.Equals(request.SellerId, currentUserId, StringComparison.Ordinal))
+        {
+            return (null, "PURCHASE_REQUEST_ACCESS_DENIED", "僅賣家本人可取消已同意的交易");
+        }
+
+        if ((PurchaseRequestStatus)request.Status != PurchaseRequestStatus.Accepted)
+        {
+            return (null, "PURCHASE_REQUEST_INVALID_STATE", "只有已同意且尚未完成的交易可以取消並重新上架");
+        }
+
+        var listing = await dbContext.Listings
+            .FirstOrDefaultAsync(x => x.Id == request.ListingId, cancellationToken);
+        if (listing is null)
+        {
+            return (null, "LISTING_NOT_FOUND", "找不到商品");
+        }
+
+        if (!string.Equals(listing.SellerId, currentUserId, StringComparison.Ordinal))
+        {
+            return (null, "PURCHASE_REQUEST_SELLER_MISMATCH", "交易申請與商品賣家不一致");
+        }
+
+        var now = DateTime.UtcNow;
+        request.Status = (int)PurchaseRequestStatus.Cancelled;
+        request.RespondedAt = now;
+        request.ResponseReason = "賣家取消交易並重新上架";
+        listing.Status = (int)ListingStatus.Active;
+        listing.BuyerId = null;
+        listing.UpdatedAt = now;
+
+        await AddSystemMessageAsync(
+            request.ConversationId,
+            request.SellerId,
+            SellerCancelledAcceptedRequestSystemMessage,
+            now,
+            null,
+            cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await systemMessageRealtimePublisher.PublishLatestSystemMessageAsync(request.ConversationId, cancellationToken);
+        return (ToResponse(request, now), null, null);
     }
 
     public Task<int> ExpirePendingAsync(CancellationToken cancellationToken = default) =>

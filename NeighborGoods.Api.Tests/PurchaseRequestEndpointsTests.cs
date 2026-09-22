@@ -90,6 +90,116 @@ public sealed class PurchaseRequestEndpointsTests(SqlServerContainerFixture fixt
     }
 
     [Fact]
+    public async Task CancelAcceptedBySellerAndRelist_CancelsRequestAndSetsListingActive()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var buyerClient = factory.CreateClient();
+        await AuthenticateAsAsync(buyerClient, "other@example.com", UserPassword);
+
+        var create = await buyerClient.PostAsync($"/api/v1/listings/{SeededListingId}/purchase-requests", null);
+        create.EnsureSuccessStatusCode();
+        var createData = (await create.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        var conversationId = createData.GetProperty("conversationId").GetGuid();
+        var requestId = createData.GetProperty("id").GetGuid();
+
+        using var sellerClient = factory.CreateClient();
+        await AuthenticateAsAsync(sellerClient, "tester@example.com", UserPassword);
+        var accept = await sellerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/accept",
+            null);
+        accept.EnsureSuccessStatusCode();
+
+        var cancel = await sellerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/cancel-by-seller-and-relist",
+            null);
+
+        cancel.EnsureSuccessStatusCode();
+        var body = await cancel.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal((int)PurchaseRequestStatus.Cancelled, body.GetProperty("data").GetProperty("status").GetInt32());
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var listing = await db.Listings.FindAsync(SeededListingId);
+        var request = await db.PurchaseRequests.FindAsync(requestId);
+        Assert.NotNull(listing);
+        Assert.NotNull(request);
+        Assert.Equal((int)ListingStatus.Active, listing!.Status);
+        Assert.Equal((int)PurchaseRequestStatus.Cancelled, request!.Status);
+        Assert.NotNull(request.RespondedAt);
+    }
+
+    [Fact]
+    public async Task CancelAcceptedBySellerAndRelist_ByBuyer_ReturnsForbidden()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var buyerClient = factory.CreateClient();
+        await AuthenticateAsAsync(buyerClient, "other@example.com", UserPassword);
+
+        var create = await buyerClient.PostAsync($"/api/v1/listings/{SeededListingId}/purchase-requests", null);
+        create.EnsureSuccessStatusCode();
+        var conversationId = (await create.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("data")
+            .GetProperty("conversationId")
+            .GetGuid();
+
+        using var sellerClient = factory.CreateClient();
+        await AuthenticateAsAsync(sellerClient, "tester@example.com", UserPassword);
+        var accept = await sellerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/accept",
+            null);
+        accept.EnsureSuccessStatusCode();
+
+        var cancel = await buyerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/cancel-by-seller-and-relist",
+            null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, cancel.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminCanViewAndCancelCurrentPurchaseRequest_AndListingIsRelisted()
+    {
+        using var factory = new ListingApiFactory(fixture.ConnectionString);
+        using var buyerClient = factory.CreateClient();
+        await AuthenticateAsAsync(buyerClient, "other@example.com", UserPassword);
+
+        var create = await buyerClient.PostAsync($"/api/v1/listings/{SeededListingId}/purchase-requests", null);
+        create.EnsureSuccessStatusCode();
+        var createData = (await create.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        var conversationId = createData.GetProperty("conversationId").GetGuid();
+        var requestId = createData.GetProperty("id").GetGuid();
+
+        using var sellerClient = factory.CreateClient();
+        await AuthenticateAsAsync(sellerClient, "tester@example.com", UserPassword);
+        var accept = await sellerClient.PostAsync(
+            $"/api/v1/conversations/{conversationId}/purchase-request/accept",
+            null);
+        accept.EnsureSuccessStatusCode();
+
+        using var adminClient = factory.CreateClient();
+        await AuthenticateAsAsync(adminClient, ListingApiFactory.AdminUserName, UserPassword);
+        var history = await adminClient.GetAsync($"/api/v1/admin/listings/{SeededListingId}/purchase-requests");
+        history.EnsureSuccessStatusCode();
+        var historyBody = await history.Content.ReadFromJsonAsync<JsonElement>();
+        var historyItem = historyBody.GetProperty("data").GetProperty("items")[0];
+        Assert.Equal(requestId, historyItem.GetProperty("id").GetGuid());
+        Assert.True(historyItem.GetProperty("isCurrent").GetBoolean());
+
+        var update = await adminClient.PatchAsJsonAsync(
+            $"/api/v1/admin/purchase-requests/{requestId}/status",
+            new { status = (int)PurchaseRequestStatus.Cancelled, reason = "buyer unreachable" });
+        update.EnsureSuccessStatusCode();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NeighborGoodsDbContext>();
+        var listing = await db.Listings.FindAsync(SeededListingId);
+        var request = await db.PurchaseRequests.FindAsync(requestId);
+        Assert.Equal((int)ListingStatus.Active, listing!.Status);
+        Assert.Equal((int)PurchaseRequestStatus.Cancelled, request!.Status);
+        Assert.Equal("buyer unreachable", request.ResponseReason);
+    }
+
+    [Fact]
     public async Task CancelPurchaseRequest_ByBuyer_ChangesStatusToCancelled()
     {
         using var factory = new ListingApiFactory(fixture.ConnectionString);

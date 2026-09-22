@@ -56,6 +56,27 @@ export type AdminDashboard = {
   }>
 }
 
+export type AdminPurchaseRequest = {
+  id: string
+  listingId: string
+  conversationId: string
+  buyerId: string
+  buyerDisplayName: string
+  sellerId: string
+  sellerDisplayName: string
+  status: number
+  createdAt: string
+  expireAt: string
+  respondedAt: string | null
+  responseReason: string | null
+  isCurrent: boolean
+}
+
+export type AdminListingPurchaseRequests = {
+  listingId: string
+  items: AdminPurchaseRequest[]
+}
+
 export type AdminAnnouncement = {
   id: string
   message: string
@@ -157,6 +178,7 @@ export type AdminListingManagement = {
     isFree: boolean
     status: number
     isPinned: boolean
+    purchaseRequestCount: number
     createdAt: string
   }>
   pagination: {
@@ -299,6 +321,27 @@ export const adminApi = {
 
   async getListingDetail(id: string): Promise<AdminListingDetail> {
     const response = await http.get<ApiResponse<AdminListingDetail>>(`/api/v1/admin/listings/${id}`)
+    return unwrapApiResponse(response.data)
+  },
+
+  async getListingPurchaseRequests(id: string): Promise<AdminListingPurchaseRequests> {
+    const response = await http.get<ApiResponse<AdminListingPurchaseRequests>>(
+      `/api/v1/admin/listings/${id}/purchase-requests`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
+  async updatePurchaseRequestStatus(
+    requestId: string,
+    status: number,
+    reason?: string,
+  ): Promise<{ id: string; status: number; listingId: string; listingStatus: number; isCurrent: boolean }> {
+    const response = await http.patch<
+      ApiResponse<{ id: string; status: number; listingId: string; listingStatus: number; isCurrent: boolean }>
+    >(`/api/v1/admin/purchase-requests/${requestId}/status`, {
+      status,
+      reason: reason?.trim() || null,
+    })
     return unwrapApiResponse(response.data)
   },
 

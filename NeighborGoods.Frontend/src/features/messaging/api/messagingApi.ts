@@ -123,6 +123,13 @@ export const messagingApi = {
     return unwrapApiResponse(response.data)
   },
 
+  async cancelAcceptedBySellerAndRelist(conversationId: string): Promise<ConversationPurchaseRequest> {
+    const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
+      `/api/v1/conversations/${conversationId}/purchase-request/cancel-by-seller-and-relist`,
+    )
+    return unwrapApiResponse(response.data)
+  },
+
   async completeBySeller(conversationId: string): Promise<ConversationPurchaseRequest> {
     const response = await http.post<ApiResponse<ConversationPurchaseRequest>>(
       `/api/v1/conversations/${conversationId}/purchase-request/complete-by-seller`,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminApi, type AdminListingManagement } from '@/features/admin/api/adminApi'
 import { AdminListingEditModal } from '@/features/admin/components/listings/AdminListingEditModal'
+import { AdminListingPurchaseRequestsModal } from '@/features/admin/components/listings/AdminListingPurchaseRequestsModal'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -26,6 +27,7 @@ export const AdminListingsPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [purchaseRequestsListingId, setPurchaseRequestsListingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -109,6 +111,13 @@ export const AdminListingsPage = () => {
               <Button
                 type="button"
                 variant="secondary"
+                onClick={() => setPurchaseRequestsListingId(item.id)}
+              >
+                交易紀錄（{item.purchaseRequestCount}）
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
                 className="border-[#e9b4b4] bg-[#fbe2e2] text-[#b23a3a] hover:bg-[#f6d3d3]"
                 onClick={() => void handleHardDelete(item.id)}
                 disabled={deletingId === item.id}
@@ -135,6 +144,12 @@ export const AdminListingsPage = () => {
       </div>
 
       <AdminListingEditModal open={Boolean(editingId)} listingId={editingId} onClose={() => setEditingId(null)} onUpdated={() => void load()} />
+      <AdminListingPurchaseRequestsModal
+        open={Boolean(purchaseRequestsListingId)}
+        listingId={purchaseRequestsListingId}
+        onClose={() => setPurchaseRequestsListingId(null)}
+        onUpdated={() => void load()}
+      />
     </div>
   )
 }

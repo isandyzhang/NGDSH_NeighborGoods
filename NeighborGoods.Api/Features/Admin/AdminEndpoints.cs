@@ -12,6 +12,7 @@ using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Data;
 using NeighborGoods.Data.Announcements;
+using NeighborGoods.Data.PurchaseRequests;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Admin;
@@ -50,6 +51,14 @@ public static class AdminEndpoints
 
         app.MapPatch("/api/v1/admin/listings/{id:guid}", UpdateAdminListingAsync)
         .WithName("AdminUpdateListingV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/listings/{id:guid}/purchase-requests", GetAdminListingPurchaseRequestsAsync)
+        .WithName("AdminGetListingPurchaseRequestsV1")
+        .RequireAuthorization();
+
+        app.MapPatch("/api/v1/admin/purchase-requests/{requestId:guid}/status", UpdateAdminPurchaseRequestStatusAsync)
+        .WithName("AdminUpdatePurchaseRequestStatusV1")
         .RequireAuthorization();
 
         app.MapGet("/api/v1/admin/members", GetAdminMembersAsync)
@@ -380,6 +389,7 @@ public static class AdminEndpoints
                 x.IsFree,
                 x.Status,
                 x.IsPinned,
+                x.PurchaseRequests.Count,
                 x.CreatedAt))
             .ToListAsync(ct);
 
@@ -392,6 +402,153 @@ public static class AdminEndpoints
                 (int)Math.Ceiling(totalCount / (double)normalizedPageSize)));
 
         return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
+    }
+
+    private static async Task<IResult> GetAdminListingPurchaseRequestsAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid id,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "Admin access is required.", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (!await dbContext.Listings.AsNoTracking().AnyAsync(x => x.Id == id, ct))
+        {
+            return Results.NotFound(ApiResponseFactory.Error("LISTING_NOT_FOUND", "Listing was not found.", httpContext));
+        }
+
+        var rows = await dbContext.PurchaseRequests
+            .AsNoTracking()
+            .Where(x => x.ListingId == id)
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .Select(x => new
+            {
+                x.Id,
+                x.ListingId,
+                x.ConversationId,
+                x.BuyerId,
+                BuyerDisplayName = x.Buyer.DisplayName,
+                x.SellerId,
+                SellerDisplayName = x.Seller.DisplayName,
+                x.Status,
+                x.CreatedAt,
+                x.ExpireAt,
+                x.RespondedAt,
+                x.ResponseReason
+            })
+            .ToListAsync(ct);
+
+        var currentId = rows.FirstOrDefault()?.Id;
+        var items = rows.Select(x => new AdminPurchaseRequestResponse(
+            x.Id,
+            x.ListingId,
+            x.ConversationId,
+            x.BuyerId,
+            x.BuyerDisplayName,
+            x.SellerId,
+            x.SellerDisplayName,
+            x.Status,
+            x.CreatedAt,
+            x.ExpireAt,
+            x.RespondedAt,
+            x.ResponseReason,
+            x.Id == currentId)).ToList();
+
+        return Results.Ok(ApiResponseFactory.Success(
+            new AdminListingPurchaseRequestsResponse(id, items),
+            httpContext));
+    }
+
+    private static async Task<IResult> UpdateAdminPurchaseRequestStatusAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        Guid requestId,
+        AdminUpdatePurchaseRequestStatusRequest request,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "Admin access is required.", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (!Enum.IsDefined(typeof(PurchaseRequestStatus), request.Status))
+        {
+            return Results.BadRequest(ApiResponseFactory.Error(
+                "VALIDATION_ERROR",
+                "Invalid purchase request status.",
+                httpContext));
+        }
+
+        var entity = await dbContext.PurchaseRequests
+            .Include(x => x.Listing)
+            .FirstOrDefaultAsync(x => x.Id == requestId, ct);
+        if (entity is null)
+        {
+            return Results.NotFound(ApiResponseFactory.Error(
+                "PURCHASE_REQUEST_NOT_FOUND",
+                "Purchase request was not found.",
+                httpContext));
+        }
+
+        var latestRequestId = await dbContext.PurchaseRequests
+            .Where(x => x.ListingId == entity.ListingId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync(ct);
+
+        if (entity.Id != latestRequestId)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error(
+                    "PURCHASE_REQUEST_NOT_CURRENT",
+                    "Only the latest transaction record can be adjusted.",
+                    httpContext),
+                statusCode: StatusCodes.Status409Conflict);
+        }
+
+        var now = DateTime.UtcNow;
+        var targetStatus = (PurchaseRequestStatus)request.Status;
+        entity.Status = request.Status;
+        entity.RespondedAt = targetStatus == PurchaseRequestStatus.Pending ? null : now;
+        entity.ResponseReason = targetStatus == PurchaseRequestStatus.Pending
+            ? null
+            : string.IsNullOrWhiteSpace(request.Reason)
+                ? "Admin adjusted the transaction status."
+                : request.Reason.Trim();
+
+        entity.Listing.Status = targetStatus switch
+        {
+            PurchaseRequestStatus.Accepted => (int)ListingStatus.Reserved,
+            PurchaseRequestStatus.SellerMarkedCompleted or PurchaseRequestStatus.Completed =>
+                (int)ResolveCompletedListingStatus(entity.Listing),
+            _ => (int)ListingStatus.Active
+        };
+        entity.Listing.BuyerId = targetStatus is PurchaseRequestStatus.SellerMarkedCompleted or PurchaseRequestStatus.Completed
+            ? entity.BuyerId
+            : null;
+        entity.Listing.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync(ct);
+
+        return Results.Ok(ApiResponseFactory.Success(new
+        {
+            id = entity.Id,
+            status = entity.Status,
+            listingId = entity.ListingId,
+            listingStatus = entity.Listing.Status,
+            isCurrent = entity.Id == latestRequestId
+        }, httpContext));
     }
 
     private static async Task<IResult> GetAdminListingDetailAsync(
@@ -898,6 +1055,21 @@ public static class AdminEndpoints
             entity.CreatedByUserId,
             entity.UpdatedAt,
             entity.UpdatedByUserId);
+
+    private static ListingStatus ResolveCompletedListingStatus(NeighborGoods.Data.Listings.Listing listing)
+    {
+        if (listing.IsTradeable)
+        {
+            return ListingStatus.GivenOrTraded;
+        }
+
+        if (listing.IsFree || listing.IsCharity)
+        {
+            return ListingStatus.Donated;
+        }
+
+        return ListingStatus.Sold;
+    }
 
     private static async Task<bool> IsAdminAsync(
         ICurrentUserContext currentUser,

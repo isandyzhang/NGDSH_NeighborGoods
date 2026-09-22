@@ -109,7 +109,9 @@ export const ChatPage = () => {
   const [purchaseRequestBusy, setPurchaseRequestBusy] = useState(false)
   const [purchaseRequestCreating, setPurchaseRequestCreating] = useState(false)
   const [purchaseConfirmOpen, setPurchaseConfirmOpen] = useState(false)
-  const [confirmModalAction, setConfirmModalAction] = useState<'completeBySeller' | 'confirmReceivedByBuyer' | null>(null)
+  const [confirmModalAction, setConfirmModalAction] = useState<
+    'cancelAcceptedBySellerAndRelist' | 'completeBySeller' | 'confirmReceivedByBuyer' | null
+  >(null)
   const [purchaseRequestError, setPurchaseRequestError] = useState<string | null>(null)
   const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now())
   const [draft, setDraft] = useState('')
@@ -347,7 +349,7 @@ export const ChatPage = () => {
   }
 
   const handlePurchaseRequestAction = async (
-    action: 'accept' | 'reject' | 'cancel' | 'completeBySeller' | 'confirmReceivedByBuyer',
+    action: 'accept' | 'reject' | 'cancel' | 'cancelAcceptedBySellerAndRelist' | 'completeBySeller' | 'confirmReceivedByBuyer',
   ) => {
     if (!conversationId || purchaseRequestBusy) {
       return
@@ -367,6 +369,8 @@ export const ChatPage = () => {
               )
             : action === 'cancel'
               ? await messagingApi.cancelPurchaseRequest(conversationId)
+              : action === 'cancelAcceptedBySellerAndRelist'
+                ? await messagingApi.cancelAcceptedBySellerAndRelist(conversationId)
               : action === 'completeBySeller'
                 ? await messagingApi.completeBySeller(conversationId)
                 : await messagingApi.confirmReceivedByBuyer(conversationId)
@@ -429,7 +433,13 @@ export const ChatPage = () => {
     : Math.max(0, purchaseRequest.remainingSeconds - elapsedSinceRequestFetchSeconds)
 
   const confirmModalCopy =
-    confirmModalAction === 'completeBySeller'
+    confirmModalAction === 'cancelAcceptedBySellerAndRelist'
+      ? {
+          title: '取消交易並重新上架？',
+          message: '這筆已同意的交易會改為「已取消」，商品會立即恢復上架，並在對話中留下系統紀錄。',
+          finalConfirmLabel: '取消交易並重新上架',
+        }
+      : confirmModalAction === 'completeBySeller'
       ? {
           title: '確認已與買家完成交易？',
           message: '送出後將把交易狀態更新為「待買家確認收貨」，並通知買家進行下一步。',
@@ -534,14 +544,24 @@ export const ChatPage = () => {
                       </Button>
                     ) : null}
                     {isAccepted && isSeller ? (
-                      <Button
-                        type="button"
-                        onClick={() => setConfirmModalAction('completeBySeller')}
-                        disabled={purchaseRequestBusy}
-                        className={primaryActionClassName}
-                      >
-                        {purchaseRequestBusy ? '處理中...' : '完成交易'}
-                      </Button>
+                      <>
+                        <Button
+                          type="button"
+                          onClick={() => setConfirmModalAction('cancelAcceptedBySellerAndRelist')}
+                          disabled={purchaseRequestBusy}
+                          className={dangerActionClassName}
+                        >
+                          {purchaseRequestBusy ? '處理中...' : '取消交易並重新上架'}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setConfirmModalAction('completeBySeller')}
+                          disabled={purchaseRequestBusy}
+                          className={primaryActionClassName}
+                        >
+                          {purchaseRequestBusy ? '處理中...' : '完成交易'}
+                        </Button>
+                      </>
                     ) : null}
                     {isSellerMarkedCompleted && isBuyer ? (
                       <Button
