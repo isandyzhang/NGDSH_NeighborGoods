@@ -11,6 +11,7 @@ type ConfirmModalProps = {
   busyLabel?: string
   cancelButtonClassName?: string
   confirmButtonClassName?: string
+  overlayClassName?: string
   onClose: () => void
   onConfirm: () => void
 }
@@ -25,11 +26,12 @@ export const ConfirmModal = ({
   busyLabel = '處理中...',
   cancelButtonClassName,
   confirmButtonClassName,
+  overlayClassName,
   onClose,
   onConfirm,
 }: ConfirmModalProps) => {
   return (
-    <AppModal open={open} onClose={onClose} closeLabel="關閉確認視窗">
+    <AppModal open={open} onClose={onClose} closeLabel="關閉確認視窗" overlayClassName={overlayClassName}>
       <div className="space-y-2">
         <h2 className="text-3xl font-bold text-text-main">{title}</h2>
         <p className="text-base leading-relaxed text-text-subtle">{message}</p>

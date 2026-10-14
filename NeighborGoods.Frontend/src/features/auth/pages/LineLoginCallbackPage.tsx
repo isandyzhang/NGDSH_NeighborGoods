@@ -3,6 +3,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { authApi } from '@/features/auth/api/authApi'
 import { useAuth } from '@/features/auth/components/AuthProvider'
+import { armListingExpiryPrompt } from '@/features/listings/listingExpiryPromptSession'
 import { ApiClientError } from '@/shared/types/api'
 import { Card } from '@/shared/ui/Card'
 
@@ -35,6 +36,7 @@ export const LineLoginCallbackPage = () => {
             return
           }
 
+          armListingExpiryPrompt()
           acceptTokens(tokens)
           const returnTo = sessionStorage.getItem(LINE_RETURN_TO_KEY) ?? '/listings'
           sessionStorage.removeItem(LINE_RETURN_TO_KEY)

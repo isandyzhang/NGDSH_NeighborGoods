@@ -9,6 +9,7 @@ import {
   LISTING_STATUS,
   LISTING_STATUS_LABEL,
 } from '@/features/listings/constants/listingStatus'
+import { LISTING_EXPIRY_UPDATED_EVENT } from '@/features/listings/listingExpiryPromptSession'
 import { formatListingPrice } from '@/features/listings/utils/listingFormat'
 import { ApiClientError } from '@/shared/types/api'
 import { Button, getButtonClassName } from '@/shared/ui/Button'
@@ -118,6 +119,27 @@ export const MyListingsPage = () => {
     const refreshed = await listingApi.listMine(1, 50)
     setItems(refreshed.items)
   }
+
+  useEffect(() => {
+    let disposed = false
+    const onUpdated = () => {
+      void listingApi
+        .listMine(1, 50)
+        .then((data) => {
+          if (!disposed) {
+            setItems(data.items)
+          }
+        })
+        .catch(() => {
+          // 登入詢問已更新狀態；列表刷新失敗時保留目前畫面。
+        })
+    }
+    window.addEventListener(LISTING_EXPIRY_UPDATED_EVENT, onUpdated)
+    return () => {
+      disposed = true
+      window.removeEventListener(LISTING_EXPIRY_UPDATED_EVENT, onUpdated)
+    }
+  }, [])
 
   const handleStatusAction = async (listingId: string, action: StatusActionKey) => {
     setBusyItemId(listingId)

@@ -7,6 +7,7 @@ type AppModalProps = {
   onClose: () => void
   closeLabel?: string
   maxWidthClassName?: string
+  overlayClassName?: string
   children: ReactNode
 }
 
@@ -15,13 +16,14 @@ export const AppModal = ({
   onClose,
   closeLabel = '關閉視窗',
   maxWidthClassName = 'max-w-xl',
+  overlayClassName = 'z-40',
   children,
 }: AppModalProps) => {
   return (
     <AnimatePresence>
       {open ? (
         <motion.div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/55 px-4"
+          className={`fixed inset-0 flex items-center justify-center bg-black/55 px-4 ${overlayClassName}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

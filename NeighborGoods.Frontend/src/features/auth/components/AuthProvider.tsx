@@ -9,6 +9,7 @@ import {
 import { authApi } from '@/features/auth/api/authApi'
 import { authStorage } from '@/features/auth/authStorage'
 import type { AuthTokens, LoginPayload } from '@/features/auth/types'
+import { armListingExpiryPrompt, clearListingExpiryPrompt } from '@/features/listings/listingExpiryPromptSession'
 import { setupHttpAuth } from '@/shared/api/http'
 
 type AuthContextValue = {
@@ -53,6 +54,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const login = useCallback(
     async (payload: LoginPayload) => {
       const nextTokens = await authApi.login(payload)
+      armListingExpiryPrompt()
       saveTokens(nextTokens)
     },
     [saveTokens],
@@ -66,6 +68,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     } catch {
       // token may already be invalid, no further action needed
     } finally {
+      clearListingExpiryPrompt()
       saveTokens(null)
     }
   }, [saveTokens, tokens?.refreshToken])
