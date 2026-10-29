@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Data.Announcements;
 using NeighborGoods.Data.LegacyEntities;
 using NeighborGoods.Data.Listings;
+using NeighborGoods.Data.Surveys;
 using ListingEntity = NeighborGoods.Data.Listings.Listing;
 
 namespace NeighborGoods.Data;
@@ -30,6 +31,7 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<SiteAnnouncement> SiteAnnouncements => Set<SiteAnnouncement>();
+    public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -403,6 +405,30 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.CreatedByUserId).HasMaxLength(450);
             entity.Property(e => e.UpdatedByUserId).HasMaxLength(450);
             entity.HasIndex(e => new { e.IsEnabled, e.StartsAt, e.EndsAt, e.SortOrder }, "IX_SiteAnnouncements_Active_Display");
+        });
+
+        modelBuilder.Entity<SurveyResponse>(entity =>
+        {
+            entity.ToTable("SurveyResponses");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.ResidentType).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(100);
+            entity.Property(e => e.Phone).HasMaxLength(32);
+            entity.Property(e => e.Building).HasMaxLength(16);
+            entity.Property(e => e.RatingUi).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.RatingListing).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.RatingInteraction).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.RatingGuide).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.RatingPromo).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.Channel).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.Feedback).HasMaxLength(2000);
+            entity.Property(e => e.ActivityName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.UserId).HasMaxLength(450).IsRequired();
+            entity.Property(e => e.IsGiftEligible).HasDefaultValue(false);
+            entity.HasIndex(e => e.CreatedAt, "IX_SurveyResponses_CreatedAt");
+            entity.HasIndex(e => e.IsGiftEligible, "IX_SurveyResponses_IsGiftEligible");
+            entity.HasIndex(e => e.UserId, "IX_SurveyResponses_UserId").IsUnique();
         });
     }
 }

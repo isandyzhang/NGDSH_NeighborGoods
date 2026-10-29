@@ -34,6 +34,12 @@ const LineNotifyLiffPage = lazy(() =>
 const ContactAdminPage = lazy(() =>
   import('@/features/contact/pages/ContactAdminPage').then((module) => ({ default: module.ContactAdminPage })),
 )
+const SurveyPage = lazy(() =>
+  import('@/features/survey/pages/SurveyPage').then((module) => ({ default: module.SurveyPage })),
+)
+const AdminSurveysPage = lazy(() =>
+  import('@/features/admin/pages/AdminSurveysPage').then((module) => ({ default: module.AdminSurveysPage })),
+)
 const FavoritesPage = lazy(() => import('@/features/favorites/pages/FavoritesPage').then((module) => ({ default: module.FavoritesPage })))
 const PrivacyPage = lazy(() => import('@/features/legal/pages/PrivacyPage').then((module) => ({ default: module.PrivacyPage })))
 const TermsPage = lazy(() => import('@/features/legal/pages/TermsPage').then((module) => ({ default: module.TermsPage })))
@@ -231,10 +237,12 @@ export const AppRouter = () => {
           <Route path="/listings/:id" element={<ListingDetailPage />} />
           <Route path="/seller/:sellerId" element={<SellerPage />} />
           <Route element={<RequireAuth />}>
+            <Route path="/survey" element={<SurveyPage />} />
             <Route element={<RequireAdmin />}>
               <Route element={<AdminLayout />}>
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+                <Route path="/admin/surveys" element={<AdminSurveysPage />} />
                 <Route path="/admin/housing" element={<AdminHousingPage />} />
                 <Route path="/admin/listings" element={<AdminListingsPage />} />
                 <Route path="/admin/members" element={<AdminMembersPage />} />

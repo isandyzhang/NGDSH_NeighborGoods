@@ -943,6 +943,98 @@ namespace NeighborGoods.Data.Migrations
                     b.ToTable("ListingResidences", (string)null);
                 });
 
+            modelBuilder.Entity("NeighborGoods.Data.Surveys.SurveyResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActivityName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Building")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<bool>("ConsentAccepted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Feedback")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("Floor")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsGiftEligible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("RatingGuide")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("RatingInteraction")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("RatingListing")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("RatingPromo")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("RatingUi")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("ResidentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "CreatedAt" }, "IX_SurveyResponses_CreatedAt");
+
+                    b.HasIndex(new[] { "IsGiftEligible" }, "IX_SurveyResponses_IsGiftEligible");
+
+                    b.HasIndex(new[] { "UserId" }, "IX_SurveyResponses_UserId")
+                        .IsUnique();
+
+                    b.ToTable("SurveyResponses", (string)null);
+                });
+
             modelBuilder.Entity("AspNetUserRole", b =>
                 {
                     b.HasOne("NeighborGoods.Data.LegacyEntities.AspNetRole", null)
@@ -1230,6 +1322,16 @@ namespace NeighborGoods.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("NeighborGoods.Data.Listings.ListingPickupLocation", b =>
+                {
+                    b.HasOne("NeighborGoods.Data.Listings.ListingResidence", "Residence")
+                        .WithMany("PickupLocations")
+                        .HasForeignKey("ResidenceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Residence");
+                });
+
             modelBuilder.Entity("NeighborGoods.Data.LegacyEntities.AspNetRole", b =>
                 {
                     b.Navigation("AspNetRoleClaims");
@@ -1309,14 +1411,7 @@ namespace NeighborGoods.Data.Migrations
 
             modelBuilder.Entity("NeighborGoods.Data.Listings.ListingPickupLocation", b =>
                 {
-                    b.HasOne("NeighborGoods.Data.Listings.ListingResidence", "Residence")
-                        .WithMany("PickupLocations")
-                        .HasForeignKey("ResidenceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Listings");
-
-                    b.Navigation("Residence");
                 });
 
             modelBuilder.Entity("NeighborGoods.Data.Listings.ListingResidence", b =>

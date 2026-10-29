@@ -13,6 +13,8 @@ using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Data;
 using NeighborGoods.Data.Announcements;
 using NeighborGoods.Data.PurchaseRequests;
+using NeighborGoods.Api.Features.Surveys;
+using NeighborGoods.Api.Features.Surveys.Contracts;
 using NeighborGoods.Api.Shared.Security;
 
 namespace NeighborGoods.Api.Features.Admin;
@@ -99,6 +101,10 @@ public static class AdminEndpoints
 
         app.MapPost("/api/v1/admin/conversations/{conversationId:guid}/messages", PostAdminConversationMessageAsync)
         .WithName("AdminPostConversationMessageV1")
+        .RequireAuthorization();
+
+        app.MapGet("/api/v1/admin/surveys", GetAdminSurveysAsync)
+        .WithName("AdminGetSurveysV1")
         .RequireAuthorization();
 
         return app;
@@ -1037,6 +1043,64 @@ public static class AdminEndpoints
         };
 
         return Results.Ok(ApiResponseFactory.Success(dto, httpContext));
+    }
+
+    private static async Task<IResult> GetAdminSurveysAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
+        if (!isAdmin)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = dbContext.SurveyResponses.AsNoTracking().OrderByDescending(x => x.CreatedAt);
+        var totalCount = await query.CountAsync(ct);
+        var giftClaimed = await dbContext.SurveyResponses.AsNoTracking().CountAsync(x => x.IsGiftEligible, ct);
+        var remainingGiftSlots = Math.Max(0, SurveyEndpoints.GiftLimit - giftClaimed);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new AdminSurveyListItemDto(
+                x.Id,
+                x.CreatedAt,
+                x.UserId,
+                x.ResidentType,
+                x.DisplayName,
+                x.Phone,
+                x.Building,
+                x.Floor,
+                x.RatingUi,
+                x.RatingListing,
+                x.RatingInteraction,
+                x.RatingGuide,
+                x.RatingPromo,
+                x.Channel,
+                x.Feedback,
+                x.ActivityName,
+                x.IsGiftEligible))
+            .ToListAsync(ct);
+
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+        var payload = new AdminSurveyListResponse(
+            items,
+            page,
+            pageSize,
+            totalCount,
+            totalPages,
+            remainingGiftSlots,
+            SurveyEndpoints.GiftLimit);
+        return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
     }
 
     private static AdminAnnouncementResponse ToAdminResponse(SiteAnnouncement entity) =>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { listingApi, type ListingCreateFormState, type ListingMutationPayload } from '@/features/listings/api/listingApi'
 import {
   CreateListingSuccessModal,
@@ -52,7 +53,12 @@ const toMutationPayload = (form: ListingCreateFormState): ListingMutationPayload
   }
 }
 
+const SURVEY_GIFT_TITLE = '一瓶御茶園麥萃日式麥茶'
+const SURVEY_GIFT_DESCRIPTION =
+  '青創活動贈品：一瓶御茶園麥萃日式麥茶（數量有限）。領取方式以刊登說明為準；亦可至用餐區自取（若活動現場有放置）。'
+
 export const CreateListingPage = () => {
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState<ListingCreateFormState>(defaultForm)
   const [images, setImages] = useState<File[]>([])
   const [categories, setCategories] = useState<LookupItem[]>([])
@@ -74,6 +80,22 @@ export const CreateListingPage = () => {
   const pickupLocationFieldRef = useRef<HTMLDivElement | null>(null)
   const priceFieldRef = useRef<HTMLDivElement | null>(null)
   const imagesFieldRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (searchParams.get('prefill') !== 'survey-gift') {
+      return
+    }
+
+    setForm((current) => ({
+      ...current,
+      title: SURVEY_GIFT_TITLE,
+      description: SURVEY_GIFT_DESCRIPTION,
+      price: 0,
+      isFree: true,
+      isCharity: false,
+      isTradeable: false,
+    }))
+  }, [searchParams])
 
   useEffect(() => {
     let disposed = false

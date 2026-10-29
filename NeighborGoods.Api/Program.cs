@@ -29,6 +29,7 @@ using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Features.Announcements;
 using NeighborGoods.Api.Features.Announcements.Services;
 using NeighborGoods.Api.Features.Lookups;
+using NeighborGoods.Api.Features.Surveys;
 using NeighborGoods.Api.Features.System;
 using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Notifications;
@@ -209,6 +210,13 @@ builder.Services.AddRateLimiter(options =>
         accountWriteOptions.QueueLimit = 0;
         accountWriteOptions.AutoReplenishment = true;
     });
+    options.AddFixedWindowLimiter("SurveyWrite", surveyWriteOptions =>
+    {
+        surveyWriteOptions.PermitLimit = 10;
+        surveyWriteOptions.Window = TimeSpan.FromMinutes(1);
+        surveyWriteOptions.QueueLimit = 0;
+        surveyWriteOptions.AutoReplenishment = true;
+    });
     options.OnRejected = async (context, token) =>
     {
         var response = ApiResponseFactory.Error(
@@ -246,6 +254,7 @@ app.MapMessagingEndpoints();
 app.MapPurchaseRequestEndpoints();
 app.MapReviewEndpoints();
 app.MapAnnouncementEndpoints();
+app.MapSurveyEndpoints();
 app.MapAdminEndpoints();
 app.MapAdminHousingEndpoints();
 app.MapHub<MessageHub>("/hubs/messages");

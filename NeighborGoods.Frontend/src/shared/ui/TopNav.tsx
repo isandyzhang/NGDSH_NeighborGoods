@@ -114,14 +114,22 @@ export const TopNav = () => {
     <header className="sticky top-0 z-[1000] border-b border-border bg-bg/90 backdrop-blur">
       <div ref={menuContainerRef} className="mx-auto w-full max-w-6xl px-4">
         <div className="flex h-20 items-center justify-between">
-          <Link
-            to={logoTarget}
-            aria-label="NeighborGoods 首頁"
-            className="inline-flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-tight text-text-subtle md:gap-3 md:text-[1.75rem]"
-          >
-            <img src={siteLogo} alt="" width={40} height={40} className="h-9 w-9 shrink-0 object-contain md:h-11 md:w-11" />
-            <span>NeighborGoods</span>
-          </Link>
+          <div className="flex items-center gap-3 md:gap-4">
+            <Link
+              to={logoTarget}
+              aria-label="NeighborGoods 首頁"
+              className="inline-flex items-center gap-2.5 text-[1.4rem] font-semibold tracking-tight text-text-subtle md:gap-3 md:text-[1.75rem]"
+            >
+              <img src={siteLogo} alt="" width={40} height={40} className="h-9 w-9 shrink-0 object-contain md:h-11 md:w-11" />
+              <span className="tracking-[0.08em]">NeighborGoods</span>
+            </Link>
+            <Link
+              to="/survey"
+              className="text-sm font-medium text-text-subtle underline-offset-4 hover:text-text-main hover:underline md:text-base"
+            >
+              填寫問卷
+            </Link>
+          </div>
           {hideLoginAction ? null : isAuthenticated ? (
             <>
               <Button

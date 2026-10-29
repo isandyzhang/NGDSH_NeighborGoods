@@ -278,6 +278,36 @@ export type UpsertAdminPickupLocationPayload = {
   isActive: boolean
 }
 
+export type AdminSurveyListItem = {
+  id: string
+  createdAt: string
+  userId: string
+  residentType: string
+  displayName: string | null
+  phone: string | null
+  building: string | null
+  floor: number | null
+  ratingUi: string
+  ratingListing: string
+  ratingInteraction: string
+  ratingGuide: string
+  ratingPromo: string
+  channel: string
+  feedback: string | null
+  activityName: string
+  isGiftEligible: boolean
+}
+
+export type AdminSurveyList = {
+  items: AdminSurveyListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  remainingGiftSlots: number
+  giftLimit: number
+}
+
 export type AdminCategory = {
   id: number
   codeKey: string
@@ -512,5 +542,10 @@ export const adminApi = {
   async deleteCategory(id: number): Promise<void> {
     const response = await http.delete<ApiResponse<{ id: number; deleted: boolean }>>(`/api/v1/admin/categories/${id}`)
     unwrapApiResponse(response.data)
+  },
+
+  async listSurveys(params?: { page?: number; pageSize?: number }): Promise<AdminSurveyList> {
+    const response = await http.get<ApiResponse<AdminSurveyList>>('/api/v1/admin/surveys', { params })
+    return unwrapApiResponse(response.data)
   },
 }
