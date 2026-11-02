@@ -35,9 +35,43 @@ export type SurveyGiftStatus = {
   alreadyGiftEligible: boolean
 }
 
+export type OpenSurveyListItem = {
+  id: string
+  createdAt: string
+  residentType: string
+  displayNameMasked: string | null
+  phoneMasked: string | null
+  building: string | null
+  floor: number | null
+  ratingUi: string
+  ratingListing: string
+  ratingInteraction: string
+  ratingGuide: string
+  ratingPromo: string
+  channel: string
+  feedback: string | null
+  activityName: string
+  isGiftEligible: boolean
+}
+
+export type OpenSurveyList = {
+  items: OpenSurveyListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  remainingGiftSlots: number
+  giftLimit: number
+}
+
 export const surveyApi = {
   async getGiftStatus(): Promise<SurveyGiftStatus> {
     const response = await http.get<ApiResponse<SurveyGiftStatus>>('/api/v1/surveys/gift-status')
+    return unwrapApiResponse(response.data)
+  },
+
+  async listOpenSurveys(params?: { page?: number; pageSize?: number }): Promise<OpenSurveyList> {
+    const response = await http.get<ApiResponse<OpenSurveyList>>('/api/v1/surveys/open', { params })
     return unwrapApiResponse(response.data)
   },
 

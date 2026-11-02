@@ -54,12 +54,87 @@ public static partial class SurveyEndpoints
             .WithName("GetSurveyGiftStatusV1")
             .RequireAuthorization();
 
+        app.MapGet("/api/v1/surveys/open", GetOpenSurveysAsync)
+            .WithName("GetOpenSurveysV1")
+            .RequireRateLimiting("SurveyRead");
+
         app.MapPost("/api/v1/surveys", SubmitSurveyAsync)
             .WithName("SubmitSurveyV1")
             .RequireAuthorization()
             .RequireRateLimiting("SurveyWrite");
 
         return app;
+    }
+
+    private static async Task<IResult> GetOpenSurveysAsync(
+        HttpContext httpContext,
+        NeighborGoodsDbContext dbContext,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = dbContext.SurveyResponses.AsNoTracking().OrderByDescending(x => x.CreatedAt);
+        var totalCount = await query.CountAsync(ct);
+        var giftClaimed = await dbContext.SurveyResponses.AsNoTracking().CountAsync(x => x.IsGiftEligible, ct);
+        var remainingGiftSlots = Math.Max(0, GiftLimit - giftClaimed);
+        var rows = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new
+            {
+                x.Id,
+                x.CreatedAt,
+                x.ResidentType,
+                x.DisplayName,
+                x.Phone,
+                x.Building,
+                x.Floor,
+                x.RatingUi,
+                x.RatingListing,
+                x.RatingInteraction,
+                x.RatingGuide,
+                x.RatingPromo,
+                x.Channel,
+                x.Feedback,
+                x.ActivityName,
+                x.IsGiftEligible,
+            })
+            .ToListAsync(ct);
+
+        var items = rows
+            .Select(x => new OpenSurveyListItemDto(
+                x.Id,
+                x.CreatedAt,
+                x.ResidentType,
+                MaskDisplayName(x.DisplayName),
+                MaskPhone(x.Phone),
+                x.Building,
+                x.Floor,
+                x.RatingUi,
+                x.RatingListing,
+                x.RatingInteraction,
+                x.RatingGuide,
+                x.RatingPromo,
+                x.Channel,
+                x.Feedback,
+                x.ActivityName,
+                x.IsGiftEligible))
+            .ToList();
+
+        var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+        var payload = new OpenSurveyListResponse(
+            items,
+            page,
+            pageSize,
+            totalCount,
+            totalPages,
+            remainingGiftSlots,
+            GiftLimit);
+        httpContext.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(ApiResponseFactory.Success(payload, httpContext));
     }
 
     private static async Task<IResult> GetGiftStatusAsync(
@@ -222,6 +297,39 @@ public static partial class SurveyEndpoints
 
         var trimmed = value.Trim();
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string? MaskDisplayName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var name = value.Trim();
+        return name.Length switch
+        {
+            1 => "*",
+            2 => $"{name[0]}*",
+            _ => $"{name[0]}{new string('*', name.Length - 2)}{name[^1]}",
+        };
+    }
+
+    private static string? MaskPhone(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var phone = value.Trim();
+        if (phone.Length <= 7)
+        {
+            return new string('*', phone.Length);
+        }
+
+        var maskLength = phone.Length - 7;
+        return $"{phone[..4]}{new string('*', maskLength)}{phone[^3..]}";
     }
 
     [GeneratedRegex(@"^09\d{8}$")]

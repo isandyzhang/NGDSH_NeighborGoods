@@ -217,6 +217,13 @@ builder.Services.AddRateLimiter(options =>
         surveyWriteOptions.QueueLimit = 0;
         surveyWriteOptions.AutoReplenishment = true;
     });
+    options.AddFixedWindowLimiter("SurveyRead", surveyReadOptions =>
+    {
+        surveyReadOptions.PermitLimit = 60;
+        surveyReadOptions.Window = TimeSpan.FromMinutes(1);
+        surveyReadOptions.QueueLimit = 0;
+        surveyReadOptions.AutoReplenishment = true;
+    });
     options.OnRejected = async (context, token) =>
     {
         var response = ApiResponseFactory.Error(

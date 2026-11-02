@@ -13,9 +13,11 @@ import {
   Home,
   MonitorSmartphone,
   Package,
+  Search,
   Shirt,
   Sofa,
   UtensilsCrossed,
+  X,
 } from 'lucide-react'
 import type { LookupItem } from '@/features/lookups/api/lookupApi'
 import { Button } from '@/shared/ui/Button'
@@ -103,11 +105,102 @@ type Props = {
   quickFilterHover: QuickFilterKey | null
   quickFilterPlayNonce: number
   setPage: Dispatch<SetStateAction<number>>
+  searchInput: string
+  searchExpanded: boolean
+  setSearchExpanded: Dispatch<SetStateAction<boolean>>
+  onSearchInputChange: (value: string) => void
   onToggleMultiCode: (value: number, setValues: Dispatch<SetStateAction<number[]>>) => void
   onClearAllFilters: () => void
   onCloseMobileFilterSheet: () => void
   onTriggerQuickFilterLottie: (key: QuickFilterKey) => void
   onClearQuickFilterLottie: () => void
+}
+
+const SearchGlyph = ({ className }: { className?: string }) => (
+  <Search className={className ?? 'h-6 w-6'} aria-hidden="true" strokeWidth={2.2} />
+)
+
+const ExpandableSearchControl = ({
+  searchInput,
+  searchExpanded,
+  setSearchExpanded,
+  onSearchInputChange,
+  size,
+  filtersInView,
+}: {
+  searchInput: string
+  searchExpanded: boolean
+  setSearchExpanded: Dispatch<SetStateAction<boolean>>
+  onSearchInputChange: (value: string) => void
+  size: 'desktop' | 'mobile'
+  filtersInView?: boolean
+}) => {
+  const hasQuery = searchInput.trim().length > 0
+  const hasActiveQuery = searchInput.trim().length >= 2
+  const heightClass = size === 'desktop' ? 'h-[4.2rem]' : 'h-14'
+  const iconClass = size === 'desktop' ? 'h-7 w-7' : 'h-6 w-6'
+  const activeSurface =
+    '!border-[#B08F68] !bg-[#D6B897] !text-text-main shadow-[0_4px_10px_rgba(37,25,16,0.18)]'
+  const idleSurface = 'border-border bg-surface text-text-main hover:bg-surface-2'
+
+  if (!searchExpanded) {
+    return (
+      <Button
+        type="button"
+        variant="secondary"
+        aria-label="開啟文字搜尋"
+        className={`filter-fly-in fi-0 ${filtersInView ? 'is-visible' : ''} ${heightClass} aspect-square shrink-0 rounded-[999px] border px-0 shadow-soft transition ${
+          hasActiveQuery ? activeSurface : idleSurface
+        }`}
+        onClick={() => setSearchExpanded(true)}
+      >
+        <SearchGlyph className={iconClass} />
+      </Button>
+    )
+  }
+
+  return (
+    <div
+      className={`${heightClass} flex min-w-0 flex-1 items-center gap-2 rounded-[999px] border px-4 shadow-soft transition ${
+        hasActiveQuery ? activeSurface : 'border-border bg-surface text-text-main'
+      } ${size === 'desktop' ? 'max-w-[18rem]' : 'w-full'}`}
+    >
+      <SearchGlyph className={`${iconClass} shrink-0 opacity-80`} />
+      <input
+        autoFocus
+        value={searchInput}
+        onChange={(event) => onSearchInputChange(event.target.value)}
+        onBlur={() => {
+          if (!searchInput.trim()) {
+            setSearchExpanded(false)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            if (searchInput) {
+              onSearchInputChange('')
+            } else {
+              setSearchExpanded(false)
+            }
+          }
+        }}
+        placeholder="搜尋商品…"
+        aria-label="搜尋商品"
+        className="min-w-0 flex-1 bg-transparent text-[1.15rem] font-semibold text-text-main outline-none placeholder:font-medium placeholder:text-text-muted"
+      />
+      {hasQuery ? (
+        <button
+          type="button"
+          aria-label="清除搜尋"
+          className="inline-flex shrink-0 items-center justify-center rounded-full p-1 text-text-subtle transition hover:bg-black/5 hover:text-text-main"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onSearchInputChange('')}
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  )
 }
 
 const getFilterSummary = (title: string, selectedCodes: number[], options: LookupItem[]) => {
@@ -199,6 +292,10 @@ export const ListingHomeFilters = ({
   quickFilterHover,
   quickFilterPlayNonce,
   setPage,
+  searchInput,
+  searchExpanded,
+  setSearchExpanded,
+  onSearchInputChange,
   onToggleMultiCode,
   onClearAllFilters,
   onCloseMobileFilterSheet,
@@ -247,7 +344,8 @@ export const ListingHomeFilters = ({
     selectedResidenceCodes.length +
     Number(isFree) +
     Number(isCharity) +
-    Number(isTradeable)
+    Number(isTradeable) +
+    Number(searchInput.trim().length >= 2)
 
   return (
     <>
@@ -259,7 +357,16 @@ export const ListingHomeFilters = ({
       >
         <div ref={desktopFilterAreaRef} className="hidden space-y-4 md:block">
           <div ref={desktopFilterRowRef} className="flex items-start justify-between gap-5 md:flex-nowrap">
-            <div className="grid flex-1 grid-cols-3 items-start gap-5">
+            <div className="flex min-w-0 flex-1 items-start gap-5">
+              <ExpandableSearchControl
+                searchInput={searchInput}
+                searchExpanded={searchExpanded}
+                setSearchExpanded={setSearchExpanded}
+                onSearchInputChange={onSearchInputChange}
+                size="desktop"
+                filtersInView={filtersInView}
+              />
+              <div className="grid min-w-0 flex-1 grid-cols-3 items-start gap-5">
               {desktopFilterGroups.map((group) => {
                 const isExpanded = expandedFilter === group.key
                 const hasSelectedValue = group.selected.length > 0
@@ -290,6 +397,7 @@ export const ListingHomeFilters = ({
                   </div>
                 )
               })}
+              </div>
             </div>
 
             <div className="flex shrink-0 flex-nowrap justify-end gap-5">
@@ -438,6 +546,16 @@ export const ListingHomeFilters = ({
               </section>
             ) : null}
           </div>
+        </div>
+
+        <div className={`md:hidden ${searchExpanded ? '' : 'flex justify-start'}`}>
+          <ExpandableSearchControl
+            searchInput={searchInput}
+            searchExpanded={searchExpanded}
+            setSearchExpanded={setSearchExpanded}
+            onSearchInputChange={onSearchInputChange}
+            size="mobile"
+          />
         </div>
 
         <div className="grid grid-cols-3 gap-2 md:hidden">

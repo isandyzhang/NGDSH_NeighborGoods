@@ -53,6 +53,9 @@ export const ListingHomePage = () => {
   const [isFree, setIsFree] = useState(false)
   const [isCharity, setIsCharity] = useState(false)
   const [isTradeable, setIsTradeable] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchExpanded, setSearchExpanded] = useState(false)
   const [expandedFilter, setExpandedFilter] = useState<ExpandableFilterKey | null>(null)
   const [mobileSheetFilter, setMobileSheetFilter] = useState<ExpandableFilterKey | null>(null)
   const [quickFilterHover, setQuickFilterHover] = useState<QuickFilterKey | null>(null)
@@ -84,6 +87,7 @@ export const ListingHomePage = () => {
   const listingFiltersPayload = useMemo(
     () => ({
       page,
+      q: searchQuery.trim().length >= 2 ? searchQuery.trim() : undefined,
       categoryCodes: [...selectedCategoryCodes].sort((a, b) => a - b),
       conditionCodes: [...selectedConditionCodes].sort((a, b) => a - b),
       residenceCodes: [...selectedResidenceCodes].sort((a, b) => a - b),
@@ -91,11 +95,21 @@ export const ListingHomePage = () => {
       isCharity,
       isTradeable,
     }),
-    [page, selectedCategoryCodes, selectedConditionCodes, selectedResidenceCodes, isFree, isCharity, isTradeable],
+    [
+      page,
+      searchQuery,
+      selectedCategoryCodes,
+      selectedConditionCodes,
+      selectedResidenceCodes,
+      isFree,
+      isCharity,
+      isTradeable,
+    ],
   )
   const listingFilterSignature = useMemo(
     () =>
       JSON.stringify({
+        q: listingFiltersPayload.q ?? '',
         categoryCodes: listingFiltersPayload.categoryCodes,
         conditionCodes: listingFiltersPayload.conditionCodes,
         residenceCodes: listingFiltersPayload.residenceCodes,
@@ -104,6 +118,7 @@ export const ListingHomePage = () => {
         isTradeable: listingFiltersPayload.isTradeable,
       }),
     [
+      listingFiltersPayload.q,
       listingFiltersPayload.categoryCodes,
       listingFiltersPayload.conditionCodes,
       listingFiltersPayload.residenceCodes,
@@ -126,12 +141,21 @@ export const ListingHomePage = () => {
     staleTime: 5 * 60 * 1000,
   })
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const nextQuery = searchInput.trim()
+      setSearchQuery((current) => (current === nextQuery ? current : nextQuery))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
+
   const listQuery = useQuery({
     queryKey: ['listings', 'home', listingFiltersPayload],
     queryFn: () =>
       listingApi.list({
         page: listingFiltersPayload.page,
         pageSize: PAGE_SIZE,
+        q: listingFiltersPayload.q,
         categoryCodes: listingFiltersPayload.categoryCodes,
         conditionCodes: listingFiltersPayload.conditionCodes,
         residenceCodes: listingFiltersPayload.residenceCodes,
@@ -406,8 +430,15 @@ export const ListingHomePage = () => {
     setIsFree(false)
     setIsCharity(false)
     setIsTradeable(false)
+    setSearchInput('')
+    setSearchQuery('')
+    setSearchExpanded(false)
     setExpandedFilter(null)
     setMobileSheetFilter(null)
+  }
+
+  const handleSearchInputChange = (value: string) => {
+    setSearchInput(value)
   }
 
   const handleBrowseListings = () => {
@@ -641,6 +672,10 @@ export const ListingHomePage = () => {
           quickFilterHover={quickFilterHover}
           quickFilterPlayNonce={quickFilterPlayNonce}
           setPage={setPage}
+          searchInput={searchInput}
+          searchExpanded={searchExpanded}
+          setSearchExpanded={setSearchExpanded}
+          onSearchInputChange={handleSearchInputChange}
           onToggleMultiCode={toggleMultiCode}
           onClearAllFilters={clearAllFilters}
           onCloseMobileFilterSheet={closeMobileFilterSheet}

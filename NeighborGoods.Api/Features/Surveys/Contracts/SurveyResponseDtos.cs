@@ -43,3 +43,30 @@ public sealed record AdminSurveyListResponse(
     int TotalPages,
     int RemainingGiftSlots,
     int GiftLimit);
+
+public sealed record OpenSurveyListItemDto(
+    Guid Id,
+    DateTime CreatedAt,
+    string ResidentType,
+    string? DisplayNameMasked,
+    string? PhoneMasked,
+    string? Building,
+    int? Floor,
+    string RatingUi,
+    string RatingListing,
+    string RatingInteraction,
+    string RatingGuide,
+    string RatingPromo,
+    string Channel,
+    string? Feedback,
+    string ActivityName,
+    bool IsGiftEligible);
+
+public sealed record OpenSurveyListResponse(
+    IReadOnlyList<OpenSurveyListItemDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages,
+    int RemainingGiftSlots,
+    int GiftLimit);

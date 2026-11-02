@@ -37,6 +37,9 @@ const ContactAdminPage = lazy(() =>
 const SurveyPage = lazy(() =>
   import('@/features/survey/pages/SurveyPage').then((module) => ({ default: module.SurveyPage })),
 )
+const OpenSurveyPage = lazy(() =>
+  import('@/features/survey/pages/OpenSurveyPage').then((module) => ({ default: module.OpenSurveyPage })),
+)
 const AdminSurveysPage = lazy(() =>
   import('@/features/admin/pages/AdminSurveysPage').then((module) => ({ default: module.AdminSurveysPage })),
 )
@@ -232,6 +235,7 @@ export const AppRouter = () => {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/error" element={<ErrorPage />} />
           <Route path="/contact-admin" element={<ContactAdminPage />} />
+          <Route path="/open-survey" element={<OpenSurveyPage />} />
           <Route path="/listing" element={<Navigate to="/listings" replace />} />
           <Route path="/listings" element={<ListingHomePage />} />
           <Route path="/listings/:id" element={<ListingDetailPage />} />
