@@ -227,6 +227,9 @@ namespace NeighborGoods.Data.Migrations
                     b.Property<int>("LineNotificationPreference")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("LineUnreadNotificationLastSentAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("LineUserId")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");

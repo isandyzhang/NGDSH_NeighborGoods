@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPurchaseRequestScheduledOperations, PurchaseRequestScheduledOperations>();
         services.AddScoped<QuickResponderEvaluationService>();
         services.AddScoped<UnreadMessageEmailNotificationJob>();
+        services.AddScoped<UnreadMessageLineNotificationJob>();
         services.AddScoped<LinePreferencePushJob>();
         services.AddScoped<ListingExpiryJob>();
         return services;

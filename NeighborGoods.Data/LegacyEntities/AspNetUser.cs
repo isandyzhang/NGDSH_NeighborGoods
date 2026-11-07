@@ -53,6 +53,8 @@ public partial class AspNetUser
 
     public DateTime? LineNotificationLastSentAt { get; set; }
 
+    public DateTime? LineUnreadNotificationLastSentAt { get; set; }
+
     public bool EmailNotificationEnabled { get; set; }
 
     public DateTime? EmailNotificationLastSentAt { get; set; }

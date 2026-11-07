@@ -29,6 +29,23 @@ public sealed class ScheduledTriggers(
         }
     }
 
+    [Function(nameof(UnreadMessageLineTimer))]
+    public async Task UnreadMessageLineTimer(
+        [TimerTrigger("0 */1 * * * *")] TimerInfo timerInfo,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<UnreadMessageLineNotificationJob>()
+                .RunOnceAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "{Function} failed.", nameof(UnreadMessageLineTimer));
+        }
+    }
+
     [Function(nameof(LinePreferencePushTimer))]
     public async Task LinePreferencePushTimer(
         [TimerTrigger("0 */5 * * * *")] TimerInfo timerInfo,

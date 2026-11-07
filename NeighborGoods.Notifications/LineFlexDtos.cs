@@ -37,6 +37,11 @@ public sealed record LineListingExpiryItem(
     bool IsFree,
     string CategoryName);
 
+public sealed record LineUnreadMessageItem(
+    Guid ConversationId,
+    string ListingTitle,
+    string? ImageUrl);
+
 public sealed record LineRecentConversationItem(
     Guid ConversationId,
     string OtherDisplayName,

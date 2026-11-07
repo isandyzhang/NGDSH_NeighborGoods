@@ -587,6 +587,94 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             });
     }
 
+    public LineFlexMessage BuildUnreadMessageCard(LineUnreadMessageItem item)
+    {
+        var safeTitle = string.IsNullOrWhiteSpace(item.ListingTitle) ? "未命名商品" : item.ListingTitle.Trim();
+        var chatUrl = BuildUrl($"/messages/{item.ConversationId}");
+        var imageUrl = string.IsNullOrWhiteSpace(item.ImageUrl)
+            ? "https://developers-resource.landpress.line.me/fx/img/01_1_cafe.png"
+            : item.ImageUrl;
+
+        return new LineFlexMessage(
+            AltText: $"你有未讀訊息｜{safeTitle}",
+            Contents: new
+            {
+                type = "bubble",
+                hero = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "image",
+                            url = imageUrl,
+                            size = "full",
+                            aspectRatio = "20:13",
+                            aspectMode = "cover",
+                            action = new { type = "uri", uri = chatUrl }
+                        }
+                    }
+                },
+                body = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "sm",
+                    paddingAll = "16px",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = "你有未讀訊息",
+                            weight = "bold",
+                            size = "lg",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = safeTitle,
+                            size = "md",
+                            color = "#111111",
+                            wrap = true
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = "有尚未讀取的新訊息，請盡快回覆。",
+                            size = "sm",
+                            color = "#666666",
+                            wrap = true
+                        }
+                    }
+                },
+                footer = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "sm",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "button",
+                            style = "primary",
+                            color = "#1DB446",
+                            action = new
+                            {
+                                type = "uri",
+                                label = "前往查看訊息",
+                                uri = chatUrl
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
     public LineFlexMessage BuildPurchaseRequestReminderCard(string listingTitle, Guid conversationId)
     {
         var safeListingTitle = string.IsNullOrWhiteSpace(listingTitle) ? "未命名商品" : listingTitle.Trim();
