@@ -2,7 +2,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-env
 WORKDIR /app
 
-# 1. 複製還原圖所需之 csproj（僅 API 時 restore 會略過參考專案，publish --no-restore 會 NETSDK1004）
+# 1. 複製還原圖所需之 csproj + Directory.Build.props（傳遞相依覆寫需在 restore 前就存在）
+COPY Directory.Build.props ./
 COPY NeighborGoods.Data/NeighborGoods.Data.csproj ./NeighborGoods.Data/
 COPY NeighborGoods.Messaging/NeighborGoods.Messaging.csproj ./NeighborGoods.Messaging/
 COPY NeighborGoods.Notifications/NeighborGoods.Notifications.csproj ./NeighborGoods.Notifications/
