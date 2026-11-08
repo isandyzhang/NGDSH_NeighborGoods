@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
             options.UseSqlServer(connectionString));
 
         services.AddOptions();
+        services.AddMemoryCache();
         services.Configure<EmailSenderOptions>(configuration.GetSection(EmailSenderOptions.SectionName));
         services.Configure<LineMessagingOptions>(configuration.GetSection(LineMessagingOptions.SectionName));
         services.AddSingleton<IEmailSender, AcsEmailSender>();
