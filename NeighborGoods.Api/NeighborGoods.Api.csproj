@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- 本機連線字串／密鑰：dotnet user-secrets 或 appsettings.Development.json（已 gitignore） -->
+    <UserSecretsId>neighborgoods-api-dev-secrets</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

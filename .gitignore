@@ -164,6 +164,7 @@ azurite/
 
 # Application settings (do not commit sensitive config)
 appsettings*.json
+!appsettings*.example.json
 
 # Bicep local parameter files (often contain secrets)
 **/infra/bicep/*.local.json

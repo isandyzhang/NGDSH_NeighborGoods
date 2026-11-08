@@ -1,0 +1,5 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=tcp:neighborgoods-prod-sql-ytush2.database.windows.net,1433;Initial Catalog=neighborgoods-prod-db;Persist Security Info=False;User ID=andy;Password=YOUR_PASSWORD;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+  }
+}
