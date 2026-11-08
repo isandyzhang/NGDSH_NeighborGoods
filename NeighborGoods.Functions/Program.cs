@@ -13,6 +13,7 @@ var host = new HostBuilder()
     })
     .ConfigureServices((context, services) =>
     {
+        services.AddHttpClient();
         services.AddNeighborGoodsWorkerHosting(context.Configuration);
         services.AddSingleton<ScheduledTriggers>();
     })

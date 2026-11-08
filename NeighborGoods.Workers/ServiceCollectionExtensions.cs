@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,13 +44,28 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<NeighborGoodsDbContext>(options =>
             options.UseSqlServer(connectionString));
 
+        services.AddOptions();
         services.Configure<EmailSenderOptions>(configuration.GetSection(EmailSenderOptions.SectionName));
         services.Configure<LineMessagingOptions>(configuration.GetSection(LineMessagingOptions.SectionName));
         services.AddSingleton<IEmailSender, AcsEmailSender>();
-        services.AddHttpClient<ILineMessageSender, LineMessageSender>();
-        services.AddHttpClient<LineMessagingQuotaService>();
+        // Functions isolated worker 對 typed-client 介面註冊較容易缺 ITypedHttpClientFactory；
+        // 改成具名 HttpClient + ActivatorUtilities，避免 UnreadMessageLineTimer DI 解析失敗。
+        services.AddHttpClient(nameof(LineMessageSender));
+        services.AddHttpClient(nameof(LineMessagingQuotaService));
         services.AddSingleton<LinePushQuotaTracker>();
         services.AddSingleton<LinePushPolicyService>();
+        services.AddTransient<ILineMessageSender>(sp =>
+        {
+            var httpClient = sp.GetRequiredService<IHttpClientFactory>()
+                .CreateClient(nameof(LineMessageSender));
+            return ActivatorUtilities.CreateInstance<LineMessageSender>(sp, httpClient);
+        });
+        services.AddTransient(sp =>
+        {
+            var httpClient = sp.GetRequiredService<IHttpClientFactory>()
+                .CreateClient(nameof(LineMessagingQuotaService));
+            return ActivatorUtilities.CreateInstance<LineMessagingQuotaService>(sp, httpClient);
+        });
         services.AddScoped<LineFlexMessageBuilder>();
 
         var azureSignalRConnectionString = configuration["Azure:SignalR:ConnectionString"]
