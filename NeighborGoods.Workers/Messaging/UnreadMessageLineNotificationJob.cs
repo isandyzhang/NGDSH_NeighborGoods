@@ -10,6 +10,7 @@ public sealed class UnreadMessageLineNotificationJob(
     NeighborGoodsDbContext dbContext,
     ILineMessageSender lineMessageSender,
     LineFlexMessageBuilder flexMessageBuilder,
+    ListingImagePublicUrlResolver listingImagePublicUrlResolver,
     ILogger<UnreadMessageLineNotificationJob> logger)
 {
     private const int UnreadDelayMinutes = 5;
@@ -159,7 +160,7 @@ public sealed class UnreadMessageLineNotificationJob(
                 var listingTitle = listingTitles.TryGetValue(conversation.ListingId, out var title)
                     ? title
                     : "未命名商品";
-                var imageUrl = ListingImageUrlHelper.Resolve(
+                var imageUrl = listingImagePublicUrlResolver.Resolve(
                     coverImages.GetValueOrDefault(conversation.ListingId));
 
                 var card = flexMessageBuilder.BuildUnreadMessageCard(

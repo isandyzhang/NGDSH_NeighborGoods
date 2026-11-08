@@ -31,6 +31,13 @@ param aspnetcoreEnvironment string = 'Production'
 @description('SQL connection string（ConnectionStrings:DefaultConnection）')
 param sqlConnectionString string
 
+@secure()
+@description('Azure Blob connection string（商品圖公開 URL，供 LINE Flex）')
+param blobConnectionString string = ''
+
+@description('Azure Blob container name')
+param blobContainerName string = 'neighborgoods-images'
+
 @description('是否寫入 Azure SignalR 連線字串')
 param injectSignalR bool = false
 
@@ -75,6 +82,7 @@ var funcStorageAccountName = toLower(take('ngfx${replace('${namePrefix}${environ
 var deploymentContainerName = 'deployments'
 
 var injectEmail = !empty(emailConnectionString)
+var injectBlob = !empty(blobConnectionString)
 
 // 與官方 Flex quickstart 一致：https://learn.microsoft.com/azure/azure-functions/functions-create-first-function-bicep
 var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
@@ -245,10 +253,17 @@ var emailAppSettings = injectEmail
     }
   : {}
 
+var blobAppSettings = injectBlob
+  ? {
+      AzureBlob__ConnectionString: blobConnectionString
+      AzureBlob__ContainerName: blobContainerName
+    }
+  : {}
+
 resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: functionApp
   name: 'appsettings'
-  properties: union(coreAppSettings, signalRAppSettings, emailAppSettings)
+  properties: union(coreAppSettings, signalRAppSettings, emailAppSettings, blobAppSettings)
 }
 
 output functionAppName string = functionApp.name

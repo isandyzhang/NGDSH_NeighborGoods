@@ -390,6 +390,10 @@ module functionsWorker 'modules/functionapp-linux-flex-consumption.bicep' = if (
     aspnetcoreEnvironment: aspnetcoreEnvironment
     #disable-next-line BCP318
     sqlConnectionString: provisionSqlResources ? sql.outputs.sqlConnectionString : existingSqlConnectionString
+    #disable-next-line BCP318
+    blobConnectionString: provisionStorageResources ? storage.outputs.storageAccountConnectionString : existingBlobConnectionString
+    #disable-next-line BCP318
+    blobContainerName: provisionStorageResources ? storage.outputs.blobContainerName : existingBlobContainerName
     injectSignalR: deploySignalR
     #disable-next-line BCP318
     signalRConnectionString: deploySignalR ? signalr.outputs.signalRConnectionString : ''

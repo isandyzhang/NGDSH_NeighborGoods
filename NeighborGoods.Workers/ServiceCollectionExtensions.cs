@@ -9,6 +9,7 @@ using NeighborGoods.Workers.Line;
 using NeighborGoods.Workers.Listings;
 using NeighborGoods.Workers.Messaging;
 using NeighborGoods.Workers.PurchaseRequests;
+using NeighborGoods.Workers.Storage;
 
 namespace NeighborGoods.Workers;
 
@@ -48,6 +49,8 @@ public static class ServiceCollectionExtensions
         services.AddMemoryCache();
         services.Configure<EmailSenderOptions>(configuration.GetSection(EmailSenderOptions.SectionName));
         services.Configure<LineMessagingOptions>(configuration.GetSection(LineMessagingOptions.SectionName));
+        services.Configure<AzureBlobOptions>(configuration.GetSection(AzureBlobOptions.SectionName));
+        services.AddSingleton<ListingImagePublicUrlResolver>();
         services.AddSingleton<IEmailSender, AcsEmailSender>();
         // Functions isolated worker 對 typed-client 介面註冊較容易缺 ITypedHttpClientFactory；
         // 改成具名 HttpClient + ActivatorUtilities，避免 UnreadMessageLineTimer DI 解析失敗。

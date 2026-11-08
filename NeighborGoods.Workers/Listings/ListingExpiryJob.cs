@@ -13,6 +13,7 @@ public sealed class ListingExpiryJob(
     ILineMessageSender lineMessageSender,
     LinePushPolicyService linePushPolicyService,
     LineFlexMessageBuilder lineFlexMessageBuilder,
+    ListingImagePublicUrlResolver listingImagePublicUrlResolver,
     IOptions<LineMessagingOptions> lineMessagingOptions,
     ILogger<ListingExpiryJob> logger)
 {
@@ -109,7 +110,7 @@ public sealed class ListingExpiryJob(
                 var flexItems = payloads.Select(p => new LineListingExpiryItem(
                     p.ListingId,
                     p.Title,
-                    ListingImageUrlHelper.Resolve(p.CoverImageStored),
+                    listingImagePublicUrlResolver.Resolve(p.CoverImageStored),
                     p.Price,
                     p.IsFree,
                     p.CategoryName)).ToList();
@@ -139,7 +140,7 @@ public sealed class ListingExpiryJob(
             var emailItems = payloads.Select(p => new ListingExpiryEmailItem(
                 p.ListingId,
                 p.Title,
-                ListingImageUrlHelper.Resolve(p.CoverImageStored))).ToList();
+                listingImagePublicUrlResolver.Resolve(p.CoverImageStored))).ToList();
 
             var (subject, plainText, html) = ListingExpiryEmailBuilder.Build(webBaseUrl, emailItems);
             await emailSender.SendAsync(
