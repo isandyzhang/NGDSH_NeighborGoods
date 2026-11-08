@@ -8,7 +8,7 @@ public sealed record AdminListingDetailResponse(
     int ConditionCode,
     int Price,
     int ResidenceCode,
-    int PickupLocationCode,
+    string PickupLocation,
     bool IsFree,
     bool IsCharity,
     bool IsTradeable,

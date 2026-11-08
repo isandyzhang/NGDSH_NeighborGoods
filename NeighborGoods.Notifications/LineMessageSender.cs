@@ -53,9 +53,24 @@ public sealed class LineMessageSender(
         object flexContents,
         CancellationToken cancellationToken = default)
     {
+        _ = await TryPushFlexAsync(lineUserId, altText, flexContents, cancellationToken);
+    }
+
+    public async Task<LinePushAttemptResult> TryPushFlexAsync(
+        string lineUserId,
+        string altText,
+        object flexContents,
+        CancellationToken cancellationToken = default)
+    {
         if (!HasAccessTokenConfigured())
         {
-            return;
+            return LinePushAttemptResult.MissingToken();
+        }
+
+        if (string.IsNullOrWhiteSpace(lineUserId))
+        {
+            logger.LogWarning("LINE push 略過：lineUserId 為空");
+            return LinePushAttemptResult.MissingLineUserId();
         }
 
         var payload = new
@@ -73,7 +88,7 @@ public sealed class LineMessageSender(
                 }
         };
 
-        await PostPayloadAsync("/message/push", payload, lineUserId, isPush: true, cancellationToken);
+        return await PostPayloadAsync("/message/push", payload, lineUserId, isPush: true, cancellationToken);
     }
 
     public async Task SendTextAsync(
@@ -107,7 +122,7 @@ public sealed class LineMessageSender(
         return true;
     }
 
-    private async Task PostPayloadAsync(
+    private async Task<LinePushAttemptResult> PostPayloadAsync(
         string endpoint,
         object payload,
         string targetId,
@@ -132,15 +147,20 @@ public sealed class LineMessageSender(
                     targetId,
                     endpoint,
                     responseContent);
+                return LinePushAttemptResult.ProviderFailed((int)response.StatusCode, responseContent);
             }
-            else if (isPush)
+
+            if (isPush)
             {
                 pushQuotaTracker.Increment();
             }
+
+            return LinePushAttemptResult.Ok();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "LINE 訊息發生例外：Target={TargetId}, Endpoint={Endpoint}", targetId, endpoint);
+            return LinePushAttemptResult.Exception(ex.Message);
         }
     }
 

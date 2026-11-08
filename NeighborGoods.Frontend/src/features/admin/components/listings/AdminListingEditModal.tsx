@@ -45,7 +45,7 @@ export const AdminListingEditModal = ({ listingId, open, onClose, onUpdated }: P
         conditionCode: item.conditionCode,
         price: item.price,
         residenceCode: item.residenceCode,
-        pickupLocationCode: item.pickupLocationCode,
+        pickupLocation: item.pickupLocation,
         isFree: item.isFree,
         isCharity: item.isCharity,
         isTradeable: item.isTradeable,
@@ -114,12 +114,12 @@ export const AdminListingEditModal = ({ listingId, open, onClose, onUpdated }: P
             <input className={inputClassName} type="number" value={item.residenceCode} onChange={(e) => setItem({ ...item, residenceCode: Number(e.target.value) })} />
           </label>
           <label>
-            <span className="text-sm text-text-subtle">取貨地代碼</span>
+            <span className="text-sm text-text-subtle">面交地點</span>
             <input
               className={inputClassName}
-              type="number"
-              value={item.pickupLocationCode}
-              onChange={(e) => setItem({ ...item, pickupLocationCode: Number(e.target.value) })}
+              value={item.pickupLocation}
+              maxLength={80}
+              onChange={(e) => setItem({ ...item, pickupLocation: e.target.value })}
             />
           </label>
           <label className="flex items-center gap-2 text-sm text-text-main">

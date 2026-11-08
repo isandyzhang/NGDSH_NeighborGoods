@@ -23,7 +23,7 @@ const defaultForm: ListingCreateFormState = {
   conditionCode: null,
   price: 0,
   residenceCode: null,
-  pickupLocationCode: null,
+  pickupLocation: '',
   isFree: false,
   isCharity: false,
   isTradeable: false,
@@ -39,7 +39,7 @@ const toMutationPayload = (form: ListingCreateFormState): ListingMutationPayload
     form.categoryCode === null ||
     form.conditionCode === null ||
     form.residenceCode === null ||
-    form.pickupLocationCode === null
+    !form.pickupLocation.trim()
   ) {
     return null
   }
@@ -49,7 +49,7 @@ const toMutationPayload = (form: ListingCreateFormState): ListingMutationPayload
     categoryCode: form.categoryCode,
     conditionCode: form.conditionCode,
     residenceCode: form.residenceCode,
-    pickupLocationCode: form.pickupLocationCode,
+    pickupLocation: form.pickupLocation.trim(),
   }
 }
 
@@ -64,7 +64,6 @@ export const CreateListingPage = () => {
   const [categories, setCategories] = useState<LookupItem[]>([])
   const [conditions, setConditions] = useState<LookupItem[]>([])
   const [residences, setResidences] = useState<LookupItem[]>([])
-  const [pickupLocations, setPickupLocations] = useState<LookupItem[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [createdListing, setCreatedListing] = useState<CreatedListingSummary | null>(null)
   const [successModalOpen, setSuccessModalOpen] = useState(false)
@@ -117,25 +116,6 @@ export const CreateListingPage = () => {
       disposed = true
     }
   }, [])
-
-  useEffect(() => {
-    let disposed = false
-    void lookupApi
-      .pickupLocations(form.residenceCode)
-      .then((pick) => {
-        if (!disposed) {
-          setPickupLocations(pick)
-        }
-      })
-      .catch(() => {
-        if (!disposed) {
-          setError('載入面交地點失敗，請稍後再試')
-        }
-      })
-    return () => {
-      disposed = true
-    }
-  }, [form.residenceCode])
 
   const imagePreviews = useMemo(
     () =>
@@ -194,7 +174,7 @@ export const CreateListingPage = () => {
     if (form.residenceCode === null) {
       issues.push('residence')
     }
-    if (form.pickupLocationCode === null) {
+    if (!form.pickupLocation.trim()) {
       issues.push('pickupLocation')
     }
     if (!form.isFree && (!Number.isFinite(form.price) || form.price < 0)) {
@@ -307,7 +287,7 @@ export const CreateListingPage = () => {
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           <ListingFormFields
             form={form}
-            lookups={{ categories, conditions, residences, pickupLocations }}
+            lookups={{ categories, conditions, residences }}
             onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
             highlightField={highlightField === 'images' ? null : highlightField}
             fieldRefs={{

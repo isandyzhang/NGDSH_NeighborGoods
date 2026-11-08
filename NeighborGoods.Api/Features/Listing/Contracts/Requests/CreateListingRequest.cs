@@ -8,7 +8,9 @@ public sealed class CreateListingRequest
     public int ConditionCode { get; init; }
     public int Price { get; init; }
     public int ResidenceCode { get; init; }
-    public int PickupLocationCode { get; init; }
+
+    /// <summary>面交地點自由文字（例如：風雨操場、北棟大廳）。</summary>
+    public string PickupLocation { get; init; } = string.Empty;
 
     /// <summary>與 Web 刊登表單一致；未帶 JSON 時視為 false。</summary>
     public bool IsFree { get; init; }

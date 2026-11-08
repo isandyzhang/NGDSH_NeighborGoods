@@ -176,6 +176,7 @@ export type ListingDetail = {
   residenceCode: number
   residenceName: string
   pickupLocationCode: number
+  /** 面交地點顯示文字（自由輸入） */
   pickupLocationName: string
   mainImageUrl: string | null
   imageUrls: string[]
@@ -205,7 +206,7 @@ export type ListingMutationPayload = {
   conditionCode: number
   price: number
   residenceCode: number
-  pickupLocationCode: number
+  pickupLocation: string
   isFree: boolean
   isCharity: boolean
   isTradeable: boolean
@@ -213,12 +214,11 @@ export type ListingMutationPayload = {
 
 export type ListingCreateFormState = Omit<
   ListingMutationPayload,
-  'categoryCode' | 'conditionCode' | 'residenceCode' | 'pickupLocationCode'
+  'categoryCode' | 'conditionCode' | 'residenceCode'
 > & {
   categoryCode: number | null
   conditionCode: number | null
   residenceCode: number | null
-  pickupLocationCode: number | null
 }
 
 export type TopPinPayload = {

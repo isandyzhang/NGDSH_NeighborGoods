@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { adminApi, type AdminDashboard } from '@/features/admin/api/adminApi'
+import { adminApi, type AdminDashboard, type AdminLineTestPushResult } from '@/features/admin/api/adminApi'
 import { ApiClientError } from '@/shared/types/api'
+import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
 import { ErrorState } from '@/shared/ui/state/ErrorState'
 import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
@@ -20,6 +21,9 @@ export const AdminDashboardPage = () => {
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lineTestSending, setLineTestSending] = useState(false)
+  const [lineTestResult, setLineTestResult] = useState<AdminLineTestPushResult | null>(null)
+  const [lineTestError, setLineTestError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -30,6 +34,19 @@ export const AdminDashboardPage = () => {
       setError(err instanceof ApiClientError ? err.message : '讀取後台首頁失敗')
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const handleSendLineTestPush = useCallback(async () => {
+    setLineTestSending(true)
+    setLineTestError(null)
+    setLineTestResult(null)
+    try {
+      setLineTestResult(await adminApi.sendLineTestPush())
+    } catch (err) {
+      setLineTestError(err instanceof ApiClientError ? err.message : 'LINE 測試推播失敗')
+    } finally {
+      setLineTestSending(false)
     }
   }, [])
 
@@ -58,6 +75,39 @@ export const AdminDashboardPage = () => {
   const { kpi } = dashboard
   return (
     <div className="space-y-6">
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold text-text-main">LINE 推播診斷</h2>
+        <Card>
+          <p className="text-sm text-text-subtle">
+            立即對「目前登入的管理員本人」發送一則 sample Flex 商品卡。收到＝token 正常；收不到＝token／綁定問題（可排除排程）。
+          </p>
+          <div className="mt-4">
+            <Button type="button" disabled={lineTestSending} onClick={() => void handleSendLineTestPush()}>
+              {lineTestSending ? '發送中…' : '發送 sample Flex 給自己'}
+            </Button>
+          </div>
+          {lineTestError ? <p className="mt-3 text-sm text-red-600">{lineTestError}</p> : null}
+          {lineTestResult ? (
+            <div className="mt-3 space-y-1 text-sm text-text-main">
+              <p className={lineTestResult.success ? 'text-emerald-700' : 'text-amber-700'}>{lineTestResult.message}</p>
+              <p className="text-text-muted">
+                code={lineTestResult.code}
+                {' · '}
+                token={lineTestResult.channelAccessTokenConfigured ? '已設定' : '未設定'}
+                {' · '}
+                綁定={lineTestResult.lineBound ? `是（${lineTestResult.lineMessagingApiUserIdSuffix ?? '-'}）` : '否'}
+                {lineTestResult.httpStatusCode != null ? ` · HTTP ${lineTestResult.httpStatusCode}` : ''}
+              </p>
+              {lineTestResult.providerResponse ? (
+                <pre className="mt-2 overflow-x-auto rounded-lg bg-surface-2 p-3 text-xs text-text-muted">
+                  {lineTestResult.providerResponse}
+                </pre>
+              ) : null}
+            </div>
+          ) : null}
+        </Card>
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-xl font-semibold text-text-main">商品統計</h2>
         <StatCard title="總商品數量" value={kpi.totalListings} />

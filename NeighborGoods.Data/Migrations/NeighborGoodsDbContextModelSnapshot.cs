@@ -739,6 +739,11 @@ namespace NeighborGoods.Data.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(3);
 
+                    b.Property<string>("PickupLocationText")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<DateTime?>("PinnedEndDate")
                         .HasColumnType("datetime2");
 

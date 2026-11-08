@@ -1,6 +1,17 @@
 import { http } from '@/shared/api/http'
 import { unwrapApiResponse, type ApiResponse } from '@/shared/types/api'
 
+export type AdminLineTestPushResult = {
+  success: boolean
+  code: string
+  message: string
+  channelAccessTokenConfigured: boolean
+  lineBound: boolean
+  lineMessagingApiUserIdSuffix: string | null
+  httpStatusCode: number | null
+  providerResponse: string | null
+}
+
 export type AdminDashboard = {
   kpi: {
     totalListings: number
@@ -197,7 +208,7 @@ export type AdminListingDetail = {
   conditionCode: number
   price: number
   residenceCode: number
-  pickupLocationCode: number
+  pickupLocation: string
   isFree: boolean
   isCharity: boolean
   isTradeable: boolean
@@ -384,7 +395,7 @@ export const adminApi = {
       conditionCode: number
       price: number
       residenceCode: number
-      pickupLocationCode: number
+      pickupLocation: string
       isFree: boolean
       isCharity: boolean
       isTradeable: boolean
@@ -546,6 +557,11 @@ export const adminApi = {
 
   async listSurveys(params?: { page?: number; pageSize?: number }): Promise<AdminSurveyList> {
     const response = await http.get<ApiResponse<AdminSurveyList>>('/api/v1/admin/surveys', { params })
+    return unwrapApiResponse(response.data)
+  },
+
+  async sendLineTestPush(): Promise<AdminLineTestPushResult> {
+    const response = await http.post<ApiResponse<AdminLineTestPushResult>>('/api/v1/admin/line/test-push')
     return unwrapApiResponse(response.data)
   },
 }

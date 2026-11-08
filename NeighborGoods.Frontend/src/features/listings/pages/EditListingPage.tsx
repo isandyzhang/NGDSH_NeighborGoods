@@ -19,7 +19,6 @@ export const EditListingPage = () => {
   const [categories, setCategories] = useState<LookupItem[]>([])
   const [conditions, setConditions] = useState<LookupItem[]>([])
   const [residences, setResidences] = useState<LookupItem[]>([])
-  const [pickupLocations, setPickupLocations] = useState<LookupItem[]>([])
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([])
   const [imageUrlsToDelete, setImageUrlsToDelete] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,7 +65,7 @@ export const EditListingPage = () => {
           conditionCode: detail.conditionCode,
           price: detail.price,
           residenceCode: detail.residenceCode,
-          pickupLocationCode: detail.pickupLocationCode,
+          pickupLocation: detail.pickupLocationName,
           isFree: detail.isFree,
           isCharity: detail.isCharity,
           isTradeable: detail.isTradeable,
@@ -96,30 +95,6 @@ export const EditListingPage = () => {
   }, [id])
 
   useEffect(() => {
-    if (!form) {
-      return
-    }
-
-    let disposed = false
-    void lookupApi
-      .pickupLocations(form.residenceCode)
-      .then((pick) => {
-        if (!disposed) {
-          setPickupLocations(pick)
-        }
-      })
-      .catch((err: unknown) => {
-        if (!disposed) {
-          setError(err instanceof ApiClientError ? err.message : '載入面交地點失敗')
-        }
-      })
-
-    return () => {
-      disposed = true
-    }
-  }, [form?.residenceCode])
-
-  useEffect(() => {
     const shouldFocusTopPin = searchParams.get('focus') === TOP_PIN_FOCUS_QUERY
     if (!shouldFocusTopPin || !form) {
       return
@@ -137,7 +112,7 @@ export const EditListingPage = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!form || !id || form.categoryCode === null || form.conditionCode === null || form.residenceCode === null || form.pickupLocationCode === null) {
+    if (!form || !id || form.categoryCode === null || form.conditionCode === null || form.residenceCode === null || !form.pickupLocation.trim()) {
       return
     }
 
@@ -151,7 +126,7 @@ export const EditListingPage = () => {
         categoryCode: form.categoryCode!,
         conditionCode: form.conditionCode!,
         residenceCode: form.residenceCode!,
-        pickupLocationCode: form.pickupLocationCode!,
+        pickupLocation: form.pickupLocation.trim(),
         price: form.isFree ? 0 : form.price,
         isFree: form.isFree,
         isCharity: form.isCharity,
@@ -252,7 +227,7 @@ export const EditListingPage = () => {
             ) : null}
             <ListingFormFields
               form={form}
-              lookups={{ categories, conditions, residences, pickupLocations }}
+              lookups={{ categories, conditions, residences }}
               onChange={(patch) => setForm((current) => (current ? { ...current, ...patch } : current))}
             />
 

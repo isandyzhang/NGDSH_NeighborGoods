@@ -6,6 +6,8 @@ using NeighborGoods.Data.Listings;
 public static class ListingConstants
 {
     public const int MaxActiveListingsPerUser = 10;
+    public const int MaxPickupLocationLength = 80;
+    public const int LegacyDefaultPickupLocationCode = 3;
     public const int MinSearchTermLength = 2;
     public const int TopPinDurationDays = 7;
     public const int ListingExpiryDays = ListingExpiryConstants.ExpiryDays;

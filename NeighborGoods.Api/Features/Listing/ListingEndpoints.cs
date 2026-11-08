@@ -364,7 +364,7 @@ public static class ListingEndpoints
             }
         })
         .WithName("UpdateListingV1")
-        .WithSummary("更新商品（需提供 pickupLocationCode）")
+        .WithSummary("更新商品（需提供 pickupLocation 文字）")
         .RequireAuthorization();
 
         app.MapDelete("/api/v1/listings/{id:guid}", async (

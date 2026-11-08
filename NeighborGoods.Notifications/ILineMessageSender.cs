@@ -14,6 +14,12 @@ public interface ILineMessageSender
         object flexContents,
         CancellationToken cancellationToken = default);
 
+    Task<LinePushAttemptResult> TryPushFlexAsync(
+        string lineUserId,
+        string altText,
+        object flexContents,
+        CancellationToken cancellationToken = default);
+
     Task SendTextAsync(
         string lineUserId,
         string message,

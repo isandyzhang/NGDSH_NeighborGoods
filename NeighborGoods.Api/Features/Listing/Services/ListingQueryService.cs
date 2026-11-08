@@ -104,7 +104,7 @@ public sealed class ListingQueryService(
             listing.Residence,
             residenceNames.GetValueOrDefault(listing.Residence, "未指定"),
             listing.PickupLocation,
-            pickupNames.GetValueOrDefault(listing.PickupLocation, "私訊"),
+            ResolvePickupLocationName(listing.PickupLocationText, listing.PickupLocation, pickupNames),
             mainImageUrl,
             resolvedImageUrls,
             listing.Status,
@@ -582,6 +582,19 @@ public sealed class ListingQueryService(
 
     private Task<Dictionary<int, string>> GetPickupLocationMapAsync(CancellationToken cancellationToken) =>
         GetLookupMapAsync(PickupLocationLookupCacheKey, dbContext.ListingPickupLocations, cancellationToken);
+
+    private static string ResolvePickupLocationName(
+        string? pickupLocationText,
+        int pickupLocationCode,
+        IReadOnlyDictionary<int, string> pickupNames)
+    {
+        if (!string.IsNullOrWhiteSpace(pickupLocationText))
+        {
+            return pickupLocationText.Trim();
+        }
+
+        return pickupNames.GetValueOrDefault(pickupLocationCode, "私訊");
+    }
 
     private async Task<Dictionary<int, string>> GetLookupMapAsync<TEntity>(
         string cacheKey,

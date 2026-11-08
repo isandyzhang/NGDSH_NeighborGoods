@@ -103,7 +103,7 @@ public sealed class ListingCommandService(
         await EnsureActiveCategoryExistsAsync(request.CategoryCode, cancellationToken);
         await EnsureActiveConditionExistsAsync(request.ConditionCode, cancellationToken);
         await EnsureActiveResidenceExistsAsync(request.ResidenceCode, cancellationToken);
-        await EnsurePickupLocationAllowedAsync(request.ResidenceCode, request.PickupLocationCode, cancellationToken);
+        var pickupLocationText = NormalizePickupLocationText(request.PickupLocation);
 
         var entity = await dbContext.Listings
             .Include(x => x.ListingImages)
@@ -132,7 +132,8 @@ public sealed class ListingCommandService(
         entity.Condition = request.ConditionCode;
         entity.Price = price;
         entity.Residence = request.ResidenceCode;
-        entity.PickupLocation = request.PickupLocationCode;
+        entity.PickupLocationText = pickupLocationText;
+        entity.PickupLocation = ListingConstants.LegacyDefaultPickupLocationCode;
         entity.IsFree = isFree;
         entity.IsCharity = request.IsCharity;
         entity.IsTradeable = request.IsTradeable;
@@ -292,7 +293,7 @@ public sealed class ListingCommandService(
         await EnsureActiveCategoryExistsAsync(request.CategoryCode, cancellationToken);
         await EnsureActiveConditionExistsAsync(request.ConditionCode, cancellationToken);
         await EnsureActiveResidenceExistsAsync(request.ResidenceCode, cancellationToken);
-        await EnsurePickupLocationAllowedAsync(request.ResidenceCode, request.PickupLocationCode, cancellationToken);
+        var pickupLocationText = NormalizePickupLocationText(request.PickupLocation);
         var sellerId = currentUserContext.GetRequiredUserId();
         var seller = await dbContext.AspNetUsers
             .FirstOrDefaultAsync(x => x.Id == sellerId, cancellationToken);
@@ -343,7 +344,8 @@ public sealed class ListingCommandService(
             IsCharity = request.IsCharity,
             SellerId = sellerId,
             Category = request.CategoryCode,
-            PickupLocation = request.PickupLocationCode,
+            PickupLocation = ListingConstants.LegacyDefaultPickupLocationCode,
+            PickupLocationText = pickupLocationText,
             Condition = request.ConditionCode,
             BuyerId = null,
             Residence = request.ResidenceCode,
@@ -415,23 +417,22 @@ public sealed class ListingCommandService(
     private Task EnsureActiveResidenceExistsAsync(int residenceCode, CancellationToken cancellationToken) =>
         EnsureActiveLookupExistsAsync<ListingResidence>(residenceCode, "社宅", nameof(residenceCode), cancellationToken);
 
-    private async Task EnsurePickupLocationAllowedAsync(
-        int residenceCode,
-        int pickupLocationCode,
-        CancellationToken cancellationToken)
+    private static string NormalizePickupLocationText(string? pickupLocation)
     {
-        var pickup = await dbContext.ListingPickupLocations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == pickupLocationCode && c.IsActive, cancellationToken);
-        if (pickup is null)
+        var text = pickupLocation?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
         {
-            throw new ArgumentException("無效或已停用的面交地點。", nameof(pickupLocationCode));
+            throw new ArgumentException("請填寫面交地點。", nameof(pickupLocation));
         }
 
-        if (pickup.ResidenceId is not null && pickup.ResidenceId != residenceCode)
+        if (text.Length > ListingConstants.MaxPickupLocationLength)
         {
-            throw new ArgumentException("面交地點不屬於所選社宅。", nameof(pickupLocationCode));
+            throw new ArgumentException(
+                $"面交地點不可超過 {ListingConstants.MaxPickupLocationLength} 字。",
+                nameof(pickupLocation));
         }
+
+        return text;
     }
 
     private async Task EnsureActiveLookupExistsAsync<TEntity>(

@@ -15,6 +15,9 @@ public sealed class Listing
     public ListingCategory? CategoryInfo { get; set; }
     public int PickupLocation { get; set; } = 3;
     public ListingPickupLocation? PickupLocationInfo { get; set; }
+
+    /// <summary>面交地點自由文字（取代 lookup DDL；舊資料由 PickupLocation 名稱回填）。</summary>
+    public string PickupLocationText { get; set; } = string.Empty;
     public int Condition { get; set; }
     public ListingCondition? ConditionInfo { get; set; }
     public string? BuyerId { get; set; }

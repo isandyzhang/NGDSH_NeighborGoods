@@ -228,6 +228,7 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.Category).HasDefaultValue(9);
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.PickupLocation).HasDefaultValue(3);
+            entity.Property(e => e.PickupLocationText).HasMaxLength(80);
             entity.Property(e => e.Price).HasColumnType("decimal(18, 0)");
             entity.Property(e => e.Title).HasMaxLength(200);
 

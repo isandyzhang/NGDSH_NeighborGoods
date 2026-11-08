@@ -23,8 +23,17 @@ internal sealed class FakeLineMessageSender : ILineMessageSender
         object flexContents,
         CancellationToken cancellationToken = default)
     {
+        return TryPushFlexAsync(lineUserId, altText, flexContents, cancellationToken);
+    }
+
+    public Task<LinePushAttemptResult> TryPushFlexAsync(
+        string lineUserId,
+        string altText,
+        object flexContents,
+        CancellationToken cancellationToken = default)
+    {
         PushFlexMessages.Add((lineUserId, altText));
-        return Task.CompletedTask;
+        return Task.FromResult(LinePushAttemptResult.Ok());
     }
 
     public Task SendTextAsync(string lineUserId, string message, CancellationToken cancellationToken = default)

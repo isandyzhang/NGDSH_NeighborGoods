@@ -8,7 +8,8 @@ public sealed class AdminUpdateListingRequest
     public int ConditionCode { get; init; }
     public int Price { get; init; }
     public int ResidenceCode { get; init; }
-    public int PickupLocationCode { get; init; }
+    /// <summary>面交地點自由文字。</summary>
+    public string PickupLocation { get; init; } = string.Empty;
     public bool IsFree { get; init; }
     public bool IsCharity { get; init; }
     public bool IsTradeable { get; init; }

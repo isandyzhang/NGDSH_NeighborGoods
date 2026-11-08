@@ -16,7 +16,6 @@ type ListingFormLookups = {
   categories: LookupItem[]
   conditions: LookupItem[]
   residences: LookupItem[]
-  pickupLocations: LookupItem[]
 }
 
 type ListingFormFieldRefs = Partial<
@@ -121,21 +120,22 @@ export const ListingFormFields = ({
             label="社宅"
             value={form.residenceCode}
             options={lookups.residences}
-            onChange={(value) => onChange({ residenceCode: value, pickupLocationCode: null })}
+            onChange={(value) => onChange({ residenceCode: value })}
             invalid={isSelectInvalid('residence')}
             includeEmptyOption={includeEmptyOptions}
             placeholder="-"
           />
         </div>
         <div ref={fieldRefs?.pickupLocation}>
-          <ExpandableSelectField
+          <Input
             label="面交地點"
-            value={form.pickupLocationCode}
-            options={lookups.pickupLocations}
-            onChange={(value) => onChange({ pickupLocationCode: value })}
-            invalid={isSelectInvalid('pickupLocation')}
-            includeEmptyOption={includeEmptyOptions}
-            placeholder="-"
+            value={form.pickupLocation}
+            onChange={(event) => onChange({ pickupLocation: event.target.value })}
+            placeholder="例如：風雨操場、北棟大廳、私訊"
+            maxLength={80}
+            className={`py-3 text-xl ${inputHighlightClass('pickupLocation')}`}
+            labelClassName="text-[1.45rem] font-bold text-text-main"
+            required
           />
         </div>
       </div>

@@ -279,7 +279,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 2,
             price = 1500,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         using var form = BuildCreateListingForm(request);
@@ -307,7 +307,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         using var form = BuildCreateListingForm(request);
@@ -320,7 +320,7 @@ public sealed class ListingEndpointsTests
     }
 
     [Fact]
-    public async Task PostListing_InvalidPickupLocationCode_ReturnsBadRequest()
+    public async Task PostListing_EmptyPickupLocation_ReturnsBadRequest()
     {
         using var factory = new ListingApiFactory(_fixture.ConnectionString);
         using var client = factory.CreateClient();
@@ -328,40 +328,13 @@ public sealed class ListingEndpointsTests
 
         var request = new
         {
-            title = "無效面交",
+            title = "空面交",
             description = "測試",
             categoryCode = 1,
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 99
-        };
-
-        using var form = BuildCreateListingForm(request);
-        var response = await client.PostAsync("/api/v1/listings", form);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.False(body.GetProperty("success").GetBoolean());
-        Assert.Equal("VALIDATION_ERROR", body.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task PostListing_PickupLocationFromOtherResidence_ReturnsBadRequest()
-    {
-        using var factory = new ListingApiFactory(_fixture.ConnectionString);
-        using var client = factory.CreateClient();
-        await AuthenticateAsAsync(client, ConfirmedUserName, UserPassword);
-
-        var request = new
-        {
-            title = "跨社宅面交",
-            description = "測試",
-            categoryCode = 1,
-            conditionCode = 1,
-            price = 100,
-            residenceCode = 2,
-            pickupLocationCode = 4
+            pickupLocation = ""
         };
 
         using var form = BuildCreateListingForm(request);
@@ -387,7 +360,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 2,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         using var form = BuildCreateListingForm(request);
@@ -411,7 +384,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 2,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         using var form = BuildCreateListingForm(request);
@@ -438,7 +411,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
         using var form = new MultipartFormDataContent();
         form.Add(
@@ -487,7 +460,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         }, imageCount: 6);
 
         var response = await client.PostAsync("/api/v1/listings", form);
@@ -512,7 +485,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         });
 
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
@@ -595,7 +568,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 900,
             residenceCode = 1,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         var response = await client.PutAsJsonAsync($"/api/v1/listings/{Guid.NewGuid()}", request);
@@ -621,7 +594,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 1,
             residenceCode = 1,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         var response = await client.PutAsJsonAsync($"/api/v1/listings/{SeededTesterListingId}", request);
@@ -677,7 +650,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 2,
             price = 500,
             residenceCode = 3,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         using var createForm = BuildCreateListingForm(createRequest);
@@ -979,7 +952,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         });
         var response = await client.PostAsync("/api/v1/listings", notifyForm);
 
@@ -1008,7 +981,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         });
         var response = await client.PostAsync("/api/v1/listings", eleventhForm);
 
@@ -1399,7 +1372,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 1,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -1445,7 +1418,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 100,
             residenceCode = 2,
-            pickupLocationCode = 3,
+            pickupLocation = "私訊",
             isFree = false,
             isCharity = false,
             isTradeable = false,
@@ -1498,7 +1471,7 @@ public sealed class ListingEndpointsTests
             conditionCode = 1,
             price = 1000,
             residenceCode = 2,
-            pickupLocationCode = 3
+            pickupLocation = "私訊"
         };
 
         using var form = BuildCreateListingForm(createRequest);

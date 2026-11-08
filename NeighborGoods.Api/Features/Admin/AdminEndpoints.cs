@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NeighborGoods.Api.Features.Admin.Contracts.Requests;
 using NeighborGoods.Api.Features.Admin.Contracts.Responses;
 using NeighborGoods.Api.Features.Admin.Services;
@@ -8,14 +9,15 @@ using NeighborGoods.Api.Features.Listing;
 using NeighborGoods.Api.Features.Listing.Contracts;
 using NeighborGoods.Api.Features.Messaging;
 using NeighborGoods.Api.Features.Messaging.Contracts.Responses;
+using NeighborGoods.Api.Features.Surveys;
+using NeighborGoods.Api.Features.Surveys.Contracts;
 using NeighborGoods.Api.Infrastructure.Storage;
 using NeighborGoods.Api.Shared.ApiContracts;
+using NeighborGoods.Api.Shared.Security;
 using NeighborGoods.Data;
 using NeighborGoods.Data.Announcements;
 using NeighborGoods.Data.PurchaseRequests;
-using NeighborGoods.Api.Features.Surveys;
-using NeighborGoods.Api.Features.Surveys.Contracts;
-using NeighborGoods.Api.Shared.Security;
+using NeighborGoods.Notifications;
 
 namespace NeighborGoods.Api.Features.Admin;
 
@@ -105,6 +107,10 @@ public static class AdminEndpoints
 
         app.MapGet("/api/v1/admin/surveys", GetAdminSurveysAsync)
         .WithName("AdminGetSurveysV1")
+        .RequireAuthorization();
+
+        app.MapPost("/api/v1/admin/line/test-push", SendAdminLineTestPushAsync)
+        .WithName("AdminSendLineTestPushV1")
         .RequireAuthorization();
 
         return app;
@@ -580,7 +586,7 @@ public static class AdminEndpoints
                 x.Condition,
                 Convert.ToInt32(x.Price),
                 x.Residence,
-                x.PickupLocation,
+                x.PickupLocationText != "" ? x.PickupLocationText : "私訊",
                 x.IsFree,
                 x.IsCharity,
                 x.IsTradeable,
@@ -625,14 +631,18 @@ public static class AdminEndpoints
             return Results.NotFound(ApiResponseFactory.Error("LISTING_NOT_FOUND", "找不到商品", httpContext));
         }
 
-        var pickupAllowed = await dbContext.ListingPickupLocations.AsNoTracking().AnyAsync(
-            x => x.Id == request.PickupLocationCode
-                && x.IsActive
-                && (x.ResidenceId == null || x.ResidenceId == request.ResidenceCode),
-            ct);
-        if (!pickupAllowed)
+        var pickupLocationText = request.PickupLocation?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(pickupLocationText))
         {
-            return Results.BadRequest(ApiResponseFactory.Error("VALIDATION_ERROR", "面交地點不屬於所選社宅或已停用", httpContext));
+            return Results.BadRequest(ApiResponseFactory.Error("VALIDATION_ERROR", "請填寫面交地點", httpContext));
+        }
+
+        if (pickupLocationText.Length > ListingConstants.MaxPickupLocationLength)
+        {
+            return Results.BadRequest(ApiResponseFactory.Error(
+                "VALIDATION_ERROR",
+                $"面交地點不可超過 {ListingConstants.MaxPickupLocationLength} 字",
+                httpContext));
         }
 
         listing.Title = request.Title.Trim();
@@ -641,7 +651,8 @@ public static class AdminEndpoints
         listing.Condition = request.ConditionCode;
         listing.Price = request.IsFree ? 0 : Math.Max(request.Price, 0);
         listing.Residence = request.ResidenceCode;
-        listing.PickupLocation = request.PickupLocationCode;
+        listing.PickupLocationText = pickupLocationText;
+        listing.PickupLocation = ListingConstants.LegacyDefaultPickupLocationCode;
         listing.IsFree = request.IsFree || request.Price == 0;
         listing.IsCharity = request.IsCharity;
         listing.IsTradeable = request.IsTradeable;
@@ -1133,6 +1144,102 @@ public static class AdminEndpoints
         }
 
         return ListingStatus.Sold;
+    }
+
+    private static async Task<IResult> SendAdminLineTestPushAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        ILineMessageSender lineMessageSender,
+        LineFlexMessageBuilder flexMessageBuilder,
+        IOptions<LineMessagingOptions> lineOptions,
+        CancellationToken ct = default)
+    {
+        var isAdmin = await IsAdminAsync(currentUser, dbContext, ct);
+        if (!isAdmin)
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var userId = currentUser.GetRequiredUserId();
+        var user = await dbContext.AspNetUsers
+            .AsNoTracking()
+            .Where(x => x.Id == userId)
+            .Select(x => new
+            {
+                x.LineMessagingApiUserId,
+                x.LineMessagingApiAuthorizedAt
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var tokenConfigured = !string.IsNullOrWhiteSpace(lineOptions.Value.ChannelAccessToken);
+        var lineUserId = user?.LineMessagingApiUserId;
+        var lineBound = !string.IsNullOrWhiteSpace(lineUserId) && user?.LineMessagingApiAuthorizedAt != null;
+        var lineUserIdSuffix = string.IsNullOrWhiteSpace(lineUserId)
+            ? null
+            : lineUserId.Length <= 6
+                ? lineUserId
+                : $"…{lineUserId[^6..]}";
+
+        if (!tokenConfigured)
+        {
+            return Results.Ok(ApiResponseFactory.Success(
+                new AdminLineTestPushResponse(
+                    Success: false,
+                    Code: "TOKEN_MISSING",
+                    Message: "未設定 ChannelAccessToken。這代表 API 端 token 問題，不是排程問題。",
+                    ChannelAccessTokenConfigured: false,
+                    LineBound: lineBound,
+                    LineMessagingApiUserIdSuffix: lineUserIdSuffix,
+                    HttpStatusCode: null,
+                    ProviderResponse: null),
+                httpContext));
+        }
+
+        if (!lineBound || string.IsNullOrWhiteSpace(lineUserId))
+        {
+            return Results.Ok(ApiResponseFactory.Success(
+                new AdminLineTestPushResponse(
+                    Success: false,
+                    Code: "LINE_NOT_BOUND",
+                    Message: "目前登入帳號尚未完成 LINE 官方帳號通知綁定，無法推播給自己。",
+                    ChannelAccessTokenConfigured: true,
+                    LineBound: false,
+                    LineMessagingApiUserIdSuffix: null,
+                    HttpStatusCode: null,
+                    ProviderResponse: null),
+                httpContext));
+        }
+
+        var sampleCard = flexMessageBuilder.BuildUnreadMessageCard(
+            new LineUnreadMessageItem(
+                Guid.Empty,
+                "[測試] LINE 推播診斷樣本商品",
+                null));
+
+        var pushResult = await lineMessageSender.TryPushFlexAsync(
+            lineUserId,
+            sampleCard.AltText,
+            sampleCard.Contents,
+            ct);
+
+        var message = pushResult.Success
+            ? "已送出 sample Flex 給登入者本人。若有收到，代表 token 正常，未讀通知問題較可能在排程／條件。"
+            : $"推播失敗：{pushResult.Message}。這較像 token／LINE API 問題，不是排程問題。";
+
+        return Results.Ok(ApiResponseFactory.Success(
+            new AdminLineTestPushResponse(
+                Success: pushResult.Success,
+                Code: pushResult.Code,
+                Message: message,
+                ChannelAccessTokenConfigured: true,
+                LineBound: true,
+                LineMessagingApiUserIdSuffix: lineUserIdSuffix,
+                HttpStatusCode: pushResult.HttpStatusCode,
+                ProviderResponse: pushResult.ProviderResponse),
+            httpContext));
     }
 
     private static async Task<bool> IsAdminAsync(
