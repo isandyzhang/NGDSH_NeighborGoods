@@ -16,6 +16,7 @@ var host = new HostBuilder()
         services.AddHttpClient();
         services.AddNeighborGoodsWorkerHosting(context.Configuration);
         services.AddSingleton<ScheduledTriggers>();
+        services.AddScoped<LineWebhookTrigger>();
     })
     .Build();
 

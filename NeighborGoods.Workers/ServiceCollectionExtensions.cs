@@ -86,6 +86,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISystemMessageRealtimePublisher, SystemMessageRealtimePublisher>();
 
         services.AddNeighborGoodsWorkerJobs();
+        services.AddScoped<ILineMenuQueryService, LineMenuQueryService>();
+        services.AddScoped<LineWebhookReplyService>();
 
         return services;
     }

@@ -117,8 +117,6 @@ function Build-RichMenuDefinition {
     [string]$Name,
     [string]$BarText,
     [string]$ListingsUrl,
-    [string]$MyListingsUrl,
-    [string]$MessagesUrl,
     [string]$CreateListingUrl,
     [string]$AccountUrl,
     [string]$FavoritesUrl
@@ -144,15 +142,17 @@ function Build-RichMenuDefinition {
       @{
         bounds = @{ x = 833; y = 0; width = 834; height = 843 }
         action = @{
-          type = "uri"
-          uri = $MyListingsUrl
+          type = "postback"
+          data = "action=myListings"
+          displayText = "正在查詢我的商品(｡•́ω•ˋ｡)"
         }
       },
       @{
         bounds = @{ x = 1667; y = 0; width = 833; height = 843 }
         action = @{
-          type = "uri"
-          uri = $MessagesUrl
+          type = "postback"
+          data = "action=myMessages"
+          displayText = "我是個愛查看訊息的好人 ψ(｀∇´)ψ ！"
         }
       },
       # Row 2
@@ -194,8 +194,6 @@ function Get-CurrentDefaultRichMenuId {
 Write-Host "[1/4] Creating rich menu..."
 $trimmedLiffUrl = $LiffUrl.Trim()
 $listingsUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings"
-$myListingsUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/my-listings"
-$messagesUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/messages"
 $createListingUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/listings/create"
 $accountUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/account"
 $favoritesUrl = Build-LiffPathLink -LiffUrl $trimmedLiffUrl -WebBaseUrl $normalizedBaseUrl -InternalPath "/favorites"
@@ -203,17 +201,15 @@ if ([string]::IsNullOrWhiteSpace($trimmedLiffUrl)) {
   Write-Warning "LiffUrl not set; rich menu URI actions use WebBaseUrl only (LIFF init may fail in LINE in-app browser)."
 }
 else {
-  Write-Host "Using LIFF path links for all URI menu areas."
+  Write-Host "Using LIFF path links for URI menu areas."
 }
 Write-Host "  listings: $listingsUrl"
-Write-Host "  my-listings: $myListingsUrl"
-Write-Host "  messages: $messagesUrl"
+Write-Host "  my-listings: postback action=myListings"
+Write-Host "  messages: postback action=myMessages"
 $definition = Build-RichMenuDefinition `
   -Name $RichMenuName `
   -BarText $ChatBarText `
   -ListingsUrl $listingsUrl `
-  -MyListingsUrl $myListingsUrl `
-  -MessagesUrl $messagesUrl `
   -CreateListingUrl $createListingUrl `
   -AccountUrl $accountUrl `
   -FavoritesUrl $favoritesUrl

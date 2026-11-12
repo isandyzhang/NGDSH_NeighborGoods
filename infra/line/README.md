@@ -18,14 +18,16 @@ This folder contains a PowerShell script that creates and deploys one LINE rich 
 
 ## Actions configured in this script
 
-- If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), all areas use path links `liff.line.me/{LiffId}/listings` etc.
-- Otherwise fallback to `$WebBaseUrl` + path
+- If `LiffUrl` is provided (e.g. `https://liff.line.me/{LiffId}`), URI areas use path links `liff.line.me/{LiffId}/listings` etc.
+- Otherwise URI areas fallback to `$WebBaseUrl` + path
 - Row 1, Area 1: open listings (`uri` `/listings`)
-- Row 1, Area 2: open my listings (`uri` `/my-listings`)
-- Row 1, Area 3: open messages (`uri` `/messages`)
+- Row 1, Area 2: postback `action=myListings`（Functions webhook 回 Flex carousel）
+- Row 1, Area 3: postback `action=myMessages`（Functions webhook 回未讀摘要 Flex）
 - Row 2, Area 1: open create listing (`uri` `/listings/create`)
 - Row 2, Area 2: open account (`uri` `/account`)
 - Row 2, Area 3: open favorites (`uri` `/favorites`)
+
+Postback 由 Azure Functions `POST /api/line/webhook` 處理（需在 LINE Developers 將 Webhook URL 指到 Function App）。
 
 ## Example usage
 
@@ -50,7 +52,7 @@ pwsh "./infra/line/line-richmenu.ps1" `
 - The script creates a new rich menu each run.
 - Recommended release flow:
   1. Run in test/staging OA account first
-  2. Verify image map and URI links
+  2. Verify image map, URI links, and postback Flex replies
   3. Run in production OA account
 
 ## Deployment strategy (IaC + CI/CD)
@@ -68,7 +70,7 @@ For production maintenance, prefer version-controlled deployment instead of manu
    - `Line__ChannelId`
 3. In pipeline, run rich menu deployment after backend/frontend deploy
    - Deploy to staging first
-   - Smoke-test URI menu areas
+   - Smoke-test URI menu areas and postback Flex replies
    - Deploy to production
 4. Rollback strategy
    - Keep previous richMenuId in deployment output/log
