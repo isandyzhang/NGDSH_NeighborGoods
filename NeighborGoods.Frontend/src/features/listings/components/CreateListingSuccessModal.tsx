@@ -74,7 +74,7 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
     <AppModal open={open} onClose={handleClose} closeLabel="關閉成功視窗" maxWidthClassName="max-w-md">
       <div className="space-y-5 text-center">
         <div className="space-y-3">
-          <h2 className="text-2xl font-semibold text-text-main sm:text-3xl">產品新增成功</h2>
+          <h2 className="text-2xl font-semibold text-text-main sm:text-3xl">產品新增成功 🎆</h2>
           {listing ? (
             <>
               <p className="text-lg text-text-subtle">
@@ -92,24 +92,36 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
             options={shareOptions}
             returnTo={returnTo}
             variant="primary"
-            className="min-h-[3.2rem] text-lg font-semibold"
+            className="min-h-[3.2rem] text-xl font-semibold sm:text-2xl"
           />
+          <div className="space-y-1">
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              className="min-h-[3.8rem] text-2xl font-semibold sm:text-3xl"
+              disabled={!listing || groupShareBusy}
+              onClick={() => void handleShareToTransactionGroup()}
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                <span>{groupShareBusy ? '推播中…' : '分享到交易群組'}</span>
+                {!groupShareBusy ? (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-sm font-medium">
+                    👍 推薦
+                  </span>
+                ) : null}
+              </span>
+            </Button>
+            <p className="text-sm text-text-subtle">
+              由官方帳號把商品卡推播到社宅交易群，讓更多厝邊一次看到。
+            </p>
+            {groupShareNotice ? <p className="text-sm text-text-subtle">{groupShareNotice}</p> : null}
+          </div>
           <Button
             type="button"
             variant="secondary"
             fullWidth
-            className="min-h-[3.2rem] text-lg font-semibold"
-            disabled={!listing || groupShareBusy}
-            onClick={() => void handleShareToTransactionGroup()}
-          >
-            {groupShareBusy ? '推播中…' : '分享到交易群組'}
-          </Button>
-          {groupShareNotice ? <p className="text-sm text-text-subtle">{groupShareNotice}</p> : null}
-          <Button
-            type="button"
-            variant="secondary"
-            fullWidth
-            className="min-h-[3.2rem] text-lg font-semibold"
+            className="min-h-[3.2rem] text-xl font-semibold sm:text-2xl"
             onClick={() => handleNavigate('/my-listings')}
           >
             我的商品
@@ -118,7 +130,7 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
             type="button"
             variant="secondary"
             fullWidth
-            className="min-h-[3.2rem] text-lg font-semibold"
+            className="min-h-[3.2rem] text-xl font-semibold sm:text-2xl"
             onClick={() => handleNavigate('/listings')}
           >
             商品列表
