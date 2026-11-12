@@ -18,7 +18,8 @@ public interface ILineMessageSender
         string lineUserId,
         string altText,
         object flexContents,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int billingUnits = 1);
 
     Task SendTextAsync(
         string lineUserId,

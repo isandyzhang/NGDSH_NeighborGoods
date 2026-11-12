@@ -97,6 +97,25 @@ public static class ListingEndpoints
         .WithSummary("我的商品（賣家本人所有狀態）")
         .RequireAuthorization();
 
+        app.MapPost("/api/v1/listings/{id:guid}/share-to-transaction-group", async (
+            HttpContext httpContext,
+            ListingTransactionGroupShareService shareService,
+            Guid id,
+            CancellationToken ct = default) =>
+        {
+            try
+            {
+                await shareService.ShareAsync(id, ct);
+                return Results.Ok(ApiResponseFactory.Success(new { id, shared = true }, httpContext));
+            }
+            catch (ListingAccessException ex)
+            {
+                return ToListingAccessResult(ex, httpContext);
+            }
+        })
+        .WithName("ShareListingToTransactionGroupV1")
+        .RequireAuthorization();
+
         app.MapPost("/api/v1/listings/{id:guid}/favorite", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,

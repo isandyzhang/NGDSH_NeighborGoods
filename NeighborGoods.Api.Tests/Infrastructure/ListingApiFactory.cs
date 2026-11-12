@@ -54,6 +54,8 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             services.AddSingleton<IEmailSender, FakeEmailSender>();
             services.RemoveAll<ILineMessageSender>();
             services.AddSingleton<ILineMessageSender, FakeLineMessageSender>();
+            services.RemoveAll<ILineMessagingQuotaService>();
+            services.AddSingleton<ILineMessagingQuotaService, FakeLineMessagingQuotaService>();
 
             var connectionBuilder = new SqlConnectionStringBuilder(_connectionString);
             var dbName = connectionBuilder.InitialCatalog;
@@ -80,6 +82,7 @@ internal sealed class ListingApiFactory(string connectionString) : WebApplicatio
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [AdminMessages]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [SiteAnnouncements]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [LineBindingPending]");
+            dbContext.Database.ExecuteSqlRaw("DELETE FROM [LineTransactionGroups]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [Listings]");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingPickupLocations] WHERE [Id] > 12");
             dbContext.Database.ExecuteSqlRaw("DELETE FROM [ListingResidences] WHERE [Id] > 3");

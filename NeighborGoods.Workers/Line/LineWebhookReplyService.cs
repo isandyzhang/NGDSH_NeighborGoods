@@ -10,6 +10,7 @@ namespace NeighborGoods.Workers.Line;
 
 public sealed class LineWebhookReplyService(
     ILineMenuQueryService lineMenuQueryService,
+    ILineTransactionGroupService lineTransactionGroupService,
     LineFlexMessageBuilder flexMessageBuilder,
     ILineMessageSender lineMessageSender,
     IMemoryCache memoryCache,
@@ -37,6 +38,7 @@ public sealed class LineWebhookReplyService(
                     "LINE group webhook: groupId={GroupId}, eventType={EventType}",
                     evt.GroupId,
                     evt.Type);
+                await HandleGroupEventAsync(evt, cancellationToken);
             }
 
             if (string.IsNullOrWhiteSpace(evt.UserId))
@@ -46,13 +48,34 @@ public sealed class LineWebhookReplyService(
 
             // follow / unfollow 綁定已改走 LIFF，此處不處理。
 
-            if (!string.IsNullOrWhiteSpace(evt.ReplyToken))
+            if (!string.IsNullOrWhiteSpace(evt.ReplyToken) && string.IsNullOrWhiteSpace(evt.GroupId))
             {
                 await HandleInteractiveEventAsync(evt, cancellationToken);
             }
         }
 
         return (true, null, null);
+    }
+
+    private async Task HandleGroupEventAsync(LineWebhookEventItem evt, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(evt.GroupId))
+        {
+            return;
+        }
+
+        if (string.Equals(evt.Type, "leave", StringComparison.OrdinalIgnoreCase))
+        {
+            await lineTransactionGroupService.MarkLeftAsync(evt.GroupId, cancellationToken);
+            return;
+        }
+
+        if (string.Equals(evt.Type, "join", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(evt.Type, "message", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(evt.Type, "memberJoined", StringComparison.OrdinalIgnoreCase))
+        {
+            await lineTransactionGroupService.RegisterFromWebhookAsync(evt.GroupId, evt.Type, cancellationToken);
+        }
     }
 
     private async Task HandleInteractiveEventAsync(LineWebhookEventItem evt, CancellationToken cancellationToken)

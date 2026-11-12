@@ -466,6 +466,35 @@ namespace NeighborGoods.Data.Migrations
                     b.ToTable("LineBindingPending", (string)null);
                 });
 
+            modelBuilder.Entity("NeighborGoods.Data.Line.LineTransactionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("GroupId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LeftAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive");
+
+                    b.ToTable("LineTransactionGroups", (string)null);
+                });
+
             modelBuilder.Entity("NeighborGoods.Data.LegacyEntities.ListingImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -729,6 +758,9 @@ namespace NeighborGoods.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<DateTime?>("LastExposedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LineGroupSharedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("ListedAt")

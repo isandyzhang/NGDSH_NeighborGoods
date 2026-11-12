@@ -60,7 +60,8 @@ public sealed class LineMessageSender(
         string lineUserId,
         string altText,
         object flexContents,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int billingUnits = 1)
     {
         if (!HasAccessTokenConfigured())
         {
@@ -88,7 +89,13 @@ public sealed class LineMessageSender(
                 }
         };
 
-        return await PostPayloadAsync("/message/push", payload, lineUserId, isPush: true, cancellationToken);
+        return await PostPayloadAsync(
+            "/message/push",
+            payload,
+            lineUserId,
+            isPush: true,
+            cancellationToken,
+            billingUnits);
     }
 
     public async Task SendTextAsync(
@@ -127,7 +134,8 @@ public sealed class LineMessageSender(
         object payload,
         string targetId,
         bool isPush,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int billingUnits = 1)
     {
         try
         {
@@ -152,7 +160,7 @@ public sealed class LineMessageSender(
 
             if (isPush)
             {
-                pushQuotaTracker.Increment();
+                pushQuotaTracker.Increment(billingUnits);
             }
 
             return LinePushAttemptResult.Ok();

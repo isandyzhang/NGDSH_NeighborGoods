@@ -318,7 +318,7 @@ public static class AccountEndpoints
         app.MapGet("/api/v1/account/line/quota", async (
             HttpContext httpContext,
             ICurrentUserContext currentUser,
-            LineMessagingQuotaService quotaService,
+            ILineMessagingQuotaService quotaService,
             CancellationToken ct = default) =>
         {
             _ = currentUser.GetRequiredUserId();

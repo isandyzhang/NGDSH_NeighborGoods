@@ -11,8 +11,9 @@ public sealed class LinePushQuotaTracker(IMemoryCache memoryCache)
         return memoryCache.TryGetValue(GetKey(), out int count) ? count : 0;
     }
 
-    public void Increment()
+    public void Increment(int units = 1)
     {
+        var add = Math.Max(1, units);
         var key = GetKey();
         var expiresAt = new DateTimeOffset(
             DateTime.UtcNow.Year,
@@ -24,7 +25,7 @@ public sealed class LinePushQuotaTracker(IMemoryCache memoryCache)
             TimeSpan.Zero).AddMonths(1);
 
         var current = memoryCache.TryGetValue(key, out int count) ? count : 0;
-        memoryCache.Set(key, current + 1, expiresAt);
+        memoryCache.Set(key, current + add, expiresAt);
     }
 
     private static string GetKey() => $"{KeyPrefix}{DateTime.UtcNow:yyyyMM}";

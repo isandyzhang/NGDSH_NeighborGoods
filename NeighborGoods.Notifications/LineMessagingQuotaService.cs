@@ -8,7 +8,7 @@ public sealed class LineMessagingQuotaService(
     HttpClient httpClient,
     IOptions<LineMessagingOptions> options,
     LinePushQuotaTracker quotaTracker,
-    ILogger<LineMessagingQuotaService> logger)
+    ILogger<LineMessagingQuotaService> logger) : ILineMessagingQuotaService
 {
     private readonly LineMessagingOptions _options = options.Value;
 
@@ -110,6 +110,45 @@ public sealed class LineMessagingQuotaService(
         }
 
         return null;
+    }
+
+    public async Task<int?> GetGroupMemberCountAsync(string groupId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_options.ChannelAccessToken) || string.IsNullOrWhiteSpace(groupId))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var request = CreateRequest($"/group/{Uri.EscapeDataString(groupId.Trim())}/members/count");
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            using var response = await httpClient.SendAsync(request, timeoutCts.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "讀取 LINE group member count 失敗：Status={StatusCode}, GroupId={GroupId}",
+                    response.StatusCode,
+                    groupId);
+                return null;
+            }
+
+            using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: timeoutCts.Token);
+            if (doc.RootElement.TryGetProperty("count", out var countElement)
+                && countElement.ValueKind == JsonValueKind.Number)
+            {
+                return countElement.GetInt32();
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "讀取 LINE group member count 發生例外：GroupId={GroupId}", groupId);
+            return null;
+        }
     }
 
     private HttpRequestMessage CreateRequest(string path)

@@ -412,4 +412,11 @@ export const listingApi = {
     const response = await http.post<ApiResponse<PurchaseRequestPayload>>(`/api/v1/listings/${id}/purchase-requests`)
     return unwrapApiResponse(response.data)
   },
+
+  async shareToTransactionGroup(id: string): Promise<{ id: string; shared: boolean }> {
+    const response = await http.post<ApiResponse<{ id: string; shared: boolean }>>(
+      `/api/v1/listings/${id}/share-to-transaction-group`,
+    )
+    return unwrapApiResponse(response.data)
+  },
 }

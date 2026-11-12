@@ -1,8 +1,10 @@
-﻿import { useMemo } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { listingApi } from '@/features/listings/api/listingApi'
 import { ListingLineShareButton } from '@/features/listings/components/ListingLineShareButton'
 import type { ShareListingOptions } from '@/features/listings/utils/lineShare'
 import { formatListingPrice } from '@/features/listings/utils/listingFormat'
+import { ApiClientError } from '@/shared/types/api'
 import { AppModal } from '@/shared/ui/modal/AppModal'
 import { Button } from '@/shared/ui/Button'
 
@@ -23,6 +25,8 @@ type CreateListingSuccessModalProps = {
 
 export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateListingSuccessModalProps) => {
   const navigate = useNavigate()
+  const [groupShareBusy, setGroupShareBusy] = useState(false)
+  const [groupShareNotice, setGroupShareNotice] = useState<string | null>(null)
 
   const shareOptions = useMemo((): ShareListingOptions | null => {
     if (!listing) {
@@ -45,7 +49,25 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
   }
 
   const handleClose = () => {
+    setGroupShareNotice(null)
     onClose()
+  }
+
+  const handleShareToTransactionGroup = async () => {
+    if (!listing || groupShareBusy) {
+      return
+    }
+
+    setGroupShareBusy(true)
+    setGroupShareNotice(null)
+    try {
+      await listingApi.shareToTransactionGroup(listing.id)
+      setGroupShareNotice('已推播商品卡到交易群組。')
+    } catch (err) {
+      setGroupShareNotice(err instanceof ApiClientError ? err.message : '推播到交易群組失敗')
+    } finally {
+      setGroupShareBusy(false)
+    }
   }
 
   return (
@@ -72,6 +94,17 @@ export const CreateListingSuccessModal = ({ open, listing, onClose }: CreateList
             variant="primary"
             className="min-h-[3.2rem] text-lg font-semibold"
           />
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            className="min-h-[3.2rem] text-lg font-semibold"
+            disabled={!listing || groupShareBusy}
+            onClick={() => void handleShareToTransactionGroup()}
+          >
+            {groupShareBusy ? '推播中…' : '分享到交易群組'}
+          </Button>
+          {groupShareNotice ? <p className="text-sm text-text-subtle">{groupShareNotice}</p> : null}
           <Button
             type="button"
             variant="secondary"

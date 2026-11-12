@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NeighborGoods.Data.Announcements;
 using NeighborGoods.Data.LegacyEntities;
+using NeighborGoods.Data.Line;
 using NeighborGoods.Data.Listings;
 using NeighborGoods.Data.Surveys;
 using ListingEntity = NeighborGoods.Data.Listings.Listing;
@@ -19,6 +20,7 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<EmailVerificationChallenge> EmailVerificationChallenges => Set<EmailVerificationChallenge>();
     public DbSet<LineBindingPending> LineBindingPendings => Set<LineBindingPending>();
+    public DbSet<LineTransactionGroup> LineTransactionGroups => Set<LineTransactionGroup>();
     public DbSet<ListingCategory> ListingCategories => Set<ListingCategory>();
     public DbSet<ListingCondition> ListingConditions => Set<ListingCondition>();
     public DbSet<ListingResidence> ListingResidences => Set<ListingResidence>();
@@ -166,6 +168,15 @@ public sealed class NeighborGoodsDbContext(DbContextOptions<NeighborGoodsDbConte
             entity.Property(e => e.Token).HasMaxLength(32);
 
             entity.HasOne(d => d.User).WithMany(p => p.LineBindingPendings).HasForeignKey(d => d.UserId);
+        });
+
+        modelBuilder.Entity<LineTransactionGroup>(entity =>
+        {
+            entity.ToTable("LineTransactionGroups");
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.GroupId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(e => e.GroupId).IsUnique();
+            entity.HasIndex(e => e.IsActive);
         });
 
         modelBuilder.Entity<ListingCategory>(entity =>

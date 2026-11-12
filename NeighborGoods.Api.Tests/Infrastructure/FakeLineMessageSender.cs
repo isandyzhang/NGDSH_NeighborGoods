@@ -30,7 +30,8 @@ internal sealed class FakeLineMessageSender : ILineMessageSender
         string lineUserId,
         string altText,
         object flexContents,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int billingUnits = 1)
     {
         PushFlexMessages.Add((lineUserId, altText));
         return Task.FromResult(LinePushAttemptResult.Ok());

@@ -12,6 +12,19 @@ export type AdminLineTestPushResult = {
   providerResponse: string | null
 }
 
+export type AdminLineTransactionGroupItem = {
+  id: string
+  groupId: string
+  isActive: boolean
+  joinedAt: string
+  leftAt: string | null
+}
+
+export type AdminLineTransactionGroup = {
+  active: AdminLineTransactionGroupItem | null
+  inactive: AdminLineTransactionGroupItem[]
+}
+
 export type AdminDashboard = {
   kpi: {
     totalListings: number
@@ -562,6 +575,18 @@ export const adminApi = {
 
   async sendLineTestPush(): Promise<AdminLineTestPushResult> {
     const response = await http.post<ApiResponse<AdminLineTestPushResult>>('/api/v1/admin/line/test-push')
+    return unwrapApiResponse(response.data)
+  },
+
+  async getLineTransactionGroup(): Promise<AdminLineTransactionGroup> {
+    const response = await http.get<ApiResponse<AdminLineTransactionGroup>>('/api/v1/admin/line/transaction-group')
+    return unwrapApiResponse(response.data)
+  },
+
+  async activateLineTransactionGroup(id: string): Promise<AdminLineTransactionGroup> {
+    const response = await http.post<ApiResponse<AdminLineTransactionGroup>>(
+      `/api/v1/admin/line/transaction-group/${id}/activate`,
+    )
     return unwrapApiResponse(response.data)
   },
 }

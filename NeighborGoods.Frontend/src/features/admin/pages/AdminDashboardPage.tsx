@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { adminApi, type AdminDashboard, type AdminLineTestPushResult } from '@/features/admin/api/adminApi'
+import {
+  adminApi,
+  type AdminDashboard,
+  type AdminLineTestPushResult,
+  type AdminLineTransactionGroup,
+} from '@/features/admin/api/adminApi'
 import { ApiClientError } from '@/shared/types/api'
 import { Button } from '@/shared/ui/Button'
 import { Card } from '@/shared/ui/Card'
@@ -8,6 +13,13 @@ import { PageSkeleton } from '@/shared/ui/state/PageSkeleton'
 
 const formatNum = (value: number) => value.toLocaleString('zh-TW')
 const formatPercent = (count: number, total: number) => (total <= 0 ? '0.0%' : `${((count / total) * 100).toFixed(1)}%`)
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return date.toLocaleString('zh-TW')
+}
 
 const StatCard = ({ title, value, sub }: { title: string; value: number; sub?: string }) => (
   <Card>
@@ -24,18 +36,32 @@ export const AdminDashboardPage = () => {
   const [lineTestSending, setLineTestSending] = useState(false)
   const [lineTestResult, setLineTestResult] = useState<AdminLineTestPushResult | null>(null)
   const [lineTestError, setLineTestError] = useState<string | null>(null)
+  const [transactionGroup, setTransactionGroup] = useState<AdminLineTransactionGroup | null>(null)
+  const [transactionGroupError, setTransactionGroupError] = useState<string | null>(null)
+  const [transactionGroupBusyId, setTransactionGroupBusyId] = useState<string | null>(null)
+  const [copyNotice, setCopyNotice] = useState<string | null>(null)
+
+  const loadTransactionGroup = useCallback(async () => {
+    setTransactionGroupError(null)
+    try {
+      setTransactionGroup(await adminApi.getLineTransactionGroup())
+    } catch (err) {
+      setTransactionGroupError(err instanceof ApiClientError ? err.message : '讀取交易群組狀態失敗')
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setDashboard(await adminApi.getDashboard())
+      const [dash] = await Promise.all([adminApi.getDashboard(), loadTransactionGroup()])
+      setDashboard(dash)
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : '讀取後台首頁失敗')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadTransactionGroup])
 
   const handleSendLineTestPush = useCallback(async () => {
     setLineTestSending(true)
@@ -49,6 +75,30 @@ export const AdminDashboardPage = () => {
       setLineTestSending(false)
     }
   }, [])
+
+  const handleCopyGroupId = useCallback(async (groupId: string) => {
+    try {
+      await navigator.clipboard.writeText(groupId)
+      setCopyNotice('已複製 groupId')
+    } catch {
+      setCopyNotice('複製失敗，請手動選取')
+    }
+  }, [])
+
+  const handleActivateGroup = useCallback(
+    async (id: string) => {
+      setTransactionGroupBusyId(id)
+      setTransactionGroupError(null)
+      try {
+        setTransactionGroup(await adminApi.activateLineTransactionGroup(id))
+      } catch (err) {
+        setTransactionGroupError(err instanceof ApiClientError ? err.message : '設為交易群失敗')
+      } finally {
+        setTransactionGroupBusyId(null)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     void load()
@@ -73,6 +123,9 @@ export const AdminDashboardPage = () => {
   }
 
   const { kpi } = dashboard
+  const activeGroup = transactionGroup?.active ?? null
+  const inactiveGroups = transactionGroup?.inactive ?? []
+
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -105,6 +158,64 @@ export const AdminDashboardPage = () => {
               ) : null}
             </div>
           ) : null}
+
+          <div className="mt-6 border-t border-border pt-4">
+            <h3 className="text-base font-semibold text-text-main">交易群組</h3>
+            {transactionGroupError ? <p className="mt-2 text-sm text-red-600">{transactionGroupError}</p> : null}
+            {activeGroup ? (
+              <div className="mt-3 space-y-2 text-sm text-text-main">
+                <p className="text-emerald-700">狀態：已綁定</p>
+                <p className="break-all font-mono text-xs sm:text-sm">groupId={activeGroup.groupId}</p>
+                <p className="text-text-muted">加入時間：{formatDateTime(activeGroup.joinedAt)}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" onClick={() => void handleCopyGroupId(activeGroup.groupId)}>
+                    複製 groupId
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => void loadTransactionGroup()}>
+                    重新整理
+                  </Button>
+                </div>
+                {copyNotice ? <p className="text-xs text-text-muted">{copyNotice}</p> : null}
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2 text-sm text-text-main">
+                <p className="text-amber-700">狀態：尚未綁定</p>
+                <ol className="list-decimal space-y-1 pl-5 text-text-subtle">
+                  <li>在交易群把官方帳號加進去（LINE 會送 join，自動存 groupId）。</li>
+                  <li>若官方帳號本來就在群裡，請在群內 @ 官方帳號一次補登記。</li>
+                </ol>
+                <Button type="button" variant="secondary" onClick={() => void loadTransactionGroup()}>
+                  重新整理
+                </Button>
+              </div>
+            )}
+
+            {inactiveGroups.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium text-text-main">其他已記錄的群組</p>
+                <ul className="space-y-2">
+                  {inactiveGroups.map((group) => (
+                    <li
+                      key={group.id}
+                      className="flex flex-col gap-2 rounded-lg bg-surface-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="break-all font-mono text-xs sm:text-sm">{group.groupId}</p>
+                        <p className="text-xs text-text-muted">記錄時間：{formatDateTime(group.joinedAt)}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        disabled={transactionGroupBusyId === group.id}
+                        onClick={() => void handleActivateGroup(group.id)}
+                      >
+                        {transactionGroupBusyId === group.id ? '設定中…' : '設為交易群'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         </Card>
       </section>
 

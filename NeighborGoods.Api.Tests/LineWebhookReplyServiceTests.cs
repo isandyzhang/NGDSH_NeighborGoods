@@ -123,7 +123,98 @@ public sealed class LineWebhookReplyServiceTests
         Assert.Equal(1, query.MyMessagesSummaryCalls);
     }
 
-    private static LineWebhookReplyService CreateService(ILineMenuQueryService menuQuery)
+    [Fact]
+    public async Task ProcessAsync_JoinGroup_RegistersGroupId()
+    {
+        var groupService = new CapturingLineTransactionGroupService();
+        var service = CreateService(new FakeLineMenuQueryService(), groupService);
+        var body = """
+            {
+              "events": [
+                {
+                  "type": "join",
+                  "source": {
+                    "type": "group",
+                    "groupId": "C-join-1",
+                    "userId": "U-inviter"
+                  }
+                }
+              ]
+            }
+            """;
+
+        var (ok, errorCode, _) = await service.ProcessAsync(body, Sign(body));
+
+        Assert.True(ok);
+        Assert.Null(errorCode);
+        Assert.Single(groupService.Registered);
+        Assert.Equal(("C-join-1", "join"), groupService.Registered[0]);
+        Assert.Empty(groupService.Left);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_GroupMessage_RegistersGroupId()
+    {
+        var groupService = new CapturingLineTransactionGroupService();
+        var service = CreateService(new FakeLineMenuQueryService(), groupService);
+        var body = """
+            {
+              "events": [
+                {
+                  "type": "message",
+                  "replyToken": "reply-group-msg",
+                  "source": {
+                    "type": "group",
+                    "groupId": "C-msg-1",
+                    "userId": "U-member"
+                  },
+                  "message": {
+                    "type": "text",
+                    "text": "@bot hello"
+                  }
+                }
+              ]
+            }
+            """;
+
+        var (ok, errorCode, _) = await service.ProcessAsync(body, Sign(body));
+
+        Assert.True(ok);
+        Assert.Null(errorCode);
+        Assert.Equal(("C-msg-1", "message"), Assert.Single(groupService.Registered));
+        Assert.Empty(FakeLineMessageSender.ReplyFlexMessages);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_LeaveGroup_MarksLeft()
+    {
+        var groupService = new CapturingLineTransactionGroupService();
+        var service = CreateService(new FakeLineMenuQueryService(), groupService);
+        var body = """
+            {
+              "events": [
+                {
+                  "type": "leave",
+                  "source": {
+                    "type": "group",
+                    "groupId": "C-leave-1"
+                  }
+                }
+              ]
+            }
+            """;
+
+        var (ok, errorCode, _) = await service.ProcessAsync(body, Sign(body));
+
+        Assert.True(ok);
+        Assert.Null(errorCode);
+        Assert.Equal("C-leave-1", Assert.Single(groupService.Left));
+        Assert.Empty(groupService.Registered);
+    }
+
+    private static LineWebhookReplyService CreateService(
+        ILineMenuQueryService menuQuery,
+        ILineTransactionGroupService? groupService = null)
     {
         var options = Options.Create(new LineMessagingOptions
         {
@@ -135,6 +226,7 @@ public sealed class LineWebhookReplyServiceTests
 
         return new LineWebhookReplyService(
             menuQuery,
+            groupService ?? new NoOpLineTransactionGroupService(),
             new LineFlexMessageBuilder(options),
             new FakeLineMessageSender(),
             new MemoryCache(new MemoryCacheOptions()),
@@ -168,6 +260,59 @@ public sealed class LineWebhookReplyServiceTests
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(ChannelSecret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(body));
         return Convert.ToBase64String(hash);
+    }
+
+    private sealed class NoOpLineTransactionGroupService : ILineTransactionGroupService
+    {
+        public Task RegisterFromWebhookAsync(
+            string groupId,
+            string eventType,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task MarkLeftAsync(string groupId, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<LineTransactionGroupSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new LineTransactionGroupSnapshot(null, []));
+
+        public Task<NeighborGoods.Data.Line.LineTransactionGroup?> GetActiveAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<NeighborGoods.Data.Line.LineTransactionGroup?>(null);
+
+        public Task<bool> ActivateAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+    }
+
+    private sealed class CapturingLineTransactionGroupService : ILineTransactionGroupService
+    {
+        public List<(string GroupId, string EventType)> Registered { get; } = [];
+        public List<string> Left { get; } = [];
+
+        public Task RegisterFromWebhookAsync(
+            string groupId,
+            string eventType,
+            CancellationToken cancellationToken = default)
+        {
+            Registered.Add((groupId, eventType));
+            return Task.CompletedTask;
+        }
+
+        public Task MarkLeftAsync(string groupId, CancellationToken cancellationToken = default)
+        {
+            Left.Add(groupId);
+            return Task.CompletedTask;
+        }
+
+        public Task<LineTransactionGroupSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new LineTransactionGroupSnapshot(null, []));
+
+        public Task<NeighborGoods.Data.Line.LineTransactionGroup?> GetActiveAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<NeighborGoods.Data.Line.LineTransactionGroup?>(null);
+
+        public Task<bool> ActivateAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 
     private sealed class FakeLineMenuQueryService : ILineMenuQueryService

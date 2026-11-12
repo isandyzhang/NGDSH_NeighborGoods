@@ -115,3 +115,33 @@ Optional GitHub Actions variables (set in `production` Environment):
 - **Console**：Login channel 與官方帳號 **Link a bot**；LIFF **Add friend option**（建議 On aggressive）由 LINE 引導加好友。綁定頁只以 `id_token` 寫入 DB，不再以 `getFriendship()` 阻擋綁定。
 
 舊 MVC 專案（`NeighborGoods.Web`）已自本 repo 移除；正式環境以 SPA + API + LIFF 綁定為準。
+
+## 交易群組（自動取得 groupId）
+
+刊登成功後可「分享到交易群組」，由官方帳號把商品 Flex 卡推到全站唯一的 LINE **一般群組**（不是社群）。
+
+### LINE Developers 設定
+
+1. Messaging API channel 的 Webhook URL 設為：
+   - API：`https://{api-host}/api/v1/integrations/line/webhook`
+   - 或既有 Azure Functions：`https://{functions-host}/api/line/webhook`
+2. 開啟 **Use webhook**。
+3. 官方帳號允許加入群組（Allow bot to join group chats）。
+4. 確認 `LineMessagingApi__ChannelSecret` 已設定（簽章驗證用）。
+
+### 如何觸發並自動存 groupId
+
+程式無法主動向 LINE 查詢群組清單。下列任一動作會讓 webhook 自動寫入資料庫：
+
+1. **把官方帳號加入交易群組**（主路徑，`join` 事件）。
+2. **官方帳號已在群裡**：請群內有人 @ 官方帳號一次（`message` 事件備援）。
+
+第一個收到的群會自動設為交易群；之後從其他群收到的不同 `groupId` 只記錄、不覆蓋。
+
+### 後台確認
+
+開啟後台首頁「LINE 推播診斷」→「交易群組」：
+
+- 尚未綁定：會顯示觸發說明。
+- 已綁定：顯示完整 `groupId`、加入時間、複製按鈕。
+- 其他已記錄群組可按「設為交易群」手動切換。

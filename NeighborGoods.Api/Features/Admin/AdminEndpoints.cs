@@ -16,8 +16,10 @@ using NeighborGoods.Api.Shared.ApiContracts;
 using NeighborGoods.Api.Shared.Security;
 using NeighborGoods.Data;
 using NeighborGoods.Data.Announcements;
+using NeighborGoods.Data.Line;
 using NeighborGoods.Data.PurchaseRequests;
 using NeighborGoods.Notifications;
+using NeighborGoods.Workers.Line;
 
 namespace NeighborGoods.Api.Features.Admin;
 
@@ -113,8 +115,75 @@ public static class AdminEndpoints
         .WithName("AdminSendLineTestPushV1")
         .RequireAuthorization();
 
+        app.MapGet("/api/v1/admin/line/transaction-group", GetAdminLineTransactionGroupAsync)
+        .WithName("AdminGetLineTransactionGroupV1")
+        .RequireAuthorization();
+
+        app.MapPost("/api/v1/admin/line/transaction-group/{id:guid}/activate", ActivateAdminLineTransactionGroupAsync)
+        .WithName("AdminActivateLineTransactionGroupV1")
+        .RequireAuthorization();
+
         return app;
     }
+
+    private static async Task<IResult> GetAdminLineTransactionGroupAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        ILineTransactionGroupService lineTransactionGroupService,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var snapshot = await lineTransactionGroupService.GetSnapshotAsync(ct);
+        return Results.Ok(ApiResponseFactory.Success(ToGroupResponse(snapshot), httpContext));
+    }
+
+    private static async Task<IResult> ActivateAdminLineTransactionGroupAsync(
+        HttpContext httpContext,
+        ICurrentUserContext currentUser,
+        NeighborGoodsDbContext dbContext,
+        ILineTransactionGroupService lineTransactionGroupService,
+        Guid id,
+        CancellationToken ct = default)
+    {
+        if (!await IsAdminAsync(currentUser, dbContext, ct))
+        {
+            return Results.Json(
+                ApiResponseFactory.Error("FORBIDDEN", "僅管理員可存取此資源", httpContext),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var ok = await lineTransactionGroupService.ActivateAsync(id, ct);
+        if (!ok)
+        {
+            return Results.NotFound(ApiResponseFactory.Error(
+                "LINE_TRANSACTION_GROUP_NOT_FOUND",
+                "找不到此 LINE 群組紀錄",
+                httpContext));
+        }
+
+        var snapshot = await lineTransactionGroupService.GetSnapshotAsync(ct);
+        return Results.Ok(ApiResponseFactory.Success(ToGroupResponse(snapshot), httpContext));
+    }
+
+    private static AdminLineTransactionGroupResponse ToGroupResponse(LineTransactionGroupSnapshot snapshot) =>
+        new(
+            snapshot.Active is null ? null : ToGroupItem(snapshot.Active),
+            snapshot.Inactive.Select(ToGroupItem).ToList());
+
+    private static AdminLineTransactionGroupItemResponse ToGroupItem(LineTransactionGroup entity) =>
+        new(
+            entity.Id,
+            entity.GroupId,
+            entity.IsActive,
+            entity.JoinedAt,
+            entity.LeftAt);
 
     private static async Task<IResult> GetAdminDashboardAsync(
         HttpContext httpContext,

@@ -42,6 +42,15 @@ public sealed record LineUnreadMessageItem(
     string ListingTitle,
     string? ImageUrl);
 
+public sealed record LineListingShareItem(
+    Guid ListingId,
+    string Title,
+    string PriceLabel,
+    string CategoryName,
+    string ConditionName,
+    string ResidenceName,
+    string? ImageUrl);
+
 public sealed record LineRecentConversationItem(
     Guid ConversationId,
     string OtherDisplayName,

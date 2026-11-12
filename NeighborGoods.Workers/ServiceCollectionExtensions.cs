@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UnreadMessageLineNotificationJob>();
         services.AddScoped<LinePreferencePushJob>();
         services.AddScoped<ListingExpiryJob>();
+        services.AddScoped<ILineTransactionGroupService, LineTransactionGroupService>();
         return services;
     }
 
@@ -64,7 +65,7 @@ public static class ServiceCollectionExtensions
                 .CreateClient(nameof(LineMessageSender));
             return ActivatorUtilities.CreateInstance<LineMessageSender>(sp, httpClient);
         });
-        services.AddTransient(sp =>
+        services.AddTransient<ILineMessagingQuotaService>(sp =>
         {
             var httpClient = sp.GetRequiredService<IHttpClientFactory>()
                 .CreateClient(nameof(LineMessagingQuotaService));
@@ -87,6 +88,7 @@ public static class ServiceCollectionExtensions
 
         services.AddNeighborGoodsWorkerJobs();
         services.AddScoped<ILineMenuQueryService, LineMenuQueryService>();
+        services.AddScoped<ILineTransactionGroupService, LineTransactionGroupService>();
         services.AddScoped<LineWebhookReplyService>();
 
         return services;

@@ -763,6 +763,193 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             });
     }
 
+    public LineFlexMessage BuildListingShareCard(LineListingShareItem item)
+    {
+        const string altPrefix = "我在NeighborGoods-社宅二手交易平台看到一個好物：";
+        const string officialAddFriendUrl = "https://lin.ee/6ZqrGei";
+        const string officialFooterText = "還沒加官方帳號？馬上加入♪(๑ᵔ◡ᵔ๑)";
+
+        var title = TrimText(item.Title, 40, "好物分享");
+        var categoryBadge = TrimText(item.CategoryName, 8, "好物");
+        var residence = TrimText(item.ResidenceName, 24, "社宅");
+        var condition = TrimText(item.ConditionName, 24, "未提供");
+        var price = TrimText(item.PriceLabel, 24, "歡迎查看商品詳情");
+        var webBase = string.IsNullOrWhiteSpace(_options.WebBaseUrl)
+            ? "https://www.neighborgoodstw.com"
+            : _options.WebBaseUrl.TrimEnd('/');
+        var heroImage = string.IsNullOrWhiteSpace(item.ImageUrl)
+            ? $"{webBase}/logo.png"
+            : item.ImageUrl!;
+        var detailUrl = BuildUrl($"/listings/{item.ListingId}");
+        var listingsUrl = BuildUrl("/listings");
+
+        return new LineFlexMessage(
+            AltText: $"{altPrefix}{title}",
+            Contents: new
+            {
+                type = "bubble",
+                size = "kilo",
+                header = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    paddingAll = "0px",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "box",
+                            layout = "horizontal",
+                            contents = new object[]
+                            {
+                                new
+                                {
+                                    type = "image",
+                                    url = heroImage,
+                                    size = "full",
+                                    aspectMode = "cover",
+                                    aspectRatio = "5:3",
+                                    gravity = "center",
+                                    flex = 1
+                                },
+                                new
+                                {
+                                    type = "box",
+                                    layout = "horizontal",
+                                    contents = new object[]
+                                    {
+                                        new
+                                        {
+                                            type = "text",
+                                            text = categoryBadge,
+                                            size = "sm",
+                                            color = "#ffffff",
+                                            align = "center",
+                                            gravity = "center"
+                                        }
+                                    },
+                                    backgroundColor = "#06C755",
+                                    paddingAll = "4px",
+                                    paddingStart = "8px",
+                                    paddingEnd = "8px",
+                                    flex = 0,
+                                    position = "absolute",
+                                    offsetStart = "11px",
+                                    offsetTop = "11px",
+                                    cornerRadius = "100px"
+                                }
+                            }
+                        }
+                    }
+                },
+                body = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "md",
+                    paddingAll = "14px",
+                    backgroundColor = "#FFFFFF",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            text = title,
+                            weight = "bold",
+                            size = "xl",
+                            wrap = true,
+                            maxLines = 2,
+                            color = "#333333"
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = $"{residence} · {condition}",
+                            size = "md",
+                            color = "#666666",
+                            wrap = true,
+                            maxLines = 1
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = price,
+                            size = "md",
+                            color = "#333333",
+                            weight = "bold",
+                            wrap = true,
+                            maxLines = 1
+                        }
+                    }
+                },
+                footer = new
+                {
+                    type = "box",
+                    layout = "vertical",
+                    spacing = "md",
+                    paddingAll = "11px",
+                    paddingTop = "0px",
+                    backgroundColor = "#FFFFFF",
+                    contents = new object[]
+                    {
+                        new
+                        {
+                            type = "box",
+                            layout = "horizontal",
+                            spacing = "md",
+                            contents = new object[]
+                            {
+                                new
+                                {
+                                    type = "button",
+                                    style = "secondary",
+                                    height = "md",
+                                    flex = 1,
+                                    action = new
+                                    {
+                                        type = "uri",
+                                        label = "商品列表",
+                                        uri = listingsUrl
+                                    }
+                                },
+                                new
+                                {
+                                    type = "button",
+                                    style = "primary",
+                                    height = "md",
+                                    flex = 1,
+                                    color = "#06C755",
+                                    action = new
+                                    {
+                                        type = "uri",
+                                        label = "查看商品",
+                                        uri = detailUrl
+                                    }
+                                }
+                            }
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = officialFooterText,
+                            size = "sm",
+                            color = "#666666",
+                            wrap = false,
+                            maxLines = 1,
+                            align = "center",
+                            margin = "md",
+                            action = new
+                            {
+                                type = "uri",
+                                label = "加入官方帳號",
+                                uri = officialAddFriendUrl
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
     public LineFlexMessage BuildBindHintCard()
     {
         return BuildCard(
@@ -770,6 +957,22 @@ public sealed class LineFlexMessageBuilder(IOptions<LineMessagingOptions> option
             message: "請先到網站個人設定完成 LINE 通知綁定，才能查看個人摘要。",
             buttonLabel: "前往個人設定",
             buttonUrl: BuildUrl("/account"));
+    }
+
+    private static string TrimText(string? value, int maxLength, string fallback)
+    {
+        var text = (value ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return fallback;
+        }
+
+        if (text.Length <= maxLength)
+        {
+            return text;
+        }
+
+        return $"{text[..Math.Max(0, maxLength - 1)]}…";
     }
 
     private LineFlexMessage BuildCard(string title, string message, string? buttonLabel, string? buttonUrl)

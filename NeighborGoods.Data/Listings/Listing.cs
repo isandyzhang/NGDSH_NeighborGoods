@@ -32,6 +32,10 @@ public sealed class Listing
     public DateTime? LastExposedAt { get; set; }
     public DateTime? AutoExpiredAt { get; set; }
     public DateTime? ExpiryNoticeSentAt { get; set; }
+
+    /// <summary>上次成功推播商品卡到 LINE 交易群組的時間（UTC）。</summary>
+    public DateTime? LineGroupSharedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
